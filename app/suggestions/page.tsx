@@ -227,15 +227,15 @@ export default function SuggestionsPage() {
     const avoidMeat = restrictions.some((r) => ['meat', 'chicken', 'beef', 'pork', 'fish', 'seafood', 'non-veg', 'nonveg'].includes(r));
     const avoidEggs = restrictions.includes('eggs');
 
+    // Only names; macros will be derived via AI parse on add
     const base: Array<Partial<FoodLog> & { id: string }> = [
-      { id: 'preset-1', food_name: 'Greek yogurt + berries + almonds', protein_g: 20, carbs_g: 25, fat_g: 10, calories: 300, eaten_at: new Date().toISOString() },
-      { id: 'preset-2', food_name: avoidMeat ? 'Paneer/tofu wrap with veggies' : 'Chicken salad wrap', protein_g: 30, carbs_g: 30, fat_g: 12, calories: 400, eaten_at: new Date().toISOString() },
-      { id: 'preset-3', food_name: 'Tofu veggie stir-fry + rice', protein_g: 28, carbs_g: 45, fat_g: 12, calories: 480, eaten_at: new Date().toISOString() },
+      { id: 'preset-1', food_name: 'Greek yogurt with berries and almonds', eaten_at: new Date().toISOString() },
+      { id: 'preset-2', food_name: avoidMeat ? 'Paneer/tofu wrap with veggies' : 'Chicken salad wrap', eaten_at: new Date().toISOString() },
+      { id: 'preset-3', food_name: 'Tofu veggie stir-fry with rice', eaten_at: new Date().toISOString() },
     ];
 
-    // Optionally include an egg option if eggs are allowed
     if (!avoidEggs) {
-      base.push({ id: 'preset-4', food_name: 'Egg omelet + toast + salad', protein_g: 25, carbs_g: 25, fat_g: 12, calories: 350, eaten_at: new Date().toISOString() });
+      base.push({ id: 'preset-4', food_name: 'Egg omelet with toast and salad', eaten_at: new Date().toISOString() });
     }
 
     return base;
@@ -245,31 +245,54 @@ export default function SuggestionsPage() {
     if (!session?.user?.id) return;
     try {
       setAddingId(log.id || log.food_name || 'adding');
-      const itemsArr = Array.isArray(log.items) && log.items.length
+      const nameOnly = (Array.isArray(log.items) && log.items.length) ? '' : (log.food_name || '');
+      let payload: any = null;
+      if (nameOnly) {
+        // Get robust macros via AI parse for name-only presets/generated
+        const res = await fetch('/api/ai/parse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: nameOnly })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          payload = data?.log || null;
+        }
+      }
+      const baseItems = Array.isArray(log.items) && log.items.length
         ? log.items.map((i) => ({ name: String(i.name), quantity: i.quantity ?? null }))
-        : (log.food_name ? [{ name: String(log.food_name), quantity: null }] : []);
+        : (nameOnly ? [{ name: String(nameOnly), quantity: null }] : []);
+      const finalLog = payload ? { ...payload } : {
+        calories: log.calories,
+        protein_g: log.protein_g,
+        carbs_g: log.carbs_g,
+        fat_g: log.fat_g,
+        items: baseItems,
+      };
+      // Ensure calories if macros exist
+      if ((finalLog?.calories == null || isNaN(finalLog.calories)) && [finalLog?.protein_g, finalLog?.carbs_g, finalLog?.fat_g].every((v: any) => typeof v === 'number')) {
+        const cals = Math.round((finalLog.protein_g || 0) * 4 + (finalLog.carbs_g || 0) * 4 + (finalLog.fat_g || 0) * 9);
+        if (cals > 0) finalLog.calories = cals;
+      }
       const insert = {
         user_id: session.user.id,
-        // Avoid inserting NULLs into NOT NULL numeric columns
-        calories: Number(log.calories ?? 0),
-        protein_g: Number(log.protein_g ?? 0),
-        carbs_g: Number(log.carbs_g ?? 0),
-        fat_g: Number(log.fat_g ?? 0),
+        calories: Number(finalLog?.calories ?? 0),
+        protein_g: Number(finalLog?.protein_g ?? 0),
+        carbs_g: Number(finalLog?.carbs_g ?? 0),
+        fat_g: Number(finalLog?.fat_g ?? 0),
         eaten_at: new Date().toISOString(),
-        items: itemsArr,
+        items: Array.isArray(finalLog?.items) ? finalLog.items : baseItems,
       } as any;
       const { error } = await supabase.from('food_logs').insert(insert);
       if (error) throw error;
-      // Update today totals optimistically
       setTodayTotals((t) => ({
         calories: t.calories + (insert.calories || 0),
         protein_g: t.protein_g + (insert.protein_g || 0),
         carbs_g: t.carbs_g + (insert.carbs_g || 0),
         fat_g: t.fat_g + (insert.fat_g || 0),
       }));
-      // subtle confirmation & toast
       setJustAddedId(log.id || log.food_name || 'added');
-      setToast(`Added: ${displayName({ food_name: log.food_name, items: itemsArr })}`);
+      setToast(`Added: ${displayName({ food_name: nameOnly, items: insert.items })}`);
       setTimeout(() => setToast(null), 2500);
     } catch (e: any) {
       console.error('Failed to quick add', e);
@@ -464,6 +487,31 @@ export default function SuggestionsPage() {
         </div>
       </div>
 
+      {/* AI meal ideas (moved just below generation area) */}
+      {generatedMeals.length > 0 && (
+        <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-5 bg-white dark:bg-gray-950">
+          <h3 className="font-medium text-lg mb-2">AI meal ideas</h3>
+          <div className="space-y-3">
+            {generatedMeals.map((g, idx) => (
+              <div key={idx} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/40">
+                <div>
+                  <div className="text-sm font-medium">{g.name}</div>
+                  {g.why && <div className="text-xs text-gray-500 dark:text-gray-400">{g.why}</div>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => router.push(`/recipes?name=${encodeURIComponent(g.name)}`)} className="text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800">
+                    View recipe
+                  </button>
+                  <button onClick={() => addQuick({ id: `gen-${idx}`, food_name: g.name })} className="text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800">
+                    Add
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Progress vs 7-day average */}
       <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-6 border border-gray-100 dark:border-gray-800">
         <h3 className="font-medium text-lg mb-3">Progress</h3>
@@ -526,32 +574,34 @@ export default function SuggestionsPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-5">
           <h3 className="font-medium text-lg mb-2">One-tap add • Presets</h3>
-          <div className="flex flex-wrap gap-2">
+          <div className="relative">
+            <div className="overflow-x-auto whitespace-nowrap flex gap-2 pr-1 [-ms-overflow-style:none] [scrollbar-width:none]" style={{ scrollbarWidth: 'none' as any }}>
             {presetMeals.map((m) => (
               <button
                 key={m.id}
                 onClick={() => addQuick(m)}
-                className={`text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800 ${addingId===m.id?'opacity-60 cursor-wait':''} ${justAddedId===m.id?'ring-2 ring-emerald-300':''}`}
+                className={`inline-flex shrink-0 text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800 ${addingId===m.id?'opacity-60 cursor-wait':''} ${justAddedId===m.id?'ring-2 ring-emerald-300':''}`}
                 disabled={!!addingId}
                 aria-busy={addingId===m.id}
               >
                 {justAddedId===m.id ? 'Added ✓' : displayName(m)}
               </button>
             ))}
+            </div>
           </div>
-        </div>
+          </div>
 
         <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-5">
           <h3 className="font-medium text-lg mb-2">One-tap add • Recent</h3>
           {recentMeals.length === 0 ? (
             <p className="text-sm text-gray-500">No recent meals yet.</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div className="overflow-x-auto whitespace-nowrap flex gap-2 pr-1 [-ms-overflow-style:none] [scrollbar-width:none]" style={{ scrollbarWidth: 'none' as any }}>
               {recentMeals.map((m) => (
                 <button
                   key={m.id}
                   onClick={() => addQuick(m)}
-                  className={`text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800 ${addingId===m.id?'opacity-60 cursor-wait':''} ${justAddedId===m.id?'ring-2 ring-emerald-300':''}`}
+                  className={`inline-flex shrink-0 text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800 ${addingId===m.id?'opacity-60 cursor-wait':''} ${justAddedId===m.id?'ring-2 ring-emerald-300':''}`}
                   disabled={!!addingId}
                   aria-busy={addingId===m.id}
                 >
@@ -563,29 +613,7 @@ export default function SuggestionsPage() {
         </div>
       </div>
 
-      {generatedMeals.length > 0 && (
-        <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-5">
-          <h3 className="font-medium text-lg mb-2">AI meal ideas</h3>
-          <div className="space-y-3">
-            {generatedMeals.map((g, idx) => (
-              <div key={idx} className="flex items-center justify-between gap-3 p-3 rounded-lg border">
-                <div>
-                  <div className="text-sm font-medium">{g.name}</div>
-                  {g.why && <div className="text-xs text-gray-500">{g.why}</div>}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => router.push(`/recipes?name=${encodeURIComponent(g.name)}`)} className="text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800">
-                    View recipe
-                  </button>
-                  <button onClick={() => addQuick({ id: `gen-${idx}`, items: [{ name: g.name }] })} className="text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800">
-                    Add
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      
     </div>
   );
 }

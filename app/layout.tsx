@@ -46,7 +46,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           }}
         />
       </head>
-      <body className={`${inter.className} min-h-full flex flex-col text-gray-900 dark:text-gray-100`}>
+      <body className={`${inter.className} min-h-full flex flex-col text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900`}>
         <Providers session={session}>
           <Navbar />
           <main className="flex-1 pb-20 md:pb-0">

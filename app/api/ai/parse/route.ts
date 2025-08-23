@@ -80,11 +80,23 @@ ${schema}`;
       return NextResponse.json({ error: 'Could not parse meal' }, { status: 422 });
     }
 
-    // Coerce numeric fields
-    const calories = Number(parsed.calories) || 0;
-    const protein_g = Number(parsed.protein_g) || 0;
-    const carbs_g = Number(parsed.carbs_g) || 0;
-    const fat_g = Number(parsed.fat_g) || 0;
+    // Coerce numeric fields and sanitize
+    let calories = Number(parsed.calories);
+    let protein_g = Number(parsed.protein_g);
+    let carbs_g = Number(parsed.carbs_g);
+    let fat_g = Number(parsed.fat_g);
+    if (!Number.isFinite(calories)) calories = 0;
+    if (!Number.isFinite(protein_g)) protein_g = 0;
+    if (!Number.isFinite(carbs_g)) carbs_g = 0;
+    if (!Number.isFinite(fat_g)) fat_g = 0;
+    if (calories < 0) calories = 0;
+    if (protein_g < 0) protein_g = 0;
+    if (carbs_g < 0) carbs_g = 0;
+    if (fat_g < 0) fat_g = 0;
+    // If macros exist but calories are zero/missing, compute calories from macros
+    if ((protein_g > 0 || carbs_g > 0 || fat_g > 0) && calories === 0) {
+      calories = Math.round(protein_g * 4 + carbs_g * 4 + fat_g * 9);
+    }
 
     // Validate eaten_at
     const eaten_at = parsed.eaten_at && !Number.isNaN(Date.parse(parsed.eaten_at))

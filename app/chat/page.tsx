@@ -145,7 +145,7 @@ export default function ChatPage() {
           <div ref={scrollRef} />
         </div>
 
-        <div className="fixed inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] md:bottom-4 z-20">
+        <div className="fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] md:bottom-4 z-50">
           <div className="mx-auto max-w-3xl px-4">
             <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-lg p-2 flex items-end gap-2">
               <textarea

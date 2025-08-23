@@ -57,9 +57,10 @@ export async function POST(request: Request) {
     const multi = Number(generateCount) && Number(generateCount) > 1;
     const strictness = Math.max(0, Math.min(100, Number(generation?.strictness ?? 40)));
     const mealType = generation?.mealType ?? 'auto';
-    const invList = Array.isArray(inventory) && inventory.length
+    const hasInventory = Array.isArray(inventory) && inventory.length > 0;
+    const invList = hasInventory
       ? inventory.map((i: any) => `${i.name} (${i.qty} ${i.unit || 'unit'})`).join(', ')
-      : 'None provided';
+      : '';
 
     const prompt = `You are a friendly nutrition assistant. Return JSON only.
 Strictly bias the "nextMealSuggestion" to FILL THE MACRO GAPS first while staying close to remaining calories.
@@ -86,7 +87,7 @@ Remaining gaps to fill today (non-negative):
 
 User preferences (may be empty): ${JSON.stringify(preferences || {})}
 
-User grocery inventory (may be empty): ${invList}
+${hasInventory ? `User grocery inventory: ${invList}` : ''}
 
 Generation controls:
 - Strictness (0 random -> 100 strictly use inventory): ${strictness}
@@ -101,10 +102,10 @@ Rules:
 - Keep the idea concise (1-2 options). Include quick add-ons (e.g., fruit, yogurt) to close remaining carbs/fats as needed.
 - Respect time of day (breakfast-like in morning, etc.).
 - Avoid allergens if present in preferences.
- - If strictness >= 70: recipes MUST primarily use items in inventory; do not rely on unavailable ingredients (allow small staples like salt, pepper, oil). If an item is missing, suggest the closest variant using available items.
- - If 30 <= strictness < 70: prefer inventory items but allow reasonable extras.
- - If strictness < 30: feel free to suggest creative options, still considering preferences.
- - If mealType is provided (not 'auto'), tailor the idea accordingly (snack, breakfast, lunch, dinner, full meal).
+${hasInventory ? `- If strictness >= 70: recipes MUST primarily use items in inventory; do not rely on unavailable ingredients (allow small staples like salt, pepper, oil). If an item is missing, suggest the closest variant using available items.
+- If 30 <= strictness < 70: prefer inventory items but allow reasonable extras.
+- If strictness < 30: feel free to suggest creative options, still considering preferences.` : `- Ignore inventory constraints (none provided).`}
+- If mealType is provided (not 'auto'), tailor the idea accordingly (snack, breakfast, lunch, dinner, full meal).
 
 Return JSON object with fields exactly:
 {
