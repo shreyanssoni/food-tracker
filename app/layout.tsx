@@ -30,6 +30,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     <html lang="en" className="h-full bg-gray-50 dark:bg-gray-900">
       <head>
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1220" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -47,6 +49,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         />
       </head>
       <body className={`${inter.className} min-h-full flex flex-col text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900`}>
+        {/* Fixed background layer to avoid any white areas behind content (SSR/PWA) */}
+        <div className="fixed inset-0 -z-10 bg-gray-50 dark:bg-gray-900" aria-hidden />
         <Providers session={session}>
           <Navbar />
           <main className="flex-1 pb-20 md:pb-0">

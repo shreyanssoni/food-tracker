@@ -92,8 +92,8 @@ export default function DashboardPage() {
       </section>
 
       {/* Coach Summary */}
-      <section className="space-y-3" aria-labelledby="coach-summary-heading">
-        <div className="flex items-center justify-between">
+      <section className="rounded-xl border border-gray-100 dark:border-gray-800 p-5 bg-white dark:bg-gray-950">
+        <div className="flex items-center justify-between mb-2">
           <h2 id="coach-summary-heading" className="text-md font-semibold">Coach summary</h2>
           <button
             onClick={clearContext}
@@ -111,7 +111,8 @@ export default function DashboardPage() {
             </div>
           </div>
         ) : (
-          <div className="bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 rounded-xl p-4">
+          <div className="rounded-lg border border-gray-100 dark:border-gray-800 p-4 bg-white dark:bg-gray-950">
+            <h3 className="font-medium mb-2">Next meal idea</h3>
             <p className="text-sm whitespace-pre-wrap">{summary.text}</p>
             <div className="mt-3">
               <Link href="/chat" className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline">

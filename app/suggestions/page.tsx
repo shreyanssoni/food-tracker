@@ -321,6 +321,9 @@ export default function SuggestionsPage() {
         carbs_g: Math.max(0, Math.round(targetsForCall.carbs_g - todayTotals.carbs_g)),
         fat_g: Math.max(0, Math.round(targetsForCall.fat_g - todayTotals.fat_g)),
       } as NutritionTotals : null;
+      // Add fetch timeout to avoid hanging spinner
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20000);
       const response = await fetch('/api/ai/suggest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -337,7 +340,9 @@ export default function SuggestionsPage() {
           },
           inventory: inventory.map(({ name, qty, unit }) => ({ name, qty, unit })),
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timer);
       if (response.ok) {
         const data = await response.json();
         const ideas: Array<{ name: string; why?: string }> = Array.isArray(data?.mealIdeas) ? data.mealIdeas : [];
@@ -352,10 +357,12 @@ export default function SuggestionsPage() {
         setToast(msg);
         setTimeout(() => setToast(null), 2500);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to generate meals', e);
-      setError('Could not generate meals right now.');
-      setToast('Could not generate meals right now.');
+      const isAbort = (e?.name === 'AbortError');
+      const msg = isAbort ? 'AI took too long. Please try again.' : 'Could not generate meals right now.';
+      setError(msg);
+      setToast(msg);
       setTimeout(() => setToast(null), 2500);
     } finally {
       setGenLoading(false);

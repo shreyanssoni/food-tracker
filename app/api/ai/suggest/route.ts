@@ -11,8 +11,19 @@ export async function POST(request: Request) {
 
   try {
     const { timeOfDay, totals, preferences, targets, gaps, generateCount, generation, inventory } = await request.json();
-    const profile = (preferences as any)?.profile || preferences || {};
-    const restrictions: string[] = Array.isArray(profile?.dietary_restrictions) ? profile.dietary_restrictions.map((x: any) => String(x).toLowerCase()) : [];
+    // Create Supabase client up-front so we can read user preferences and recent logs
+    const supabase = createClient();
+    // Load stored preferences from DB and merge with any preferences provided by the client
+    const { data: dbPrefs } = await supabase
+      .from('user_preferences')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .single();
+    const incoming = (preferences as any)?.profile || preferences || {};
+    const profile = { ...(dbPrefs || {}), ...incoming } as any;
+    const restrictions: string[] = Array.isArray(profile?.dietary_restrictions)
+      ? profile.dietary_restrictions.map((x: any) => String(x).toLowerCase())
+      : [];
     const avoidMeat = restrictions.some((r) => ['meat', 'chicken', 'beef', 'pork', 'fish', 'seafood', 'non-veg', 'nonveg'].includes(r));
     const avoidEggs = restrictions.includes('eggs');
 
@@ -45,7 +56,6 @@ export async function POST(request: Request) {
     }
     
     // Get user's recent food logs for context
-    const supabase = createClient();
     const { data: recentLogs } = await supabase
       .from('food_logs')
       .select('*')
@@ -85,7 +95,11 @@ Remaining gaps to fill today (non-negative):
 - Carbs left: ${gaps?.carbs_g ?? Math.max(0, (targets?.carbs_g||0) - (totals?.carbs_g||0))} g
 - Fat left: ${gaps?.fat_g ?? Math.max(0, (targets?.fat_g||0) - (totals?.fat_g||0))} g
 
-User preferences (may be empty): ${JSON.stringify(preferences || {})}
+User preferences (may be empty): ${JSON.stringify({
+  dietary_restrictions: profile?.dietary_restrictions || [],
+  preferred_cuisines: profile?.preferred_cuisines || [],
+  allergies: profile?.allergies || [],
+})}
 
 ${hasInventory ? `User grocery inventory: ${invList}` : ''}
 
@@ -101,7 +115,8 @@ Rules:
 - Prioritize protein if protein gap is large (e.g., > 25g), suggest lean protein sources.
 - Keep the idea concise (1-2 options). Include quick add-ons (e.g., fruit, yogurt) to close remaining carbs/fats as needed.
 - Respect time of day (breakfast-like in morning, etc.).
-- Avoid allergens if present in preferences.
+- Avoid allergens and DO NOT include any items that violate dietary_restrictions.
+${profile?.preferred_cuisines?.length ? `- Prefer cuisines: ${(profile.preferred_cuisines as string[]).join(', ')}` : ''}
 ${hasInventory ? `- If strictness >= 70: recipes MUST primarily use items in inventory; do not rely on unavailable ingredients (allow small staples like salt, pepper, oil). If an item is missing, suggest the closest variant using available items.
 - If 30 <= strictness < 70: prefer inventory items but allow reasonable extras.
 - If strictness < 30: feel free to suggest creative options, still considering preferences.` : `- Ignore inventory constraints (none provided).`}
@@ -159,13 +174,21 @@ Return JSON object with fields exactly:
         fat_g: Number(gaps?.fat_g ?? Math.max(0, (targets?.fat_g||0) - (totals?.fat_g||0))) || 0,
       };
       const proteinForward = g.protein_g >= 25;
-      return NextResponse.json({
+      const payload: any = {
         greeting: `Good ${timeOfDay}!`,
         suggestion: `Focus on closing today's gaps — protein ${g.protein_g}g, carbs ${g.carbs_g}g, fats ${g.fat_g}g left.`,
         nextMealSuggestion: proteinForward
           ? `Aim for ~${Math.min(45, Math.max(25, g.protein_g))}g protein: ${avoidMeat ? 'tofu/paneer' : 'grilled chicken or tofu'} with veggies; add rice or fruit to reach carbs.`
           : `Balanced idea: ${avoidEggs ? 'Greek yogurt with berries and nuts' : 'Greek yogurt with berries and nuts or an omelet + toast'}. Adjust portions to fit remaining calories (~${g.calories} kcal).`
-      });
+      };
+      if (multi) {
+        payload.mealIdeas = [
+          { name: `${avoidMeat ? 'Tofu/paneer' : 'Grilled chicken or tofu'} bowl with veggies + small rice`, why: 'Protein-forward; controlled carbs' },
+          { name: 'Greek yogurt with berries and nuts', why: 'Quick, high-protein snack' },
+          ...(!avoidEggs ? [{ name: 'Egg omelet + whole-grain toast + side salad', why: 'Balanced macros' }] : []),
+        ];
+      }
+      return NextResponse.json(payload);
     }
   } catch (error) {
     console.error('Error generating suggestions:', error);
