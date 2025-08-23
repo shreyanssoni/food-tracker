@@ -582,7 +582,7 @@ export default function SuggestionsPage() {
         <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-5">
           <h3 className="font-medium text-lg mb-2">One-tap add • Presets</h3>
           <div className="relative">
-            <div className="overflow-x-auto whitespace-nowrap flex gap-2 pr-1 [-ms-overflow-style:none] [scrollbar-width:none]" style={{ scrollbarWidth: 'none' as any }}>
+            <div className="flex flex-wrap gap-2 pr-1 sm:overflow-x-auto sm:whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none]" style={{ scrollbarWidth: 'none' as any }}>
             {presetMeals.map((m) => (
               <button
                 key={m.id}
