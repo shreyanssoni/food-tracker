@@ -2,6 +2,8 @@
   "name": "Nourish — AI Food & Mood Tracker",
   "short_name": "Nourish",
   "start_url": "/",
+  "scope": "/",
+  "id": "/",
   "display": "standalone",
   "background_color": "#0b1220",
   "theme_color": "#3d7af2",
