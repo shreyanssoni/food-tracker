@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 // Define route types as string literals
 type NavPath = '/dashboard' | '/food' | '/groceries' | '/suggestions' | '/chat';
 type DropdownPath = '/profile' | '/settings';
-type AuthPath = '/auth/signin' | '/auth/signup';
+type AuthPath = '/auth/signin';
 
 // Navigation items
 interface NavItem {
@@ -47,8 +47,7 @@ const dropdownItems: DropdownItem[] = [
 
 // Auth items
 const authItems: Record<string, AuthItem> = {
-  signin: { path: '/auth/signin', label: 'Sign in', className: 'bg-blue-600 text-white hover:bg-blue-700' },
-  signup: { path: '/auth/signup', label: 'Sign up', className: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50' }
+  signin: { path: '/auth/signin', label: 'Sign in', className: 'bg-blue-600 text-white hover:bg-blue-700' }
 };
 
 export default function Navbar() {
@@ -252,9 +251,6 @@ export default function Navbar() {
               <div className="space-y-1">
                 <Link href="/auth/signin" className="block w-full px-3 py-2 rounded-md text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setMobileOpen(false)}>
                   Sign in
-                </Link>
-                <Link href="/auth/signup" className="block w-full px-3 py-2 rounded-md text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setMobileOpen(false)}>
-                  Sign up
                 </Link>
               </div>
             )}

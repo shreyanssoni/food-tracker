@@ -172,7 +172,7 @@ function QuickAction({ href, emoji, label, className, kind = 'blue' }: { href: s
   const c = colorClasses(kind);
   return (
     <Link
-      href={href}
+      href={{ pathname: href }}
       aria-label={label}
       className={`group rounded-2xl p-2.5 sm:p-3 aspect-square flex items-center justify-center ${className||''}`}
     >

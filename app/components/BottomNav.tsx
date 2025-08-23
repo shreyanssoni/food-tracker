@@ -27,7 +27,7 @@ export default function BottomNav() {
           return (
             <li key={href} className="flex items-stretch">
               <Link
-                href={href}
+                href={{ pathname: href }}
                 className={cn(
                   "flex-1 flex flex-col items-center justify-center text-xs gap-1",
                   active ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
