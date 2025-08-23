@@ -1,0 +1,91 @@
+import './globals.css';
+import { ReactNode } from 'react';
+import { Inter } from 'next/font/google';
+import { auth } from '@/auth';
+import { Providers } from './providers';
+import Navbar from './components/Navbar';
+import BottomNav from './components/BottomNav';
+import ProfilePrompt from './components/ProfilePrompt';
+
+const inter = Inter({ subsets: ['latin'] });
+
+export const metadata = {
+  title: 'Nourish — AI Food & Mood Tracker',
+  description: 'Log meals by text or photo. Get empathetic coaching. PWA-ready.',
+  manifest: '/manifest.json',
+  icons: [{ rel: 'icon', url: '/icons/icon-192.svg' }],
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: 'no' as const,
+  themeColor: '#ffffff',
+};
+
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const session = await auth();
+
+  return (
+    <html lang="en" className="h-full bg-gray-50 dark:bg-gray-900">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function(){
+                try {
+                  var t = localStorage.getItem('pref_theme') || 'system';
+                  var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  var desired = t === 'system' ? (prefersDark ? 'dark' : 'light') : t;
+                  if (desired === 'dark') document.documentElement.classList.add('dark');
+                  else document.documentElement.classList.remove('dark');
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
+      <body className={`${inter.className} min-h-full flex flex-col text-gray-900 dark:text-gray-100`}>
+        <Providers session={session}>
+          <Navbar />
+          <main className="flex-1 pb-20 md:pb-0">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+              {children}
+            </div>
+          </main>
+          <BottomNav />
+          {/* Profile prompt modal */}
+          <ProfilePrompt />
+          <footer className="hidden md:block bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 mt-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+              <p className="text-center text-sm text-gray-500">
+                &copy; {new Date().getFullYear()} Nourish. All rights reserved.
+              </p>
+              <p className="mt-2 text-center text-xs text-gray-400">
+                Made with ❤️ — Be kind to yourself
+              </p>
+            </div>
+          </footer>
+          <script 
+            dangerouslySetInnerHTML={{ 
+              __html: `
+                if('serviceWorker' in navigator) {
+                  window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/sw.js')
+                      .then(registration => {
+                        console.log('ServiceWorker registration successful');
+                      })
+                      .catch(err => {
+                        console.error('ServiceWorker registration failed: ', err);
+                      });
+                  });
+                }
+              ` 
+            }} 
+          />
+        </Providers>
+      </body>
+    </html>
+  );
+}

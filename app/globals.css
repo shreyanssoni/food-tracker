@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Respect user-selected theme via html.dark */
+html { color-scheme: light; }
+html.dark { color-scheme: dark; }
+
+html, body { height: 100%; }
+
+/* Calming UI tweaks */
+.card { @apply bg-white dark:bg-gray-950 shadow-soft rounded-xl p-4; }
+.input { @apply w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 outline-none focus:ring-2 focus:ring-brand-300; }
+.btn { @apply inline-flex items-center justify-center rounded-lg bg-brand-600 text-white px-4 py-2 text-sm font-medium shadow hover:bg-brand-700 active:scale-[.98]; }
+.btn-ghost { @apply text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-gray-800 rounded-lg px-3 py-2; }
+
+/* Focus styles (keyboard only) */
+:focus { outline: none; }
+:focus-visible { outline: 2px solid theme('colors.blue.500'); outline-offset: 2px; }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* Animations */
+@keyframes fade-in-up { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in-up { animation: fade-in-up 180ms ease-out both; }
+
+/* Skeletons */
+.skeleton { @apply animate-pulse bg-gray-200 dark:bg-gray-800 rounded-md; }
+.skeleton-line { @apply skeleton h-3; }
+.skeleton-circle { @apply skeleton rounded-full; }
