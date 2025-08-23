@@ -35,8 +35,9 @@ export default function ProfilePrompt() {
       .then((r) => r.json())
       .then((d) => {
         const p = d?.profile;
-        const missing = !p || !p.height_cm || !p.weight_kg || !p.age || !p.gender;
-        setShow(!!missing);
+        const hasTargets = !!d?.targets; // computed only when sufficient data exists
+        // If targets exist, profile is complete -> don't show modal
+        setShow(!hasTargets);
         if (p) {
           setForm((prev) => ({
             ...prev,

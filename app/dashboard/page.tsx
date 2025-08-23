@@ -59,12 +59,15 @@ export default function DashboardPage() {
       {/* Greeting + Quick Actions */}
       <section className="space-y-4">
         <h1 className="text-lg font-semibold">Today</h1>
-        <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-5 sm:gap-3">
-          <QuickAction href="/food" emoji="🍽️" label="Log" kind="emerald" />
-          <QuickAction href="/chat" emoji="💬" label="Chat" kind="blue" />
-          <QuickAction href="/suggestions" emoji="✨" label="Ideas" kind="violet" />
-          <QuickAction href="/profile" emoji="👤" label="Profile" kind="amber" className="hidden sm:flex" />
-          <QuickAction href="/settings" emoji="⚙️" label="Settings" kind="slate" className="hidden sm:flex" />
+        <div
+          className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 scroll-smooth snap-x snap-mandatory overscroll-x-contain sm:mx-0 sm:px-0 sm:grid sm:grid-cols-5 sm:gap-3"
+          aria-label="Quick actions"
+        >
+          <QuickAction href="/food" emoji="🍽️" label="Log" kind="emerald" className="snap-start min-w-[104px]" />
+          <QuickAction href="/chat" emoji="💬" label="Chat" kind="blue" className="snap-start min-w-[104px]" />
+          <QuickAction href="/suggestions" emoji="✨" label="Ideas" kind="violet" className="snap-start min-w-[104px]" />
+          <QuickAction href="/profile" emoji="👤" label="Profile" kind="amber" className="snap-start min-w-[104px]" />
+          <QuickAction href="/settings" emoji="⚙️" label="Settings" kind="slate" className="snap-start min-w-[104px]" />
         </div>
       </section>
 
@@ -174,15 +177,15 @@ function QuickAction({ href, emoji, label, className, kind = 'blue' }: { href: s
     <Link
       href={{ pathname: href }}
       aria-label={label}
-      className={`group rounded-2xl p-2.5 sm:p-3 aspect-square flex items-center justify-center ${className||''}`}
+      className={`group rounded-2xl p-2.5 sm:p-3 aspect-square flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-600 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 ${className||''}`}
     >
       <div
-        className={`w-full h-full rounded-xl bg-gradient-to-br ${c.from} ${c.to} ring-1 ring-inset ${c.ring} shadow-sm flex flex-col items-center justify-center transition-transform duration-150 ease-out group-hover:translate-y-[1px] group-active:translate-y-[2px]`}
+        className={`w-full h-full rounded-xl bg-gradient-to-br ${c.from} ${c.to} ring-1 ring-inset ${c.ring} shadow-sm hover:shadow-md active:shadow-sm flex flex-col items-center justify-center transition-all duration-150 ease-out group-hover:translate-y-[1px] group-active:translate-y-[2px]`}
       >
-        <div className={`h-10 w-10 sm:h-11 sm:w-11 ${c.iconBg} ${c.iconText} rounded-xl grid place-items-center text-2xl`} aria-hidden>
+        <div className={`h-10 w-10 sm:h-11 sm:w-11 ${c.iconBg} ${c.iconText} rounded-xl grid place-items-center text-2xl shadow-inner`} aria-hidden>
           <span className="leading-none">{emoji}</span>
         </div>
-        <span className="mt-1.5 sm:mt-2 text-[11px] sm:text-xs font-medium tracking-wide text-slate-700 dark:text-slate-200">{label}</span>
+        <span className="mt-1.5 sm:mt-2 text-[11px] sm:text-xs font-medium tracking-wide text-slate-800 dark:text-slate-100">{label}</span>
       </div>
     </Link>
   );
