@@ -92,12 +92,12 @@ export default function FoodPage() {
         </div>
       )}
       <HabitBanner />
-      <div className="bg-white shadow-soft rounded-xl p-4">
+      <div className="bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 shadow-soft rounded-xl p-4">
         <div className="flex items-baseline justify-between">
           <h1 className="text-lg font-semibold">Log your meal</h1>
         </div>
         <div className="mt-2">
-          <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="log-date">Date</label>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1" htmlFor="log-date">Date</label>
           <input
             id="log-date"
             type="date"
@@ -109,7 +109,7 @@ export default function FoodPage() {
 
         {/* Quick text log */}
         <div className="mt-4">
-          <h2 className="text-sm font-medium text-gray-700 mb-2">Quick log</h2>
+          <h2 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Quick log</h2>
           <FoodForm onLogged={onLogged} />
         </div>
 
@@ -143,7 +143,7 @@ export default function FoodPage() {
             <SkeletonLogCard />
           </div>
         ) : logs.length === 0 ? (
-          <p className="text-sm text-gray-500">No logs yet. Try adding your first meal!</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">No logs yet. Try adding your first meal!</p>
         ) : (
           logs.map((l) => <LogCard key={l.id} log={l} onDelete={onDelete} />)
         )}
@@ -179,7 +179,7 @@ function PhotoUploadSection({ onLogged }: { onLogged: (log: any) => void }) {
 
 function SkeletonLogCard() {
   return (
-    <div className="bg-white shadow-soft rounded-xl p-4">
+    <div className="bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 shadow-soft rounded-xl p-4">
       <div className="flex items-start gap-3">
         <div className="h-12 w-12 skeleton-circle" />
         <div className="flex-1 space-y-2">

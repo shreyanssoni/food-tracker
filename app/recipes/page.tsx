@@ -76,12 +76,12 @@ export default function RecipePage() {
       )}
 
       <div className="flex items-center gap-3">
-        <button onClick={() => router.back()} className="text-sm px-3 py-1.5 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800">← Back</button>
+        <button onClick={() => router.back()} className="text-sm px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">← Back</button>
         <h1 className="text-xl font-semibold">{name || 'Recipe'}</h1>
       </div>
 
       {loading && (
-        <div className="bg-white rounded-xl shadow-soft p-6" aria-hidden>
+        <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-6 border border-gray-100 dark:border-gray-800" aria-hidden>
           <div className="skeleton-line w-1/3 mb-4" />
           <div className="skeleton-line w-2/3 mb-2" />
           <div className="skeleton-line w-1/2" />
@@ -89,16 +89,16 @@ export default function RecipePage() {
       )}
 
       {error && !loading && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 my-4">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="bg-red-50 dark:bg-red-950/30 border-l-4 border-red-500 p-4 my-4">
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
         </div>
       )}
 
       {recipe && (
-        <div className="bg-white rounded-xl shadow-soft p-6 space-y-4">
+        <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-6 space-y-4 border border-gray-100 dark:border-gray-800">
           <div>
             <h2 className="text-lg font-semibold">{recipe.title}</h2>
-            <p className="text-sm text-gray-500">Servings: {recipe.servings} · Cook time: {recipe.cook_time_minutes} min · Difficulty: {recipe.difficulty}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Servings: {recipe.servings} · Cook time: {recipe.cook_time_minutes} min · Difficulty: {recipe.difficulty}</p>
           </div>
 
           {recipe.why && (
@@ -113,7 +113,7 @@ export default function RecipePage() {
               {recipe.ingredients?.map((ing, i) => (
                 <li key={i}>
                   <span className="font-medium">{ing.item}</span>{' '}
-                  <span className="text-gray-600">{ing.amount}</span>
+                  <span className="text-gray-600 dark:text-gray-300">{ing.amount}</span>
                 </li>
               ))}
             </ul>

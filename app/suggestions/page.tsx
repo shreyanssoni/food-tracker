@@ -354,14 +354,14 @@ export default function SuggestionsPage() {
   if (loading) {
     return (
       <div className="space-y-6" aria-hidden>
-        <div className="bg-white rounded-xl shadow-soft p-6">
+        <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-6 border border-gray-100 dark:border-gray-800">
           <div className="skeleton-line w-1/3 mb-4" />
           <div className="space-y-2">
             <div className="skeleton-line w-2/3" />
             <div className="skeleton-line w-1/2" />
           </div>
         </div>
-        <div className="bg-white rounded-xl shadow-soft p-6">
+        <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-6 border border-gray-100 dark:border-gray-800">
           <div className="skeleton-line w-1/2 mb-3" />
           <div className="skeleton-line w-3/4" />
         </div>
@@ -400,9 +400,9 @@ export default function SuggestionsPage() {
       )}
 
       {/* Greeting + Next Meal */}
-      <div className="bg-white rounded-xl shadow-soft p-6">
+      <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-6 border border-gray-100 dark:border-gray-800">
         <h2 className="text-xl font-semibold mb-1">Hello{suggestion?.greeting ? `, ${suggestion.greeting}` : ''}!</h2>
-        <p className="text-sm text-gray-500 mb-4">Here’s a plan tailored for the rest of your {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Here’s a plan tailored for the rest of your {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}.</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-lg border border-gray-100 dark:border-gray-800 p-4">
             <h3 className="font-medium mb-2">Next meal idea</h3>
@@ -465,7 +465,7 @@ export default function SuggestionsPage() {
       </div>
 
       {/* Progress vs 7-day average */}
-      <div className="bg-white rounded-xl shadow-soft p-6">
+      <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-6 border border-gray-100 dark:border-gray-800">
         <h3 className="font-medium text-lg mb-3">Progress</h3>
         <p className="text-sm text-gray-700 dark:text-gray-200">Calories today: <span className="font-semibold">{todayTotals.calories}</span>{avgCalories7d !== null && (
           <> · 7-day avg: <span className="font-semibold">{avgCalories7d}</span></>

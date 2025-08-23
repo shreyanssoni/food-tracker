@@ -59,11 +59,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <ProfilePrompt />
           <footer className="hidden md:block bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 mt-8">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-              <p className="text-center text-sm text-gray-500">
+              <p className="text-center text-sm text-gray-500 dark:text-gray-400">
                 &copy; {new Date().getFullYear()} Nourish. All rights reserved.
               </p>
-              <p className="mt-2 text-center text-xs text-gray-400">
-                Made with ❤️ — Be kind to yourself
+              <p className="mt-2 text-center text-xs text-gray-400 dark:text-gray-500">
+                Made with ❤️ — by Shreyans. Be Kind to Yourself.
               </p>
             </div>
           </footer>

@@ -92,11 +92,11 @@ export default function GroceriesPage() {
           <h1 className="text-2xl font-semibold">Groceries</h1>
           <p className="text-xs text-gray-500 dark:text-gray-400">Keep your pantry in sync across devices.</p>
         </div>
-        <a href="/suggestions" className="text-sm text-blue-600 hover:underline">Use in Suggestions →</a>
+        <a href="/suggestions" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">Use in Suggestions →</a>
       </div>
 
       {/* Add new item - mobile first stacked */}
-      <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4 mb-6 bg-white dark:bg-gray-900 shadow-sm">
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4 mb-6 bg-white dark:bg-gray-950 shadow-sm">
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
           <label className="sr-only" htmlFor="new-name">Item</label>
           <input
@@ -104,7 +104,7 @@ export default function GroceriesPage() {
             value={newItem.name}
             onChange={(e) => setNewItem((s) => ({ ...s, name: e.target.value }))}
             placeholder="e.g. Eggs"
-            className="sm:col-span-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 text-sm"
+            className="sm:col-span-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2.5 text-sm"
           />
           <label className="sr-only" htmlFor="new-qty">Quantity</label>
           <input
@@ -113,14 +113,14 @@ export default function GroceriesPage() {
             value={newItem.qty}
             onChange={(e) => setNewItem((s) => ({ ...s, qty: e.target.value }))}
             placeholder="Qty"
-            className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 text-sm"
+            className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2.5 text-sm"
           />
           <label className="sr-only" htmlFor="new-unit">Unit</label>
           <select
             id="new-unit"
             value={newItem.unit}
             onChange={(e) => setNewItem((s) => ({ ...s, unit: e.target.value }))}
-            className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 text-sm"
+            className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2.5 text-sm"
           >
             {units.map((u) => (
               <option key={u} value={u}>{u}</option>
@@ -150,7 +150,7 @@ export default function GroceriesPage() {
       ) : (
         <ul className="space-y-3">
           {items.map((it) => (
-            <li key={it.id} className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 bg-white dark:bg-gray-900 shadow-sm">
+            <li key={it.id} className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 bg-white dark:bg-gray-950 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <input
                   aria-label="Item name"
@@ -165,13 +165,13 @@ export default function GroceriesPage() {
                     inputMode="decimal"
                     value={Number(it.qty)}
                     onChange={(e) => updateItem(it.id, { qty: Number(e.target.value) })}
-                    className="w-24 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 text-sm"
+                    className="w-24 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 py-2 text-sm"
                   />
                   <select
                     aria-label="Unit"
                     value={it.unit}
                     onChange={(e) => updateItem(it.id, { unit: e.target.value })}
-                    className="w-28 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 text-sm"
+                    className="w-28 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 py-2 text-sm"
                   >
                     {units.map((u) => (
                       <option key={u} value={u}>{u}</option>

@@ -7,9 +7,9 @@ export default function HomePage() {
 
   return (
     <div className="space-y-8">
-      <section className="bg-white shadow-soft rounded-xl p-6">
+      <section className="bg-white dark:bg-gray-950 shadow-soft rounded-xl p-6 border border-gray-100 dark:border-gray-800">
         <h1 className="text-2xl font-bold mb-2">Nourish — Track food and mood with AI</h1>
-        <p className="text-gray-600 mb-4">
+        <p className="text-gray-600 dark:text-gray-300 mb-4">
           Log meals by typing naturally or snapping a photo. Get gentle, personalized insights powered by AI.
         </p>
         {status !== 'authenticated' ? (
@@ -22,7 +22,7 @@ export default function HomePage() {
             </button>
             <Link
               href="/auth/signin"
-              className="inline-flex items-center justify-center rounded-md border px-4 py-2 text-gray-700 hover:bg-gray-50"
+              className="inline-flex items-center justify-center rounded-md border border-gray-200 dark:border-gray-700 px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               Other sign-in options
             </Link>
@@ -30,19 +30,19 @@ export default function HomePage() {
         ) : (
           <div className="flex gap-3">
             <Link href="/food" className="btn">Go to Food Log</Link>
-            <Link href="/dashboard" className="btn-outline">Open Dashboard</Link>
+            <Link href="/dashboard" className="btn-ghost border border-gray-200 dark:border-gray-700">Open Dashboard</Link>
           </div>
         )}
       </section>
 
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl p-4 shadow-soft">
+        <div className="bg-white dark:bg-gray-950 rounded-xl p-4 shadow-soft border border-gray-100 dark:border-gray-800">
           <h2 className="font-semibold mb-1">Chat-based logging</h2>
-          <p className="text-sm text-gray-600">Say “2 eggs and toast at 9am” and we’ll parse it for you.</p>
+          <p className="text-sm text-gray-600 dark:text-gray-300">Say “2 eggs and toast at 9am” and we’ll parse it for you.</p>
         </div>
-        <div className="bg-white rounded-xl p-4 shadow-soft">
+        <div className="bg-white dark:bg-gray-950 rounded-xl p-4 shadow-soft border border-gray-100 dark:border-gray-800">
           <h2 className="font-semibold mb-1">Private and secure</h2>
-          <p className="text-sm text-gray-600">Your data is stored securely with Supabase and NextAuth.</p>
+          <p className="text-sm text-gray-600 dark:text-gray-300">Your data is stored securely with Supabase and NextAuth.</p>
         </div>
       </section>
     </div>

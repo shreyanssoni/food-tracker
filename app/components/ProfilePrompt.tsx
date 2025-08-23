@@ -82,29 +82,29 @@ export default function ProfilePrompt() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+      <div className="w-full max-w-md rounded-xl bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 p-5 shadow-lg">
         <h2 className="text-lg font-semibold">Tell us about you</h2>
-        <p className="text-sm text-gray-600 mb-3">We use this to personalize your daily calorie and macro targets.</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">We use this to personalize your daily calorie and macro targets.</p>
         <form onSubmit={onSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm">Height (cm)
-              <input className="mt-1 w-full border rounded-md px-2 py-1" value={form.height_cm} onChange={(e)=>setForm({...form, height_cm: e.target.value})} required />
+              <input className="mt-1 w-full border border-gray-200 dark:border-gray-800 rounded-md px-2 py-1 bg-white dark:bg-gray-900" value={form.height_cm} onChange={(e)=>setForm({...form, height_cm: e.target.value})} required />
             </label>
             <label className="text-sm">Weight (kg)
-              <input className="mt-1 w-full border rounded-md px-2 py-1" value={form.weight_kg} onChange={(e)=>setForm({...form, weight_kg: e.target.value})} required />
+              <input className="mt-1 w-full border border-gray-200 dark:border-gray-800 rounded-md px-2 py-1 bg-white dark:bg-gray-900" value={form.weight_kg} onChange={(e)=>setForm({...form, weight_kg: e.target.value})} required />
             </label>
             <label className="text-sm">Age
-              <input className="mt-1 w-full border rounded-md px-2 py-1" value={form.age} onChange={(e)=>setForm({...form, age: e.target.value})} required />
+              <input className="mt-1 w-full border border-gray-200 dark:border-gray-800 rounded-md px-2 py-1 bg-white dark:bg-gray-900" value={form.age} onChange={(e)=>setForm({...form, age: e.target.value})} required />
             </label>
             <label className="text-sm">Gender
-              <select className="mt-1 w-full border rounded-md px-2 py-1" value={form.gender} onChange={(e)=>setForm({...form, gender: e.target.value as any})}>
+              <select className="mt-1 w-full border border-gray-200 dark:border-gray-800 rounded-md px-2 py-1 bg-white dark:bg-gray-900" value={form.gender} onChange={(e)=>setForm({...form, gender: e.target.value as any})}>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
                 <option value="other">Other</option>
               </select>
             </label>
             <label className="text-sm">Activity
-              <select className="mt-1 w-full border rounded-md px-2 py-1" value={form.activity_level} onChange={(e)=>setForm({...form, activity_level: e.target.value as any})}>
+              <select className="mt-1 w-full border border-gray-200 dark:border-gray-800 rounded-md px-2 py-1 bg-white dark:bg-gray-900" value={form.activity_level} onChange={(e)=>setForm({...form, activity_level: e.target.value as any})}>
                 <option value="sedentary">Sedentary</option>
                 <option value="light">Light</option>
                 <option value="moderate">Moderate</option>
@@ -113,7 +113,7 @@ export default function ProfilePrompt() {
               </select>
             </label>
             <label className="text-sm">Goal
-              <select className="mt-1 w-full border rounded-md px-2 py-1" value={form.goal} onChange={(e)=>setForm({...form, goal: e.target.value as any})}>
+              <select className="mt-1 w-full border border-gray-200 dark:border-gray-800 rounded-md px-2 py-1 bg-white dark:bg-gray-900" value={form.goal} onChange={(e)=>setForm({...form, goal: e.target.value as any})}>
                 <option value="maintain">Maintain</option>
                 <option value="lose">Lose</option>
                 <option value="gain">Gain</option>
