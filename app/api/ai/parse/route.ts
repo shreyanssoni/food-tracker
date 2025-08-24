@@ -26,15 +26,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing text' }, { status: 400 });
     }
 
-    // Debug short-circuit: naive parse without AI
+    // Debug short-circuit: simple heuristic parser without AI
     if (String(process.env.AI_DEBUG || '').toLowerCase() === 'true') {
       const nowIso = new Date().toISOString();
+      const lower = text.toLowerCase();
+      let calories = 0, protein_g = 0, carbs_g = 0, fat_g = 0;
+      // Heuristics for common quick items
+      const hasSugar = /sugar|sweet/i.test(lower);
+      const hasMilk = /milk|latte|cream|creamer/i.test(lower);
+      if (/\bblack\s*(coffee|tea)\b|\bcoffee\b|\btea\b/.test(lower)) {
+        // base near-zero cals for plain coffee/tea
+        calories = 2;
+        if (hasMilk) { calories += 20; fat_g += 1; carbs_g += 1; }
+        if (hasSugar) { calories += 16; carbs_g += 4; }
+      } else if (/\bbanana\b/.test(lower)) {
+        calories = 105; protein_g = 1.3; carbs_g = 27; fat_g = 0.3;
+      } else if (/\begg\b/.test(lower)) {
+        calories = 78; protein_g = 6; carbs_g = 0.6; fat_g = 5;
+      }
       const log: ParsedLog = {
         items: [{ name: text.trim(), quantity: null }],
-        calories: 0,
-        protein_g: 0,
-        carbs_g: 0,
-        fat_g: 0,
+        calories,
+        protein_g,
+        carbs_g,
+        fat_g,
         eaten_at: nowIso,
         note: null,
       };

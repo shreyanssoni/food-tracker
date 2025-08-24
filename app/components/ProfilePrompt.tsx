@@ -37,10 +37,11 @@ export default function ProfilePrompt() {
       .then((r) => r.json())
       .then((d) => {
         const p = d?.profile;
-        const hasTargets = !!d?.targets; // computed only when sufficient data exists
+        // Decide visibility based on essential fields to avoid false negatives from computeTargets
+        const hasBasics = !!(p?.height_cm && p?.weight_kg);
         const hasWorkout = !!p?.workout_level;
-        // Show if targets missing OR workout level missing
-        setShow(!(hasTargets && hasWorkout));
+        // Show only if any essential field is missing
+        setShow(!(hasBasics && hasWorkout));
         if (p) {
           setForm((prev) => ({
             ...prev,

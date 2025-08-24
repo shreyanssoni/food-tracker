@@ -56,6 +56,58 @@ export default function SuggestionsPage() {
   const [strictness, setStrictness] = useState<number>(40); // 0 random -> 100 strictly use inventory
   const [mealType, setMealType] = useState<string>('auto');
 
+  // Weekly chart state
+  type DayTotals = NutritionTotals & { date: string };
+  const [weekOffset, setWeekOffset] = useState<number>(0); // 0=current week, 1=previous week, etc.
+  const [weekTotals, setWeekTotals] = useState<DayTotals[]>([]);
+
+  function startOfWeekLocal(date = new Date()) {
+    const d = new Date(date);
+    const day = d.getDay(); // 0 Sun - 6 Sat
+    const diff = (day === 0 ? -6 : 1) - day; // make Monday=first day
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+  function endOfWeekLocal(start: Date) {
+    const e = new Date(start);
+    e.setDate(e.getDate() + 6);
+    e.setHours(23, 59, 59, 999);
+    return e;
+  }
+
+  async function loadWeek(offset: number) {
+    if (!session?.user?.id) return;
+    // compute week range in local time
+    const base = new Date();
+    base.setDate(base.getDate() - offset * 7);
+    const start = startOfWeekLocal(base);
+    const end = endOfWeekLocal(start);
+    const { data, error } = await supabase
+      .from('food_logs')
+      .select('eaten_at,calories,protein_g,carbs_g,fat_g')
+      .gte('eaten_at', start.toISOString())
+      .lte('eaten_at', end.toISOString());
+    if (error) return;
+    // initialize 7 days
+    const days: DayTotals[] = Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const label = d.toLocaleDateString(undefined, { weekday: 'short' });
+      return { date: label, calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
+    });
+    (data || []).forEach((l: any) => {
+      const dt = new Date(l.eaten_at);
+      // index by day difference from start
+      const idx = Math.max(0, Math.min(6, Math.floor((dt.getTime() - start.getTime()) / (24 * 3600 * 1000))));
+      days[idx].calories += Number(l.calories) || 0;
+      days[idx].protein_g += Number(l.protein_g) || 0;
+      days[idx].carbs_g += Number(l.carbs_g) || 0;
+      days[idx].fat_g += Number(l.fat_g) || 0;
+    });
+    setWeekTotals(days);
+  }
+
   // Helper: derive display name from log
   const displayName = (log: Partial<FoodLog>) => {
     if (log.food_name && log.food_name.trim()) return log.food_name.trim();
@@ -111,14 +163,16 @@ export default function SuggestionsPage() {
           if (prefJson) setPreferences(prefJson);
         } catch {}
 
-        // Get today's nutrition data
-        const today = new Date().toISOString().split('T')[0];
+        // Get today's nutrition data (use local start/end to avoid UTC offset issues)
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        const end = new Date();
+        end.setHours(23, 59, 59, 999);
         const { data: todayLogs, error: logsError } = await supabase
           .from('food_logs')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .gte('eaten_at', `${today}T00:00:00`)
-          .lte('eaten_at', `${today}T23:59:59`);
+          .select('calories,protein_g,carbs_g,fat_g')
+          .gte('eaten_at', start.toISOString())
+          .lte('eaten_at', end.toISOString());
 
         if (logsError) {
           throw new Error('Failed to fetch today\'s logs');
@@ -126,10 +180,10 @@ export default function SuggestionsPage() {
 
         const totals = (todayLogs || []).reduce(
           (acc, log) => ({
-            calories: acc.calories + (log.calories || 0),
-            protein_g: acc.protein_g + (log.protein_g || 0),
-            carbs_g: acc.carbs_g + (log.carbs_g || 0),
-            fat_g: acc.fat_g + (log.fat_g || 0),
+            calories: acc.calories + (Number(log.calories) || 0),
+            protein_g: acc.protein_g + (Number(log.protein_g) || 0),
+            carbs_g: acc.carbs_g + (Number(log.carbs_g) || 0),
+            fat_g: acc.fat_g + (Number(log.fat_g) || 0),
           }),
           { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 } as NutritionTotals
         );
@@ -140,10 +194,9 @@ export default function SuggestionsPage() {
         const { data: last7d, error: last7dError } = await supabase
           .from('food_logs')
           .select('calories')
-          .eq('user_id', session.user.id)
           .gte('eaten_at', sevenDaysAgo);
         if (!last7dError && last7d) {
-          const sum = last7d.reduce((s, l) => s + (l.calories || 0), 0);
+          const sum = last7d.reduce((s, l) => s + (Number(l.calories) || 0), 0);
           setAvgCalories7d(Math.round(sum / Math.max(1, last7d.length)));
         }
 
@@ -151,7 +204,6 @@ export default function SuggestionsPage() {
         const { data: recent } = await supabase
           .from('food_logs')
           .select('*')
-          .eq('user_id', session.user.id)
           .order('eaten_at', { ascending: false })
           .limit(12);
         // Deduplicate by normalized display name and limit to 4 random unique
@@ -209,6 +261,12 @@ export default function SuggestionsPage() {
     } catch {}
     initPage();
   }, [session?.user?.id]);
+
+  // Load weekly data when session or offset changes
+  useEffect(() => {
+    loadWeek(weekOffset);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id, weekOffset]);
 
   const gaps = useMemo(() => {
     if (!targets) return null;
@@ -499,15 +557,65 @@ export default function SuggestionsPage() {
         </div>
       )}
 
-      {/* Progress vs 7-day average */}
+      {/* Progress • Weekly chart */}
       <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-6 border border-gray-100 dark:border-gray-800">
-        <h3 className="font-medium text-lg mb-3">Progress</h3>
-        <p className="text-sm text-gray-700 dark:text-gray-200">Calories today: <span className="font-semibold">{todayTotals.calories}</span>{avgCalories7d !== null && (
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-medium text-lg">Progress</h3>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setWeekOffset((v) => v + 1)}
+              className="text-xs px-2 py-1 rounded border hover:bg-gray-50 dark:hover:bg-gray-800"
+              title="Previous week"
+            >← Prev</button>
+            <button
+              onClick={() => setWeekOffset((v) => Math.max(0, v - 1))}
+              className="text-xs px-2 py-1 rounded border hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+              disabled={weekOffset === 0}
+              title="Next week"
+            >Next →</button>
+          </div>
+        </div>
+        <p className="text-sm text-gray-700 dark:text-gray-200 mb-3">Calories today: <span className="font-semibold">{todayTotals.calories}</span>{avgCalories7d !== null && (
           <> · 7-day avg: <span className="font-semibold">{avgCalories7d}</span></>
         )}</p>
-        {avgCalories7d !== null && (
-          <div className="mt-2 h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-            <div className="h-full bg-blue-600" style={{ width: `${Math.min(100, Math.round((todayTotals.calories / Math.max(1, avgCalories7d)) * 100))}%` }} />
+
+        {/* Legend */}
+        <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-300 mb-2">
+          <span className="inline-flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm bg-emerald-500" />Protein</span>
+          <span className="inline-flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm bg-blue-500" />Carbs</span>
+          <span className="inline-flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm bg-amber-500" />Fats</span>
+          <span className="inline-flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm bg-slate-400" />Total kcal (bar height)</span>
+        </div>
+
+        {/* Stacked bars */}
+        {weekTotals.length === 0 ? (
+          <div className="text-sm text-gray-500">No data for selected week.</div>
+        ) : (
+          <div className="grid grid-cols-7 gap-3 items-end" style={{ minHeight: 160 }}>
+            {(() => {
+              const kcalPerDay = weekTotals.map(d => Math.max(0, Math.round((d.protein_g*4)+(d.carbs_g*4)+(d.fat_g*9))));
+              const maxKcal = Math.max(1, ...kcalPerDay);
+              return weekTotals.map((d, idx) => {
+                const totalKcal = kcalPerDay[idx];
+                const hPct = Math.min(100, Math.round((totalKcal / maxKcal) * 100));
+                const pk = Math.max(0, d.protein_g*4);
+                const ck = Math.max(0, d.carbs_g*4);
+                const fk = Math.max(0, d.fat_g*9);
+                const sum = Math.max(1, pk+ck+fk);
+                const ph = (pk/sum)*100, ch = (ck/sum)*100, fh = (fk/sum)*100;
+                return (
+                  <div key={idx} className="flex flex-col items-center gap-1">
+                    <div className="w-7 sm:w-8 rounded-md bg-gray-100 dark:bg-gray-800 overflow-hidden flex flex-col justify-end" style={{ height: 140 }}>
+                      <div className="bg-emerald-500" style={{ height: `${(hPct*ph/100)}%` }} />
+                      <div className="bg-blue-500" style={{ height: `${(hPct*ch/100)}%` }} />
+                      <div className="bg-amber-500" style={{ height: `${(hPct*fh/100)}%` }} />
+                    </div>
+                    <div className="text-[11px] text-gray-600 dark:text-gray-300">{d.date}</div>
+                    <div className="text-[11px] text-gray-500">{totalKcal} kcal</div>
+                  </div>
+                );
+              })
+            })()}
           </div>
         )}
       </div>
