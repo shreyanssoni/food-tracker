@@ -50,26 +50,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
     }
 
-    // Fetch latest subscription for target user
-    const { data: subRow, error: subErr } = await supabase
+    // Fetch all subscriptions for target user
+    const { data: subs, error: subErr } = await supabase
       .from('push_subscriptions')
       .select('endpoint, p256dh, auth, expiration_time')
       .eq('user_id', targetUserId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order('created_at', { ascending: false });
 
     if (subErr) {
-      console.error('fetch sub error', subErr);
+      console.error('fetch subs error', subErr);
       return NextResponse.json({ error: 'DB error' }, { status: 500 });
     }
-    if (!subRow) return NextResponse.json({ error: 'No subscription' }, { status: 404 });
-
-    const subscription: WebPushSubscription = {
-      endpoint: subRow.endpoint,
-      expirationTime: subRow.expiration_time ?? null,
-      keys: { p256dh: subRow.p256dh, auth: subRow.auth },
-    };
+    if (!subs || subs.length === 0) return NextResponse.json({ error: 'No subscription' }, { status: 404 });
 
     // Build payload
     let payload: PushPayload | null = null;
@@ -105,29 +97,49 @@ export async function POST(req: NextRequest) {
       payload = await generateMessageFor(slot, tz);
     }
 
-    const res = await sendWebPush(subscription, payload);
+    // Send to all subs and collect results
+    let sent = 0;
+    const attempted = subs.length;
+    const logs: Array<{
+      user_id: string;
+      slot: string;
+      title: string;
+      body: string;
+      url: string;
+      success: boolean;
+      status_code: number | null;
+    }> = [];
 
-    // Log
-    const success = res.ok;
-    const status = res.statusCode ?? (success ? 201 : null);
-    await supabase.from('push_sends').insert({
-      user_id: targetUserId,
-      slot: body.slot || 'midday',
-      title: payload.title,
-      body: payload.body,
-      url: payload.url || '/',
-      success,
-      status_code: status,
-    });
-
-    if (!success) {
-      if (status === 404 || status === 410) {
+    for (const s of subs) {
+      const subscription: WebPushSubscription = {
+        endpoint: s.endpoint,
+        expirationTime: s.expiration_time ?? null,
+        keys: { p256dh: s.p256dh, auth: s.auth },
+      };
+      const res = await sendWebPush(subscription, payload);
+      const success = res.ok;
+      const status = res.statusCode ?? (success ? 201 : null);
+      if (success) sent += 1;
+      logs.push({
+        user_id: targetUserId,
+        slot: body.slot || 'midday',
+        title: payload.title,
+        body: payload.body,
+        url: payload.url || '/',
+        success,
+        status_code: status,
+      });
+      if (!success && (status === 404 || status === 410)) {
+        // prune expired
         await supabase.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint);
       }
-      return NextResponse.json({ error: 'Send failed', status }, { status: 502 });
     }
 
-    return NextResponse.json({ ok: true });
+    if (logs.length) {
+      await supabase.from('push_sends').insert(logs);
+    }
+
+    return NextResponse.json({ ok: true, attempted, sent });
   } catch (e) {
     console.error('send-to-user error', e);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

@@ -50,3 +50,8 @@ export async function POST() {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
+
+// Allow triggering via simple GET (useful on mobile without console)
+export async function GET() {
+  return POST();
+}
