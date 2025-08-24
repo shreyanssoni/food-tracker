@@ -35,3 +35,13 @@ html, body { height: 100%; }
 .skeleton { @apply animate-pulse bg-gray-200 dark:bg-gray-800 rounded-md; }
 .skeleton-line { @apply skeleton h-3; }
 .skeleton-circle { @apply skeleton rounded-full; }
+
+/* Hide scrollbars utility */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+  -webkit-overflow-scrolling: touch; /* iOS momentum */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
