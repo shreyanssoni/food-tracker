@@ -250,7 +250,12 @@ export default function Navbar() {
                         <DropdownLink key={item.path} {...item} />
                       ))}
                       <button
-                        onClick={() => signOut({ callbackUrl: '/' })}
+                        onClick={async () => {
+                          try {
+                            await disableNotifications();
+                          } catch {}
+                          await signOut({ callbackUrl: '/' });
+                        }}
                         className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50/80 dark:hover:bg-white/5"
                       >
                         Sign out
@@ -349,7 +354,7 @@ export default function Navbar() {
                     {item.label}
                   </Link>
                 ))}
-                <button onClick={() => signOut({ callbackUrl: '/' })} className="block w-full text-left px-3 py-2 rounded-full text-base font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5">
+                <button onClick={async () => { try { await disableNotifications(); } catch {} await signOut({ callbackUrl: '/' }); }} className="block w-full text-left px-3 py-2 rounded-full text-base font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5">
                   Sign out
                 </button>
               </div>

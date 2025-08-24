@@ -32,43 +32,43 @@ async function handleSend(slot?: Slot, timezone?: string) {
     if ((dayCount ?? 0) >= 8) {
       return NextResponse.json({ error: 'Rate limit exceeded (8/day)' }, { status: 429 });
     }
-    const { data, error } = await supabase
+    const { data: subs, error } = await supabase
       .from('push_subscriptions')
       .select('endpoint, p256dh, auth, expiration_time')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('fetch sub error', error);
+      console.error('fetch subs error', error);
       return NextResponse.json({ error: 'DB error' }, { status: 500 });
     }
-    if (!data) return NextResponse.json({ error: 'No subscription' }, { status: 404 });
-
-    const subscription: WebPushSubscription = {
-      endpoint: data.endpoint,
-      expirationTime: data.expiration_time ?? null,
-      keys: { p256dh: data.p256dh, auth: data.auth },
-    };
+    if (!subs || subs.length === 0) return NextResponse.json({ error: 'No subscription' }, { status: 404 });
 
     // Build payload: if slot provided, generate slot-specific; else use fixed test
     const payload = slot
       ? await generateMessageFor(slot, timezone || 'Asia/Kolkata')
       : { title: 'Test notification', body: 'If you see this, push is working!', url: '/suggestions' };
 
-    const res = await sendWebPush(subscription, payload);
-
-    if (!res.ok) {
-      const status = res.statusCode;
-      if (status === 404 || status === 410) {
-        // prune expired
-        await supabase.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint);
+    let sent = 0;
+    for (const s of subs) {
+      const subscription: WebPushSubscription = {
+        endpoint: s.endpoint,
+        expirationTime: s.expiration_time ?? null,
+        keys: { p256dh: s.p256dh, auth: s.auth },
+      };
+      const res = await sendWebPush(subscription, payload);
+      if (!res.ok) {
+        const status = res.statusCode;
+        if (status === 404 || status === 410) {
+          // prune expired
+          await supabase.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint);
+        }
+      } else {
+        sent += 1;
       }
-      return NextResponse.json({ error: 'Send failed', status }, { status: 502 });
     }
 
-    return NextResponse.json({ ok: true, slot: slot || null });
+    return NextResponse.json({ ok: true, attempted: subs.length, sent, slot: slot || null });
   } catch (e) {
     console.error('send-test error', e);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
