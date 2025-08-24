@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/utils/cn";
 
 const items = [
+  { href: "/me", label: "Me", icon: HeartIcon },
   { href: "/dashboard", label: "Home", icon: HomeIcon },
   { href: "/food", label: "Log", icon: PlusIcon },
   { href: "/suggestions", label: "Suggest", icon: SparklesIcon },
@@ -21,7 +22,7 @@ export default function BottomNav() {
       aria-label="Primary"
       className="fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200/80 dark:border-gray-800/80 bg-white/90 dark:bg-gray-950/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-gray-950/70 md:hidden"
     >
-      <ul className={`grid ${items.length === 6 ? 'grid-cols-6' : 'grid-cols-5'} h-16 px-2`}>
+      <ul className={`grid grid-cols-7 h-16 px-2`}>
         {items.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== "/" && pathname?.startsWith(href));
           return (
@@ -57,6 +58,13 @@ function HomeIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
       <path d="M4 10.5 12 4l8 6.5V20a2 2 0 0 1-2 2h-4v-6H10v6H6a2 2 0 0 1-2-2v-9.5Z" className="stroke-current" fill="none" strokeWidth="1.5"/>
+    </svg>
+  );
+}
+function HeartIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <path d="M12 21s-6.7-3.9-9.3-7.5C.5 10.7 2 7 5.3 6.3c1.8-.4 3.7.3 4.7 1.9 1-1.6 2.9-2.3 4.7-1.9C18 7 19.5 10.7 17.3 13.5 14.7 17.1 12 21 12 21Z" className="stroke-current" fill="none" strokeWidth="1.5"/>
     </svg>
   );
 }

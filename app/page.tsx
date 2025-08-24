@@ -15,7 +15,7 @@ export default function HomePage() {
         {status !== 'authenticated' ? (
           <div className="flex flex-col sm:flex-row gap-3">
             <button
-              onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+              onClick={() => signIn('google', { callbackUrl: '/me' })}
               className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
             >
               Continue with Google
@@ -29,7 +29,7 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="flex gap-3">
-            <Link href="/food" className="btn">Go to Food Log</Link>
+            <Link href={{ pathname: '/me' }} className="btn">Open Me</Link>
             <Link href="/dashboard" className="btn-ghost border border-gray-200 dark:border-gray-700">Open Dashboard</Link>
           </div>
         )}
