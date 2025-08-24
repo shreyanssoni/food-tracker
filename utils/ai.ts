@@ -56,7 +56,7 @@ export async function geminiText(prompt: string) {
     return '';
   }
 
-  // If provider is groq, try Groq first
+  // If provider is groq, try Groq first (explicit override)
   if (providerPref === 'groq' && process.env.GROQ_API_KEY) {
     const groq = await groqText(prompt).catch(() => '');
     if (groq) return groq;
@@ -92,13 +92,7 @@ export async function geminiText(prompt: string) {
     }
   }
 
-  // Fallback to Groq if available (before OpenRouter) when not already tried first
-  if (process.env.GROQ_API_KEY) {
-    const groq = await groqText(prompt).catch(() => '');
-    if (groq) return groq;
-  }
-
-  // Fallback to OpenRouter with rotating models if configured
+  // Fallback to OpenRouter with rotating models if configured (now before Groq)
   if (process.env.OPENROUTER_API_KEY) {
     // Build model list: env list > single model > sensible defaults
     const envList = (process.env.OPENROUTER_MODELS || '')
@@ -153,12 +147,17 @@ export async function geminiText(prompt: string) {
         // try next model
       }
     }
-    // All models exhausted or failed
-    return 'We are rate-limited right now. Provide a concise, actionable nutrition tip and a protein-forward next meal idea.';
+    // If OpenRouter exhausted, try Groq next (last fallback)
+  }
+
+  // Fallback to Groq last if available (and not already tried above)
+  if (process.env.GROQ_API_KEY) {
+    const groq = await groqText(prompt).catch(() => '');
+    if (groq) return groq;
   }
 
   // Final graceful fallback to avoid breaking routes that rely on AI
-  return 'AI is temporarily unavailable. Suggest a lean-protein meal adjusted to remaining macros, plus 1-2 quick add-ons to close gaps.';
+  return 'We are rate-limited right now. Provide a concise, actionable nutrition tip and a protein-forward next meal idea.';
 }
 
 // Groq provider (OpenAI-compatible)
@@ -193,8 +192,11 @@ export async function geminiImagePrompt(prompt: string, imageBase64: string, mim
   if (String(process.env.AI_DEBUG || '').toLowerCase() === 'true') {
     throw new Error('AI_DEBUG is enabled: image prompt disabled');
   }
+  // Currently, only Gemini is implemented for image understanding. If the key
+  // is missing, return a graceful text fallback instead of throwing, so routes
+  // remain resilient.
   if (!process.env.GEMINI_API_KEY) {
-    throw new Error('Missing GEMINI_API_KEY');
+    return 'Image analysis is temporarily unavailable. Provide a concise nutrition summary based on user text only, and suggest a balanced, protein-forward meal.';
   }
   const res = await fetch(`${GEMINI_URL}?key=${process.env.GEMINI_API_KEY}`, {
     method: 'POST',
