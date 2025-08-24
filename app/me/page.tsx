@@ -199,7 +199,7 @@ export default function MePage() {
             </span>
           ) : (
             <span className="inline-flex items-center gap-2">
-              <BoltIcon className="h-5 w-5" /> Most Motivation
+              <BoltIcon className="h-5 w-5" /> Q.O.T.D
             </span>
           )}
         </button>
