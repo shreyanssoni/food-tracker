@@ -192,74 +192,97 @@ export default function Navbar() {
           <div className="flex items-center sm:hidden">
             <button
               type="button"
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
               aria-controls="mobile-menu"
               aria-expanded={mobileOpen}
+              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
               onClick={() => setMobileOpen((v) => !v)}
+              className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
             >
-              <span className="sr-only">Open main menu</span>
-              <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+              <span className="sr-only">Toggle main menu</span>
+              <span className="relative block h-5 w-6">
+                <span
+                  className={`absolute left-0 top-0 h-0.5 w-6 bg-current rounded transition-all duration-300 ease-out motion-reduce:transition-none ${
+                    mobileOpen ? 'translate-y-2 rotate-45' : ''
+                  }`}
+                />
+                <span
+                  className={`absolute left-0 top-2 h-0.5 w-6 bg-current rounded transition-opacity duration-300 ease-out motion-reduce:transition-none ${
+                    mobileOpen ? 'opacity-0' : 'opacity-100'
+                  }`}
+                />
+                <span
+                  className={`absolute left-0 bottom-0 h-0.5 w-6 bg-current rounded transition-all duration-300 ease-out motion-reduce:transition-none ${
+                    mobileOpen ? '-translate-y-2 -rotate-45' : ''
+                  }`}
+                />
+              </span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile menu */}
-      {mobileOpen && (
-        <>
-          {/* Backdrop overlay */}
-          <div className="fixed inset-0 z-40 bg-black/30 sm:hidden" onClick={() => setMobileOpen(false)} aria-hidden />
-          <div className="sm:hidden fixed z-50 top-16 inset-x-0" id="mobile-menu" ref={mobileMenuRef}>
-          <div className="space-y-1 px-4 pt-2 pb-3 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800">
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                href={item.path as unknown as Route}
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  isActive(item.path)
-                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800'
-                }`}
-                onClick={() => setMobileOpen(false)}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
-          <div className="border-t border-gray-200 dark:border-gray-800 px-4 py-3 bg-white dark:bg-gray-950">
-            {status === 'authenticated' ? (
-              <>
-                <div className="flex items-center gap-3">
-                  <img className="h-10 w-10 rounded-full" src={session.user?.image || '/default-avatar.png'} alt={session.user?.name || 'User'} />
-                  <div>
-                    <div className="text-base font-medium text-gray-800 dark:text-gray-100">{session.user?.name}</div>
-                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400">{session.user?.email}</div>
-                  </div>
+      {/* Mobile menu (animated) */}
+      {/* Backdrop overlay */}
+      <div
+        className={`fixed inset-0 z-40 bg-black/30 sm:hidden transition-opacity duration-300 ease-out ${
+          mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setMobileOpen(false)}
+        aria-hidden
+      />
+      <div
+        className={`sm:hidden fixed z-50 top-16 inset-x-0 transform transition-all duration-300 ease-out ${
+          mobileOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-2 pointer-events-none'
+        }`}
+        id="mobile-menu"
+        ref={mobileMenuRef}
+      >
+        <div className="space-y-1 px-4 pt-2 pb-3 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800">
+          {navItems.map((item) => (
+            <Link
+              key={item.path}
+              href={item.path as unknown as Route}
+              className={`block px-3 py-2 rounded-md text-base font-medium ${
+                isActive(item.path)
+                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800'
+              }`}
+              onClick={() => setMobileOpen(false)}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+        <div className="border-t border-gray-200 dark:border-gray-800 px-4 py-3 bg-white dark:bg-gray-950">
+          {status === 'authenticated' ? (
+            <>
+              <div className="flex items-center gap-3">
+                <img className="h-10 w-10 rounded-full" src={session.user?.image || '/default-avatar.png'} alt={session.user?.name || 'User'} />
+                <div>
+                  <div className="text-base font-medium text-gray-800 dark:text-gray-100">{session.user?.name}</div>
+                  <div className="text-sm font-medium text-gray-500 dark:text-gray-400">{session.user?.email}</div>
                 </div>
-                <div className="mt-3 space-y-1">
-                  {dropdownItems.map((item) => (
-                    <Link key={item.path} href={item.path as unknown as Route} className="block px-3 py-2 rounded-md text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setMobileOpen(false)}>
-                      {item.label}
-                    </Link>
-                  ))}
-                  <button onClick={() => signOut({ callbackUrl: '/' })} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800">
-                    Sign out
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="space-y-1">
-                <Link href="/auth/signin" className="block w-full px-3 py-2 rounded-md text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setMobileOpen(false)}>
-                  Sign in
-                </Link>
               </div>
-            )}
-          </div>
-          </div>
-        </>
-      )}
+              <div className="mt-3 space-y-1">
+                {dropdownItems.map((item) => (
+                  <Link key={item.path} href={item.path as unknown as Route} className="block px-3 py-2 rounded-md text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setMobileOpen(false)}>
+                    {item.label}
+                  </Link>
+                ))}
+                <button onClick={() => signOut({ callbackUrl: '/' })} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800">
+                  Sign out
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-1">
+              <Link href="/auth/signin" className="block w-full px-3 py-2 rounded-md text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setMobileOpen(false)}>
+                Sign in
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
     </nav>
   );
 }
