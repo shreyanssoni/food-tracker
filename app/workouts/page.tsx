@@ -128,6 +128,13 @@ export default function WorkoutsPage() {
 
   // muscles selection handled by MultiSelect
 
+  // Presets: helper to extract values by group
+  const groupVals = (group: string) => MUSCLE_OPTIONS_GROUPED.filter(o => o.group === group).map(o => o.value);
+  const presetPush = () => setForm((p) => ({ ...p, muscles: groupVals('Upper — Push') }));
+  const presetPull = () => setForm((p) => ({ ...p, muscles: groupVals('Upper — Pull') }));
+  const presetLegs = () => setForm((p) => ({ ...p, muscles: groupVals('Lower Body') }));
+  const presetFull = () => setForm((p) => ({ ...p, muscles: MUSCLE_OPTIONS_GROUPED.map(o => o.value) }));
+
   const adjustDuration = (delta: number) => {
     setForm((prev) => ({
       ...prev,
@@ -233,6 +240,12 @@ export default function WorkoutsPage() {
         </div>
         <div className="text-sm">
           <div className="mb-1">Muscles to train (optional)</div>
+          <div className="mb-2 flex flex-wrap gap-2">
+            <button type="button" onClick={presetPush} className="px-3 py-1 rounded-full text-sm border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800">Push</button>
+            <button type="button" onClick={presetPull} className="px-3 py-1 rounded-full text-sm border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800">Pull</button>
+            <button type="button" onClick={presetLegs} className="px-3 py-1 rounded-full text-sm border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800">Legs</button>
+            <button type="button" onClick={presetFull} className="px-3 py-1 rounded-full text-sm border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800">Full</button>
+          </div>
           <MultiSelect
             options={MUSCLE_OPTIONS_GROUPED}
             value={form.muscles}

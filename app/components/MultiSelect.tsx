@@ -64,6 +64,18 @@ export default function MultiSelect({
   };
   const clearAll = () => onChange([]);
 
+  const toggleGroup = (group: string, items: MultiSelectOption[]) => {
+    const vals = items.map((it) => it.value);
+    const allSelected = vals.every((v) => value.includes(v));
+    if (allSelected) {
+      onChange(value.filter((v) => !vals.includes(v)));
+    } else {
+      const set = new Set(value);
+      vals.forEach((v) => set.add(v));
+      onChange(Array.from(set));
+    }
+  };
+
   // Close on outside click
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -153,8 +165,38 @@ export default function MultiSelect({
             ) : (
               filtered.map(({ group, items }) => (
                 <div key={group} className="mb-3">
-                  <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {group}
+                  <div className="px-2 py-1.5 flex items-center justify-between gap-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{group}</div>
+                    {items.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); toggleGroup(group, items); }}
+                        className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-600 dark:text-gray-300"
+                        aria-label={`Select all in ${group}`}
+                      >
+                        {(() => {
+                          const vals = items.map((it) => it.value);
+                          const count = vals.filter((v) => value.includes(v)).length;
+                          const all = count === vals.length;
+                          const none = count === 0;
+                          return (
+                            <span className="inline-flex items-center gap-1">
+                              <span
+                                aria-hidden
+                                className={`inline-block h-3 w-3 rounded-sm border ${
+                                  all
+                                    ? 'bg-blue-600 border-blue-600'
+                                    : none
+                                    ? 'border-gray-300 dark:border-gray-700'
+                                    : 'border-blue-400 bg-blue-200/60 dark:border-blue-500 dark:bg-blue-500/20'
+                                }`}
+                              />
+                              <span>{all ? 'Clear' : 'Select all'}</span>
+                            </span>
+                          );
+                        })()}
+                      </button>
+                    )}
                   </div>
                   <div className="h-px bg-gray-100 dark:bg-gray-800 mb-1" />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 p-1">
