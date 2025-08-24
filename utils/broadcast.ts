@@ -37,8 +37,8 @@ function buildPrompt(slot: Slot, timezone: string) {
   const base = `You are an empathetic nutrition coach.
 Audience: busy professionals in timezone ${timezone}.
 Constraints:
-- Title <= 45 chars, imperative or inviting
-- Body <= 120 chars, actionable and positive
+- Title <= 30 chars, imperative or inviting
+- Body <= 80 chars, actionable and positive
 - Focus on protein-forward choices and hydration
 - No emojis
 Return JSON: { "title": string, "body": string, "url": string starting with '/' }`;
