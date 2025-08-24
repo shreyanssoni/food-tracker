@@ -56,8 +56,17 @@ Return JSON: { "title": string, "body": string, "url": string starting with '/' 
 
 export async function generateMessageFor(slot: Slot, timezone: string) {
   const supabase = createClient();
-  const today = new Date().toISOString().slice(0,10);
   const { canonical: tz } = normalizeTimezone(timezone || 'Asia/Kolkata');
+  // Derive YYYY-MM-DD for the provided timezone (per-timezone daily cache)
+  const today = (() => {
+    try {
+      const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+      // en-CA gives YYYY-MM-DD by default
+      return fmt.format(new Date());
+    } catch {
+      return new Date().toISOString().slice(0,10);
+    }
+  })();
 
   // Use cache first
   const { data: cached } = await supabase
@@ -98,12 +107,15 @@ export async function generateMessageFor(slot: Slot, timezone: string) {
         } catch {}
       })();
     }
+    console.log('[broadcast] using_cached_payload', { slot, timezone: tz, title: cleanTitle, body: cleanBody, url: cleanUrl });
     return { title: cleanTitle, body: cleanBody, url: cleanUrl } as PushPayload;
   }
 
   // Generate fresh
   const prompt = buildPrompt(slot, tz);
+  console.log('[broadcast] prompt', { slot, timezone: tz, prompt });
   const text = await geminiText(prompt);
+  console.log('[broadcast] raw_model_output', text);
 
   let title = 'Healthy nudge';
   let body = text?.slice(0, 120) || 'Stay hydrated and add a lean protein to your next meal!';
@@ -154,6 +166,7 @@ export async function generateMessageFor(slot: Slot, timezone: string) {
     url,
   }, { onConflict: 'date,slot,timezone' });
 
+  console.log('[broadcast] final_payload', { slot, timezone: tz, title, body, url });
   return { title, body, url } as PushPayload;
 }
 
