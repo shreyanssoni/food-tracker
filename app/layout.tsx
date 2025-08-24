@@ -80,7 +80,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 if('serviceWorker' in navigator) {
                   const registerSW = async () => {
                     const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-                    const swUrl = isLocalhost ? '/sw-push.js' : '/sw.js';
+                    // Use the push-capable SW in all environments so notifications show.
+                    // The previous prod SW ('/sw.js') is a Workbox precache that doesn't handle 'push'.
+                    const swUrl = '/sw-push.js';
                     try {
                       // Unregister any previous SWs that don't match the chosen script
                       try {
