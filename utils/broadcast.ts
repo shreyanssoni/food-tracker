@@ -12,6 +12,15 @@ export function slotFromHour(hour: number): Slot {
   return 'night';
 }
 
+// Exact-hour mapping: send only at these specific local times
+export function slotFromExactHour(hour: number): Slot | null {
+  if (hour === 8) return 'morning';
+  if (hour === 13) return 'midday';
+  if (hour === 18) return 'evening';
+  if (hour === 22) return 'night';
+  return null;
+}
+
 // Normalize common IANA aliases to a single canonical form, while preserving accepted aliases
 function normalizeTimezone(tz: string): { canonical: string; accepted: string[] } {
   const inStr = (tz || '').trim();
@@ -25,14 +34,24 @@ function normalizeTimezone(tz: string): { canonical: string; accepted: string[] 
 }
 
 function buildPrompt(slot: Slot, timezone: string) {
-  return `You are an empathetic nutrition coach. Write a concise push notification (title + body) for the ${slot} slot.
+  const base = `You are an empathetic nutrition coach.
 Audience: busy professionals in timezone ${timezone}.
 Constraints:
 - Title <= 45 chars, imperative or inviting
 - Body <= 120 chars, actionable and positive
-- Focus on protein-forward, hydration, and a tiny habit
+- Focus on protein-forward choices and hydration
 - No emojis
-Return JSON with keys: title, body, url (path starting with /).`;
+Return JSON: { "title": string, "body": string, "url": string starting with '/' }`;
+
+  // Slot-specific intent
+  const intents: Record<Slot, string> = {
+    morning: '8 AM: Encourage getting ready for the day and a workout. Gentle nudge to move body and hydrate before starting the day.',
+    midday: '1 PM: Ask to log breakfast and lunch. Nudge to reflect briefly and add a protein-forward choice if possible.',
+    evening: '6 PM: Motivation reminder. Reinforce that they are doing great, stay consistent, choose balanced snacks/dinner, and log meals.',
+    night: '10 PM: Wind down reminder. Encourage rest and relaxation, log dinner, and plan one tiny step for tomorrow.',
+  };
+
+  return `${base}\n\nTask: Write a concise push (title + body) for the ${slot} slot.\nIntent: ${intents[slot]}`;
 }
 
 export async function generateMessageFor(slot: Slot, timezone: string) {

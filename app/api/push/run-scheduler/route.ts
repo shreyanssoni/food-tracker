@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { broadcastToTimezone, slotFromHour, type Slot } from '@/utils/broadcast';
+import { broadcastToTimezone, slotFromExactHour, type Slot } from '@/utils/broadcast';
 import { createClient } from '@/utils/supabase/server';
 
 function hourInTimezone(tz: string) {
@@ -33,7 +33,8 @@ export async function GET(req: NextRequest) {
     const results: Array<{ timezone: string; slot: Slot; sent: number }> = [];
     for (const tz of finalTzs) {
       const hour = hourInTimezone(tz);
-      const slot = slotFromHour(hour);
+      const slot = slotFromExactHour(hour);
+      if (!slot) continue; // only send at exact hours 8,13,18,22
       const res = await broadcastToTimezone(slot, tz);
       results.push({ timezone: tz, slot, sent: res.sent });
     }
@@ -83,7 +84,9 @@ export async function POST(req: NextRequest) {
 
     for (const tz of tzs) {
       const hour = hourInTimezone(tz);
-      const slot = slotParam || slotFromHour(hour);
+      const derived = slotFromExactHour(hour);
+      const slot = slotParam || derived;
+      if (!slot) continue; // skip if not an exact-hour window and no explicit slot provided
       const res = await broadcastToTimezone(slot, tz);
       results.push({ timezone: tz, slot, sent: res.sent });
     }
