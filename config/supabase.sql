@@ -234,3 +234,26 @@ CREATE INDEX IF NOT EXISTS push_sends_user_time_idx ON public.push_sends(user_id
 ALTER TABLE public.push_sends ENABLE ROW LEVEL SECURITY;
 CREATE POLICY IF NOT EXISTS "Allow read to all on push_sends" ON public.push_sends FOR SELECT USING (true);
 CREATE POLICY IF NOT EXISTS "Allow insert to all on push_sends" ON public.push_sends FOR INSERT WITH CHECK (true);
+
+-- Device sessions -----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.device_sessions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT NOT NULL,
+  device_id TEXT NOT NULL,
+  push_endpoint TEXT,
+  user_agent TEXT,
+  ip TEXT,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '10 days'),
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  UNIQUE(user_id, device_id)
+);
+
+CREATE INDEX IF NOT EXISTS device_sessions_user_idx ON public.device_sessions(user_id);
+CREATE INDEX IF NOT EXISTS device_sessions_expiry_idx ON public.device_sessions(expires_at);
+
+ALTER TABLE public.device_sessions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "Allow select to all on device_sessions" ON public.device_sessions FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "Allow insert to all on device_sessions" ON public.device_sessions FOR INSERT WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow update to all on device_sessions" ON public.device_sessions FOR UPDATE USING (true) WITH CHECK (true);

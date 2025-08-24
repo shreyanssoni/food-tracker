@@ -1,8 +1,10 @@
 import NextAuth from 'next-auth';
 import Google from 'next-auth/providers/google';
+import Credentials from 'next-auth/providers/credentials';
 import { createClient } from '@/utils/supabase/server';
 import type { NextAuthConfig } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
+import { OAuth2Client } from 'google-auth-library';
 
 const config: NextAuthConfig = {
   providers: [
@@ -16,6 +18,34 @@ const config: NextAuthConfig = {
           response_type: 'code',
           scope: 'openid email profile',
         },
+      },
+    }),
+    Credentials({
+      id: 'google-onetap',
+      name: 'Google One Tap',
+      credentials: {
+        id_token: { label: 'Google ID Token', type: 'text' },
+      },
+      async authorize(credentials) {
+        try {
+          const idToken = (credentials as any)?.id_token as string;
+          if (!idToken) return null;
+          const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+          if (!clientId) return null;
+          const client = new OAuth2Client(clientId);
+          const ticket = await client.verifyIdToken({ idToken, audience: clientId });
+          const payload = ticket.getPayload();
+          if (!payload || !payload.email) return null;
+          return {
+            id: payload.sub || payload.email,
+            email: payload.email,
+            name: payload.name || payload.email.split('@')[0],
+            image: payload.picture || null,
+          } as any;
+        } catch (e) {
+          console.error('One Tap authorize error', e);
+          return null;
+        }
       },
     }),
   ],

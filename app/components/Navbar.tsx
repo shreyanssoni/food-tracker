@@ -6,6 +6,8 @@ import { useSession, signOut } from 'next-auth/react';
 import type { Route } from 'next';
 import { useEffect, useRef, useState } from 'react';
 import { useNotifications, syncSubscriptionWithServer } from '@/utils/notifications';
+import { sendSessionHeartbeat } from '@/utils/sessions';
+import { initGoogleOneTap } from '@/utils/oneTap';
 
 // Define route types as string literals
 type NavPath = '/me' | '/dashboard' | '/food' | '/groceries' | '/suggestions' | '/chat' | '/workouts';
@@ -139,6 +141,14 @@ export default function Navbar() {
     if (status === 'authenticated') {
       (async () => {
         try {
+          // Start/refresh device session; if expired -> logout
+          const hb = await sendSessionHeartbeat();
+          if (!hb.ok && hb.expired) {
+            try { await disableNotifications(); } catch {}
+            await signOut({ callbackUrl: '/' });
+            return;
+          }
+
           const res = await fetch('/api/me');
           if (res.status === 404) {
             // App user was deleted; clean up this device's push and sign out
@@ -160,6 +170,42 @@ export default function Navbar() {
     } else {
       setIsAdmin(false);
     }
+  }, [status]);
+
+  // Initialize Google One Tap for quick login when logged out
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (status !== 'unauthenticated') return;
+    if (pathname?.startsWith('/auth/')) return; // don't show on sign-in page
+    // Small delay so UI settles
+    const t = setTimeout(() => { void initGoogleOneTap(); }, 400);
+    return () => clearTimeout(t);
+  }, [status, pathname]);
+
+  // After auth, associate any existing browser push subscription with the user
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (status !== 'authenticated') return;
+    void syncSubscriptionWithServer();
+  }, [status]);
+
+  // Send heartbeat when tab becomes visible to refresh expiry window
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (status !== 'authenticated') return;
+    const onVis = async () => {
+      if (document.visibilityState === 'visible') {
+        const hb = await sendSessionHeartbeat();
+        if (!hb.ok && hb.expired) {
+          try { await disableNotifications(); } catch {}
+          await signOut({ callbackUrl: '/' });
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+    // fire once
+    void onVis();
+    return () => document.removeEventListener('visibilitychange', onVis);
   }, [status]);
 
   // Auto-prompt on sign-in/open if not granted/denied
