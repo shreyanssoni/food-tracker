@@ -29,6 +29,12 @@ CREATE TABLE IF NOT EXISTS public.app_users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS app_users_email_unique ON public.app_users(email);
+
+-- Add admin flag (idempotent)
+ALTER TABLE public.app_users
+  ADD COLUMN IF NOT EXISTS is_sys_admin BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- User preferences (diet, goals, etc.)
 CREATE TABLE IF NOT EXISTS public.user_preferences (
   user_id TEXT PRIMARY KEY REFERENCES public.app_users(id) ON DELETE CASCADE,
@@ -173,3 +179,58 @@ CREATE POLICY IF NOT EXISTS "Allow delete to all on groceries" ON public.groceri
 -- For production, you'd replace the above with something like:
 -- CREATE POLICY "Users can only see their own data" ON public.user_preferences
 --   USING (user_id = auth.uid());
+
+-- Push notifications -------------------------------------------
+CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT NOT NULL,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  expiration_time BIGINT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS push_subscriptions_user_idx ON public.push_subscriptions(user_id);
+
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+
+-- Dev policies (adjust for prod)
+CREATE POLICY IF NOT EXISTS "Allow select to all on push_subscriptions" ON public.push_subscriptions FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "Allow insert to all on push_subscriptions" ON public.push_subscriptions FOR INSERT WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow delete to all on push_subscriptions" ON public.push_subscriptions FOR DELETE USING (true);
+
+-- Cache AI-generated push texts to reduce cost (optional)
+CREATE TABLE IF NOT EXISTS public.push_message_cache (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  date date NOT NULL,
+  slot TEXT NOT NULL CHECK (slot IN ('morning','midday','evening','night')),
+  timezone TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  url TEXT DEFAULT '/',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(date, slot, timezone)
+);
+
+ALTER TABLE public.push_message_cache ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "Allow read to all on push_message_cache" ON public.push_message_cache FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "Allow insert to all on push_message_cache" ON public.push_message_cache FOR INSERT WITH CHECK (true);
+
+-- Log of pushes sent (for observability)
+CREATE TABLE IF NOT EXISTS public.push_sends (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT, -- null for broadcast logs
+  slot TEXT CHECK (slot IN ('morning','midday','evening','night')),
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  url TEXT DEFAULT '/',
+  success BOOLEAN NOT NULL DEFAULT true,
+  status_code INT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS push_sends_user_time_idx ON public.push_sends(user_id, created_at DESC);
+ALTER TABLE public.push_sends ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "Allow read to all on push_sends" ON public.push_sends FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "Allow insert to all on push_sends" ON public.push_sends FOR INSERT WITH CHECK (true);

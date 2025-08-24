@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
+import { useNotifications } from '@/utils/notifications';
 import { useSession } from 'next-auth/react';
 
 type Units = 'metric' | 'us';
@@ -11,7 +12,7 @@ export default function SettingsPage() {
   const [units, setUnits] = useState<Units>('metric');
   const [theme, setTheme] = useState<Theme>('system');
   const [dietary, setDietary] = useState('');
-  const [notifications, setNotifications] = useState(false);
+  const { enabled: notifications, status: notifStatus, pending, toggle, enable, disable } = useNotifications();
 
   // load from localStorage
   useEffect(() => {
@@ -23,7 +24,7 @@ export default function SettingsPage() {
       setUnits(lu);
       setTheme(lt);
       setDietary(ld);
-      setNotifications(ln);
+      // notifications state comes from hook; keep localStorage for backward compat
       applyTheme(lt);
     } catch {}
   }, []);
@@ -53,13 +54,15 @@ export default function SettingsPage() {
     localStorage.setItem('pref_dietary', v);
   };
 
-  const onToggleNotifications = (v: boolean) => {
-    setNotifications(v);
-    localStorage.setItem('pref_notifications', v ? '1' : '0');
-    // Hook: request permission if enabling
-    if (v && typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {});
-    }
+  useEffect(() => {
+    try {
+      if (notifications) localStorage.setItem('pref_notifications', '1');
+      else localStorage.setItem('pref_notifications', '0');
+    } catch {}
+  }, [notifications]);
+
+  const onToggleNotifications = async (v: boolean) => {
+    if (v) await enable(); else await disable();
   };
 
   return (
@@ -118,13 +121,20 @@ export default function SettingsPage() {
                     <div className="text-sm font-medium text-gray-700 dark:text-gray-200">Notifications</div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">Reminders for logging meals and habits.</p>
                   </div>
-                  <button
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${notifications ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`}
-                    onClick={() => onToggleNotifications(!notifications)}
-                    aria-pressed={notifications}
-                  >
-                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${notifications ? 'translate-x-5' : 'translate-x-1'}`} />
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${notifications ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`}
+                      onClick={() => toggle()}
+                      disabled={pending}
+                      aria-busy={pending}
+                      aria-pressed={!!notifications}
+                    >
+                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${notifications ? 'translate-x-5' : 'translate-x-1'}`} />
+                    </button>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {pending ? 'Working…' : notifStatus === 'unsupported' ? 'Not supported' : `Permission: ${notifStatus}`}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

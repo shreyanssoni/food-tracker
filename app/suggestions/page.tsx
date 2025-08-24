@@ -93,7 +93,9 @@ export default function SuggestionsPage() {
     const days: DayTotals[] = Array.from({ length: 7 }).map((_, i) => {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
-      const label = d.toLocaleDateString(undefined, { weekday: 'short' });
+      const w = d.toLocaleDateString(undefined, { weekday: 'short' });
+      const dm = d.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit' });
+      const label = `${w} ${dm}`; // e.g., Sun 24/08
       return { date: label, calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
     });
     (data || []).forEach((l: any) => {
@@ -422,20 +424,128 @@ export default function SuggestionsPage() {
   if (loading) {
     return (
       <div className="space-y-6" aria-hidden>
+        {/* Greeting + Next Meal & Aim For */}
         <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-6 border border-gray-100 dark:border-gray-800">
-          <div className="skeleton-line w-1/3 mb-4" />
-          <div className="space-y-2">
-            <div className="skeleton-line w-2/3" />
-            <div className="skeleton-line w-1/2" />
+          <div className="skeleton-line w-1/3 mb-2" />
+          <div className="skeleton-line w-1/2 mb-4" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-lg border border-gray-100 dark:border-gray-800 p-4">
+              <div className="skeleton-line w-1/3 mb-3" />
+              <div className="space-y-2">
+                <div className="skeleton-line w-5/6" />
+                <div className="skeleton-line w-2/3" />
+                <div className="skeleton-line w-1/2" />
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <div className="h-7 w-36 rounded-lg bg-gray-100 dark:bg-gray-800" />
+                <div className="h-7 w-24 rounded-lg bg-gray-100 dark:bg-gray-800" />
+                <div className="h-7 w-28 rounded-lg bg-gray-100 dark:bg-gray-800" />
+              </div>
+            </div>
+            <div className="rounded-lg border border-gray-100 dark:border-gray-800 p-4">
+              <div className="skeleton-line w-1/3 mb-3" />
+              <div className="space-y-2">
+                <div className="skeleton-line w-3/4" />
+                <div className="skeleton-line w-2/3" />
+                <div className="skeleton-line w-1/2" />
+                <div className="skeleton-line w-1/3" />
+              </div>
+            </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-6 border border-gray-100 dark:border-gray-800">
-          <div className="skeleton-line w-1/2 mb-3" />
-          <div className="skeleton-line w-3/4" />
-        </div>
-        <div className="bg-blue-50 rounded-xl p-6">
+
+        {/* AI meal ideas */}
+        <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-5 bg-white dark:bg-gray-950">
           <div className="skeleton-line w-1/4 mb-3" />
-          <div className="skeleton-line w-2/3" />
+          <div className="space-y-3">
+            {[0,1,2].map(i => (
+              <div key={i} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/40">
+                <div className="space-y-2">
+                  <div className="skeleton-line w-40" />
+                  <div className="skeleton-line w-28" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-7 w-20 rounded-lg bg-gray-100 dark:bg-gray-800" />
+                  <div className="h-7 w-14 rounded-lg bg-gray-100 dark:bg-gray-800" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Progress • Weekly chart */}
+        <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-6 border border-gray-100 dark:border-gray-800">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+            <div className="skeleton-line w-24" />
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-16 rounded-lg bg-gray-100 dark:bg-gray-800" />
+              <div className="h-7 w-16 rounded-lg bg-gray-100 dark:bg-gray-800" />
+            </div>
+          </div>
+          <div className="skeleton-line w-48 mb-3" />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs mb-3">
+            <div className="h-3 w-20 rounded bg-gray-100 dark:bg-gray-800" />
+            <div className="h-3 w-16 rounded bg-gray-100 dark:bg-gray-800" />
+            <div className="h-3 w-16 rounded bg-gray-100 dark:bg-gray-800" />
+            <div className="h-3 w-44 rounded bg-gray-100 dark:bg-gray-800" />
+          </div>
+          <div className="-mx-2 overflow-x-auto pb-1 pt-2">
+            <div className="min-w-[520px] sm:min-w-0 grid grid-cols-7 gap-2 sm:gap-3 items-end mx-2" style={{ minHeight: 150 }}>
+              {Array.from({ length: 7 }).map((_, i) => (
+                <div key={i} className="flex flex-col items-center gap-1">
+                  <div className="w-5 sm:w-8 rounded-md bg-gray-100 dark:bg-gray-800" style={{ height: 120 }} />
+                  <div className="h-3 w-10 rounded bg-gray-100 dark:bg-gray-800" />
+                  <div className="h-3 w-12 rounded bg-gray-100 dark:bg-gray-800" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Hydration & Quick Actions */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 p-5">
+            <div className="skeleton-line w-1/4 mb-3" />
+            <div className="space-y-2">
+              <div className="skeleton-line w-2/3" />
+              <div className="skeleton-line w-1/2" />
+              <div className="skeleton-line w-1/3" />
+            </div>
+          </div>
+          <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-5">
+            <div className="skeleton-line w-1/4 mb-3" />
+            <div className="flex flex-wrap gap-2">
+              <div className="h-7 w-20 rounded-lg bg-gray-100 dark:bg-gray-800" />
+              <div className="h-7 w-24 rounded-lg bg-gray-100 dark:bg-gray-800" />
+              <div className="h-7 w-24 rounded-lg bg-gray-100 dark:bg-gray-800" />
+            </div>
+          </div>
+        </div>
+
+        {/* Grocery inventory */}
+        <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-5">
+          <div className="flex items-center justify-between mb-2">
+            <div className="skeleton-line w-40" />
+            <div className="h-4 w-40 rounded bg-gray-100 dark:bg-gray-800" />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-full border">
+                <div className="h-3 w-16 rounded bg-gray-100 dark:bg-gray-800" />
+                <div className="h-3 w-10 rounded bg-gray-100 dark:bg-gray-800" />
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* One-tap add • Recent */}
+        <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-5">
+          <div className="skeleton-line w-48 mb-3" />
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-8 w-28 rounded-lg bg-gray-100 dark:bg-gray-800" />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -559,9 +669,9 @@ export default function SuggestionsPage() {
 
       {/* Progress • Weekly chart */}
       <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-6 border border-gray-100 dark:border-gray-800">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-medium text-lg">Progress</h3>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+          <h3 className="font-medium text-lg order-1">Progress</h3>
+          <div className="order-2 sm:order-1 flex items-center gap-2 self-start sm:self-auto">
             <button
               onClick={() => setWeekOffset((v) => v + 1)}
               className="text-xs px-2 py-1 rounded border hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -580,7 +690,7 @@ export default function SuggestionsPage() {
         )}</p>
 
         {/* Legend */}
-        <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-300 mb-2">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-300 mb-2">
           <span className="inline-flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm bg-emerald-500" />Protein</span>
           <span className="inline-flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm bg-blue-500" />Carbs</span>
           <span className="inline-flex items-center gap-1"><span className="w-3 h-3 inline-block rounded-sm bg-amber-500" />Fats</span>
@@ -591,31 +701,36 @@ export default function SuggestionsPage() {
         {weekTotals.length === 0 ? (
           <div className="text-sm text-gray-500">No data for selected week.</div>
         ) : (
-          <div className="grid grid-cols-7 gap-3 items-end" style={{ minHeight: 160 }}>
-            {(() => {
-              const kcalPerDay = weekTotals.map(d => Math.max(0, Math.round((d.protein_g*4)+(d.carbs_g*4)+(d.fat_g*9))));
-              const maxKcal = Math.max(1, ...kcalPerDay);
-              return weekTotals.map((d, idx) => {
-                const totalKcal = kcalPerDay[idx];
-                const hPct = Math.min(100, Math.round((totalKcal / maxKcal) * 100));
-                const pk = Math.max(0, d.protein_g*4);
-                const ck = Math.max(0, d.carbs_g*4);
-                const fk = Math.max(0, d.fat_g*9);
-                const sum = Math.max(1, pk+ck+fk);
-                const ph = (pk/sum)*100, ch = (ck/sum)*100, fh = (fk/sum)*100;
-                return (
+          <div className="-mx-2 overflow-x-auto pb-1 pt-2">
+            <div className="min-w-[520px] sm:min-w-0 grid grid-cols-7 gap-2 sm:gap-3 items-end mx-2" style={{ minHeight: 150 }}>
+              {(() => {
+                const kcalPerDay = weekTotals.map(d => Math.max(0, Math.round((d.protein_g*4)+(d.carbs_g*4)+(d.fat_g*9))));
+                const maxKcal = Math.max(1, ...kcalPerDay);
+                return weekTotals.map((d, idx) => {
+                  const totalKcal = kcalPerDay[idx];
+                  const hPct = Math.min(100, Math.round((totalKcal / maxKcal) * 100));
+                  const pk = Math.max(0, d.protein_g*4);
+                  const ck = Math.max(0, d.carbs_g*4);
+                  const fk = Math.max(0, d.fat_g*9);
+                  const sum = Math.max(1, pk+ck+fk);
+                  const ph = (pk/sum)*100, ch = (ck/sum)*100, fh = (fk/sum)*100;
+                  return (
                   <div key={idx} className="flex flex-col items-center gap-1">
-                    <div className="w-7 sm:w-8 rounded-md bg-gray-100 dark:bg-gray-800 overflow-hidden flex flex-col justify-end" style={{ height: 140 }}>
+                    <div className="w-5 sm:w-8 rounded-md bg-gray-100 dark:bg-gray-800 overflow-hidden flex flex-col justify-end" style={{ height: 120 }}>
                       <div className="bg-emerald-500" style={{ height: `${(hPct*ph/100)}%` }} />
                       <div className="bg-blue-500" style={{ height: `${(hPct*ch/100)}%` }} />
                       <div className="bg-amber-500" style={{ height: `${(hPct*fh/100)}%` }} />
                     </div>
-                    <div className="text-[11px] text-gray-600 dark:text-gray-300">{d.date}</div>
+                    <div className="text-[11px] text-gray-600 dark:text-gray-300 leading-tight">
+                      <div>{d.date.split(' ')[0]}</div>
+                      <div className="text-gray-500">{d.date.split(' ')[1]}</div>
+                    </div>
                     <div className="text-[11px] text-gray-500">{totalKcal} kcal</div>
                   </div>
-                );
-              })
-            })()}
+                  );
+                })
+              })()}
+            </div>
           </div>
         )}
       </div>

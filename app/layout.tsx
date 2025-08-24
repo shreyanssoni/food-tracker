@@ -78,15 +78,33 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             dangerouslySetInnerHTML={{ 
               __html: `
                 if('serviceWorker' in navigator) {
-                  window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('/sw.js')
-                      .then(registration => {
-                        console.log('ServiceWorker registration successful');
-                      })
-                      .catch(err => {
-                        console.error('ServiceWorker registration failed: ', err);
-                      });
-                  });
+                  const registerSW = async () => {
+                    const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+                    const swUrl = isLocalhost ? '/sw-push.js' : '/sw.js';
+                    try {
+                      // Unregister any previous SWs that don't match the chosen script
+                      try {
+                        const regs = await navigator.serviceWorker.getRegistrations();
+                        regs.forEach(r => {
+                          const url = (r.active && r.active.scriptURL) || '';
+                          if (url && !url.endsWith(swUrl)) {
+                            r.unregister();
+                            console.log('[SW] Unregistered old:', url);
+                          }
+                        });
+                      } catch (e) {}
+
+                      const reg = await navigator.serviceWorker.register(swUrl, { scope: '/' });
+                      console.log('[SW] Registered:', swUrl);
+                      await navigator.serviceWorker.ready;
+                      console.log('[SW] Ready');
+                    } catch (err) {
+                      console.error('[SW] Registration failed:', err);
+                    }
+                  };
+
+                  if (document.readyState === 'complete') registerSW();
+                  else window.addEventListener('load', registerSW);
                 }
               ` 
             }} 

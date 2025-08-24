@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import type { Route } from 'next';
 import { useEffect, useRef, useState } from 'react';
+import { useNotifications } from '@/utils/notifications';
 
 // Define route types as string literals
 type NavPath = '/me' | '/dashboard' | '/food' | '/groceries' | '/suggestions' | '/chat' | '/workouts';
@@ -59,6 +60,8 @@ export default function Navbar() {
   const isActive = (path: string) => pathname === path;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const { enabled: notifEnabled, pending: notifPending, enable: enableNotifications, disable: disableNotifications } = useNotifications();
+  const [isAdmin, setIsAdmin] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const mobileMenuRef = useRef<HTMLDivElement | null>(null);
   
@@ -129,6 +132,48 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [mobileOpen]);
 
+  // Fetch admin flag
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Fetch admin flag when authenticated
+    if (status === 'authenticated') {
+      fetch('/api/me')
+        .then((r) => r.json())
+        .then((j) => {
+          setIsAdmin(Boolean(j?.user?.is_sys_admin));
+        })
+        .catch(() => setIsAdmin(false));
+    } else {
+      setIsAdmin(false);
+    }
+  }, [status]);
+
+  // Auto-prompt on sign-in/open if not granted/denied
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!('Notification' in window)) return;
+    if (status !== 'authenticated') return;
+    if (Notification.permission === 'default') {
+      // Fire and forget; errors are handled inside
+      enableNotifications();
+    }
+  }, [status]);
+
+  const sendTest = async () => {
+    try {
+      const res = await fetch('/api/push/send-test-admin', { method: 'POST' });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || 'Send failed');
+      }
+      alert('Test notification sent');
+    } catch (e) {
+      console.error('sendTest error', e);
+      alert('Failed to send test');
+    }
+  };
+
   if (status === 'loading') {
     return null;
   }
@@ -148,7 +193,16 @@ export default function Navbar() {
           </div>
 
           {/* Right: Actions */}
-          <div className="hidden sm:flex items-center">
+          <div className="hidden sm:flex items-center gap-3">
+            {status === 'authenticated' && isAdmin && (
+              <button
+                type="button"
+                onClick={sendTest}
+                className="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                Send test
+              </button>
+            )}
             {status === 'authenticated' ? (
               <div className="relative" ref={dropdownRef}>
                 <button
@@ -161,21 +215,47 @@ export default function Navbar() {
                   <span className="sr-only">Open user menu</span>
                   <img
                     className="h-8 w-8 rounded-full"
-                    src={session.user?.image || '/default-avatar.png'}
-                    alt={session.user?.name || 'User'}
+                    src={session?.user?.image || '/default-avatar.png'}
+                    alt={session?.user?.name || 'User'}
                   />
                 </button>
                 {dropdownOpen && (
-                  <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-900 ring-1 ring-black/5 dark:ring-white/10 z-10">
-                    {dropdownItems.map((item) => (
-                      <DropdownLink key={item.path} {...item} />
-                    ))}
-                    <button
-                      onClick={() => signOut({ callbackUrl: '/' })}
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                    >
-                      Sign out
-                    </button>
+                  <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-900 ring-1 ring-black ring-opacity-5 focus:outline-none z-20">
+                    <div className="py-1">
+                      {/* Notifications toggle */}
+                      <button
+                        className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        onClick={async () => {
+                          if (notifPending) return;
+                          if (notifEnabled) {
+                            await disableNotifications();
+                          } else {
+                            await enableNotifications();
+                          }
+                        }}
+                        disabled={notifPending || notifEnabled === null}
+                        aria-busy={notifPending}
+                      >
+                        <span>Notifications {notifPending ? '(working...)' : ''}</span>
+                        <span
+                          className={`${notifEnabled ? 'bg-blue-600' : 'bg-gray-300'} ${notifPending ? 'opacity-60' : ''} inline-flex h-5 w-10 items-center rounded-full transition-colors`}
+                          aria-hidden
+                        >
+                          <span
+                            className={`${notifEnabled ? 'translate-x-5' : 'translate-x-1'} inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+                          />
+                        </span>
+                      </button>
+                      {dropdownItems.map((item) => (
+                        <DropdownLink key={item.path} {...item} />
+                      ))}
+                      <button
+                        onClick={() => signOut({ callbackUrl: '/' })}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      >
+                        Sign out
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

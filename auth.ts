@@ -25,12 +25,27 @@ const config: NextAuthConfig = {
       try {
         const supabase = createClient();
 
-        // Upsert user into app_users
+        // 1) If a user already exists with this email, reuse its id
+        const { data: existingByEmail, error: findErr } = await supabase
+          .from('app_users')
+          .select('id, email')
+          .eq('email', user.email)
+          .maybeSingle();
+        if (findErr) {
+          console.error('Error finding user by email:', findErr);
+          return false;
+        }
+
+        const normalizedId = existingByEmail?.id || user.id!; // reuse existing id if found
+        // Mutate the user object so NextAuth uses our normalized id
+        user.id = normalizedId;
+
+        // 2) Upsert with normalized id
         const { error: upsertErr } = await supabase
           .from('app_users')
           .upsert(
             {
-              id: user.id,
+              id: normalizedId,
               email: user.email,
               name: user.name || user.email.split('@')[0],
               image: user.image || null,
@@ -44,13 +59,13 @@ const config: NextAuthConfig = {
           return false;
         }
 
-        // Ensure default preferences row exists
+        // 3) Ensure default preferences row exists for normalized id
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const { error: prefsErr } = await supabase
           .from('user_preferences')
           .upsert(
             {
-              user_id: user.id!,
+              user_id: normalizedId,
               timezone,
               updated_at: new Date().toISOString(),
             },
@@ -71,7 +86,9 @@ const config: NextAuthConfig = {
       if (token?.sub && session?.user) session.user.id = token.sub;
       return session;
     },
-    async jwt({ token }) {
+    async jwt({ token, user }: { token: JWT; user?: any }) {
+      // On first sign-in, user is present; ensure token.sub uses our normalized user.id
+      if (user?.id) token.sub = user.id;
       return token;
     },
   },

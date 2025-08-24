@@ -11,6 +11,7 @@ export async function middleware(request: NextRequest) {
     '/auth/signin',
     '/auth/error',
     '/api/auth/[...nextauth]',
+    '/api/push/run-scheduler',
     '/api/ai',
     '/api/trpc',
     '/_next',

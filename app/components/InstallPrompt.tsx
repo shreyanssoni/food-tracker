@@ -6,47 +6,42 @@ import { useEffect, useState } from 'react';
 export default function InstallPrompt() {
   const [deferred, setDeferred] = useState<any>(null);
   const [visible, setVisible] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [canPrompt, setCanPrompt] = useState(true);
 
   useEffect(() => {
-    const isMobileCheck = () => {
-      try {
-        const coarse = window.matchMedia('(pointer: coarse)').matches;
-        const narrow = window.matchMedia('(max-width: 1024px)').matches;
-        return coarse || narrow;
-      } catch {
-        return false;
-      }
+    const inStandalone = () => {
+      // iOS standalone check + PWA display-mode
+      // @ts-ignore
+      const iosStandalone = typeof navigator !== 'undefined' && (navigator as any).standalone;
+      const displayStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      return Boolean(iosStandalone || displayStandalone);
     };
 
     const onBeforeInstall = (e: any) => {
-      // Only handle on mobile; let desktop behave normally
-      if (!isMobileCheck()) return;
+      // If already installed, don't intercept
+      if (inStandalone()) return;
+      // We are going to show our own UI, so prevent default
       e.preventDefault();
       setDeferred(e);
       setVisible(true);
+      setCanPrompt(true);
     };
     window.addEventListener('beforeinstallprompt', onBeforeInstall as any);
 
-    // Some browsers fire appinstalled; hide if installed
     const onInstalled = () => {
       setVisible(false);
       setDeferred(null);
+      setCanPrompt(false);
     };
     window.addEventListener('appinstalled', onInstalled);
-
-    const onResize = () => setIsMobile(isMobileCheck());
-    onResize();
-    window.addEventListener('resize', onResize);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', onBeforeInstall as any);
       window.removeEventListener('appinstalled', onInstalled);
-      window.removeEventListener('resize', onResize);
     };
   }, []);
 
-  if (!isMobile || !visible || !deferred) return null;
+  if (!visible || !deferred || !canPrompt) return null;
 
   const install = async () => {
     try {

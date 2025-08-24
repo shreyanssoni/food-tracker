@@ -44,7 +44,9 @@ const nextConfig = {
 // Initialize PWA plugin with options, then wrap Next config
 const withPWA = withPWAInit({
   dest: 'public',
-  disable: process.env.NODE_ENV === 'development',
+  // Enable PWA in dev only if explicitly set
+  disable: process.env.NEXT_PUBLIC_ENABLE_PWA_DEV === '1' ? false : process.env.NODE_ENV === 'development',
+  customWorkerDir: 'worker',
 });
 
 export default withPWA(nextConfig);

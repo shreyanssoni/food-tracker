@@ -19,6 +19,7 @@ export default function ProfilePrompt() {
   const { data: session } = useSession();
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [completed, setCompleted] = useState(false);
   const [form, setForm] = useState<FormState>({
     height_cm: '',
@@ -64,10 +65,12 @@ export default function ProfilePrompt() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/preferences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           height_cm: Number(form.height_cm) || null,
           weight_kg: Number(form.weight_kg) || null,
@@ -81,6 +84,13 @@ export default function ProfilePrompt() {
       if (res.ok) {
         setCompleted(true);
         setShow(false);
+      } else {
+        let msg = 'Failed to save';
+        try {
+          const data = await res.json();
+          if (data?.error) msg = data.error;
+        } catch {}
+        setError(`${msg} (status ${res.status})`);
       }
     } finally {
       setLoading(false);
@@ -136,6 +146,9 @@ export default function ProfilePrompt() {
             </label>
           </div>
           <div className="flex justify-end gap-2 pt-2">
+            {error && (
+              <div className="mr-auto text-xs text-red-600 dark:text-red-400">{error}</div>
+            )}
             <button type="submit" disabled={loading} className="px-3 py-1 rounded-md bg-emerald-600 text-white disabled:opacity-60">{loading ? 'Saving…' : 'Save'}</button>
           </div>
         </form>
