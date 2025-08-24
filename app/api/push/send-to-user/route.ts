@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
         success,
         status_code: status,
       });
-      if (!success && (status === 404 || status === 410)) {
+      if (!success && (status === 404 || status === 410 || status === 403)) {
         // prune expired
         await supabase.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint);
       }
