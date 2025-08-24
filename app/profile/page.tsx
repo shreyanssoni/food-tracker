@@ -13,6 +13,7 @@ interface Profile {
   gender: 'male' | 'female' | 'other' | null;
   activity_level: Activity | null;
   goal: Goal | null;
+  workout_level: 'beginner' | 'intermediate' | 'advanced' | 'pro' | null;
 }
 
 export default function ProfilePage() {
@@ -27,6 +28,7 @@ export default function ProfilePage() {
     gender: null,
     activity_level: 'sedentary',
     goal: 'maintain',
+    workout_level: null,
   });
 
   useEffect(() => {
@@ -44,6 +46,7 @@ export default function ProfilePage() {
             gender: p.gender ?? null,
             activity_level: p.activity_level ?? 'sedentary',
             goal: p.goal ?? 'maintain',
+            workout_level: p.workout_level ?? null,
           });
         } catch (e: any) {
           setError(e?.message || 'Error');
@@ -71,6 +74,7 @@ export default function ProfilePage() {
           gender: profile.gender,
           activity_level: profile.activity_level,
           goal: profile.goal,
+          workout_level: profile.workout_level,
         }),
       });
       if (!res.ok) throw new Error('Failed to save');
@@ -191,6 +195,25 @@ export default function ProfilePage() {
               <option value="maintain">Maintain</option>
               <option value="lose">Lose</option>
               <option value="gain">Gain</option>
+            </select>
+          )}
+        </div>
+
+        {/* Workout intensity */}
+        <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-4 border border-gray-100 dark:border-gray-800">
+          <label className="text-xs uppercase tracking-wide text-gray-500">Workout intensity</label>
+          {!editing ? (
+            <div className="mt-1 text-base font-medium dark:text-gray-100">{profile.workout_level ?? '—'}</div>
+          ) : (
+            <select
+              className="mt-1 input w-full"
+              value={profile.workout_level ?? 'beginner'}
+              onChange={(e)=>setProfile({...profile, workout_level: e.target.value as any})}
+            >
+              <option value="beginner">Beginner</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="advanced">Advanced</option>
+              <option value="pro">Pro</option>
             </select>
           )}
         </div>

@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
     gender: body.gender ?? null,
     activity_level: body.activity_level ?? 'sedentary',
     goal: body.goal ?? 'maintain',
+    workout_level: body.workout_level ?? null,
     updated_at: new Date().toISOString(),
   };
 

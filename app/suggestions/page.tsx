@@ -220,26 +220,6 @@ export default function SuggestionsPage() {
     } as NutritionTotals;
   }, [targets, todayTotals]);
 
-  // One-tap add helpers
-  const presetMeals: Array<Partial<FoodLog> & { id: string }> = useMemo(() => {
-    const profile = (preferences as any)?.profile || preferences || {};
-    const restrictions: string[] = Array.isArray(profile?.dietary_restrictions) ? profile.dietary_restrictions.map((x: any) => String(x).toLowerCase()) : [];
-    const avoidMeat = restrictions.some((r) => ['meat', 'chicken', 'beef', 'pork', 'fish', 'seafood', 'non-veg', 'nonveg'].includes(r));
-    const avoidEggs = restrictions.includes('eggs');
-
-    // Only names; macros will be derived via AI parse on add
-    const base: Array<Partial<FoodLog> & { id: string }> = [
-      { id: 'preset-1', food_name: 'Greek yogurt with berries and almonds', eaten_at: new Date().toISOString() },
-      { id: 'preset-2', food_name: avoidMeat ? 'Paneer/tofu wrap with veggies' : 'Chicken salad wrap', eaten_at: new Date().toISOString() },
-      { id: 'preset-3', food_name: 'Tofu veggie stir-fry with rice', eaten_at: new Date().toISOString() },
-    ];
-
-    if (!avoidEggs) {
-      base.push({ id: 'preset-4', food_name: 'Egg omelet with toast and salad', eaten_at: new Date().toISOString() });
-    }
-
-    return base;
-  }, [preferences]);
 
   async function addQuick(log: Partial<FoodLog> & { id?: string }) {
     if (!session?.user?.id) return;
@@ -577,47 +557,26 @@ export default function SuggestionsPage() {
         )}
       </div>
 
-      {/* One-tap add */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-5">
-          <h3 className="font-medium text-lg mb-2">One-tap add • Presets</h3>
-          <div className="relative">
-            <div className="flex flex-wrap gap-2 pr-1 sm:overflow-x-auto sm:whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none]" style={{ scrollbarWidth: 'none' as any }}>
-            {presetMeals.map((m) => (
+      {/* One-tap add • Recent (Presets removed) */}
+      <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-5">
+        <h3 className="font-medium text-lg mb-2">One-tap add • Recent</h3>
+        {recentMeals.length === 0 ? (
+          <p className="text-sm text-gray-500">No recent meals yet.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {recentMeals.map((m) => (
               <button
                 key={m.id}
                 onClick={() => addQuick(m)}
-                className={`inline-flex shrink-0 text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800 ${addingId===m.id?'opacity-60 cursor-wait':''} ${justAddedId===m.id?'ring-2 ring-emerald-300':''}`}
+                className={`text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800 whitespace-normal break-words text-left max-w-[85vw] sm:max-w-none ${addingId===m.id?'opacity-60 cursor-wait':''} ${justAddedId===m.id?'ring-2 ring-emerald-300':''}`}
                 disabled={!!addingId}
                 aria-busy={addingId===m.id}
               >
                 {justAddedId===m.id ? 'Added ✓' : displayName(m)}
               </button>
             ))}
-            </div>
           </div>
-          </div>
-
-        <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-5">
-          <h3 className="font-medium text-lg mb-2">One-tap add • Recent</h3>
-          {recentMeals.length === 0 ? (
-            <p className="text-sm text-gray-500">No recent meals yet.</p>
-          ) : (
-            <div className="overflow-x-auto whitespace-nowrap flex gap-2 pr-1 [-ms-overflow-style:none] [scrollbar-width:none]" style={{ scrollbarWidth: 'none' as any }}>
-              {recentMeals.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => addQuick(m)}
-                  className={`inline-flex shrink-0 text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800 ${addingId===m.id?'opacity-60 cursor-wait':''} ${justAddedId===m.id?'ring-2 ring-emerald-300':''}`}
-                  disabled={!!addingId}
-                  aria-busy={addingId===m.id}
-                >
-                  {justAddedId===m.id ? 'Added ✓' : displayName(m)}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       

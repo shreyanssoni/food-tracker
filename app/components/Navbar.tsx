@@ -7,7 +7,7 @@ import type { Route } from 'next';
 import { useEffect, useRef, useState } from 'react';
 
 // Define route types as string literals
-type NavPath = '/me' | '/dashboard' | '/food' | '/groceries' | '/suggestions' | '/chat';
+type NavPath = '/me' | '/dashboard' | '/food' | '/groceries' | '/suggestions' | '/chat' | '/workouts';
 type DropdownPath = '/profile' | '/settings';
 type AuthPath = '/auth/signin';
 
@@ -36,6 +36,7 @@ const navItems: NavItem[] = [
   { path: '/dashboard', label: 'Dashboard' },
   { path: '/food', label: 'Food Log' },
   { path: '/groceries', label: 'Groceries' },
+  { path: '/workouts', label: 'Workouts' },
   { path: '/suggestions', label: 'Suggestions' },
   { path: '/chat', label: 'Coach' },
 ];

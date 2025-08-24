@@ -12,6 +12,7 @@ type FormState = {
   gender: 'male' | 'female' | 'other';
   activity_level: Activity;
   goal: Goal;
+  workout_level: 'beginner' | 'intermediate' | 'advanced' | 'pro';
 };
 
 export default function ProfilePrompt() {
@@ -26,6 +27,7 @@ export default function ProfilePrompt() {
     gender: 'male',
     activity_level: 'sedentary',
     goal: 'maintain',
+    workout_level: 'beginner',
   });
 
   useEffect(() => {
@@ -36,8 +38,9 @@ export default function ProfilePrompt() {
       .then((d) => {
         const p = d?.profile;
         const hasTargets = !!d?.targets; // computed only when sufficient data exists
-        // If targets exist, profile is complete -> don't show modal
-        setShow(!hasTargets);
+        const hasWorkout = !!p?.workout_level;
+        // Show if targets missing OR workout level missing
+        setShow(!(hasTargets && hasWorkout));
         if (p) {
           setForm((prev) => ({
             ...prev,
@@ -47,6 +50,7 @@ export default function ProfilePrompt() {
             gender: p.gender || prev.gender,
             activity_level: p.activity_level || prev.activity_level,
             goal: p.goal || prev.goal,
+            workout_level: p.workout_level || prev.workout_level,
           }));
         }
       })
@@ -70,6 +74,7 @@ export default function ProfilePrompt() {
           gender: form.gender,
           activity_level: form.activity_level,
           goal: form.goal,
+          workout_level: form.workout_level,
         }),
       });
       if (res.ok) {
@@ -118,6 +123,14 @@ export default function ProfilePrompt() {
                 <option value="maintain">Maintain</option>
                 <option value="lose">Lose</option>
                 <option value="gain">Gain</option>
+              </select>
+            </label>
+            <label className="text-sm">Workout intensity
+              <select className="mt-1 w-full border border-gray-200 dark:border-gray-800 rounded-md px-2 py-1 bg-white dark:bg-gray-900" value={form.workout_level} onChange={(e)=>setForm({...form, workout_level: e.target.value as any})}>
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+                <option value="pro">Pro</option>
               </select>
             </label>
           </div>

@@ -7,11 +7,17 @@ function buildQueries(mode: 'male' | 'female' | 'mix') {
     'male gym physique, fitness body, abs, strength, bodybuilding, aesthetic',
     'athletic male body, gym, physique, shredded, abs, motivation',
     'men workout gym strength, physique, bodybuilding, athletic',
+    'calisthenics male outdoor workout, bars, bodyweight, street workout',
+    'male powerlifting strength, deadlift, squat, bench press, barbell',
+    'male cardio running treadmill, rowing, bike, conditioning',
   ];
   const female = [
     'female gym physique, fitness body, abs, strength, bodybuilding, aesthetic',
     'athletic woman body, gym, physique, shredded, abs, motivation',
     'women workout gym strength, physique, bodybuilding, athletic',
+    'yoga strong woman, flexibility, stretching, balance',
+    'female powerlifting strength, squat, deadlift, bench, barbell',
+    'female cardio running treadmill, cycling, conditioning',
   ];
   if (mode === 'male') return male;
   if (mode === 'female') return female;
@@ -25,11 +31,12 @@ function buildQueries(mode: 'male' | 'female' | 'mix') {
   return out;
 }
 
-async function searchUnsplash(query: string, perPage: number, page: number) {
+async function searchUnsplash(query: string, perPage: number, page: number, orientation: 'portrait'|'landscape'|'squarish', orderBy: 'relevant'|'latest') {
   const url = new URL('https://api.unsplash.com/search/photos');
   url.searchParams.set('query', query);
-  url.searchParams.set('orientation', 'portrait');
+  url.searchParams.set('orientation', orientation);
   url.searchParams.set('content_filter', 'high');
+  url.searchParams.set('order_by', orderBy);
   url.searchParams.set('per_page', String(perPage));
   url.searchParams.set('page', String(page));
   const res = await fetch(url.toString(), {
@@ -39,11 +46,17 @@ async function searchUnsplash(query: string, perPage: number, page: number) {
   if (!res.ok) throw new Error(`Unsplash error ${res.status}`);
   const data = await res.json();
   const results = Array.isArray(data?.results) ? data.results : [];
-  return results.map((r: any) => {
-    // prefer regular with width params for consistency
+  // Deduplicate by ID within this page
+  const seen = new Set<string>();
+  const urls: string[] = [];
+  for (const r of results) {
+    const id = r?.id;
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
     const src: string = r?.urls?.regular || r?.urls?.small || r?.urls?.full || '';
-    return src;
-  });
+    if (src) urls.push(src);
+  }
+  return urls;
 }
 
 export async function GET(req: NextRequest) {
@@ -71,17 +84,24 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ urls });
     }
 
-    // With API key: single query per page to keep costs low but results relevant
+    // With API key: vary orientation/order to increase variety, and dedupe
     const queries = buildQueries(mode);
+    const orientations: Array<'portrait'|'landscape'|'squarish'> = ['portrait','landscape','squarish'];
+    const orientation = orientations[(page - 1) % orientations.length];
+    const orderBy: 'relevant'|'latest' = ((page % 2) === 0 ? 'latest' : 'relevant');
     const q = queries[(page - 1) % queries.length];
-    let urls = await searchUnsplash(q, count, page);
-    // If Unsplash returns fewer than requested, pad from next query
+    let urls = await searchUnsplash(q, count, page, orientation, orderBy);
+    // If Unsplash returns fewer than requested, pad from next query/topic
     if (urls.length < count) {
       const q2 = queries[page % queries.length];
-      const more = await searchUnsplash(q2, count - urls.length, 1);
+      const more = await searchUnsplash(q2, count - urls.length, 1, orientation, orderBy);
       urls = urls.concat(more);
     }
-    return NextResponse.json({ urls });
+    // Final dedupe in case of overlap between q and q2, then shuffle slightly
+    const unique = Array.from(new Set(urls));
+    // light shuffle
+    unique.sort(() => Math.random() - 0.5);
+    return NextResponse.json({ urls: unique.slice(0, count) });
   } catch (e) {
     return NextResponse.json({ urls: [] }, { status: 200 });
   }

@@ -49,6 +49,7 @@ ALTER TABLE public.user_preferences
   ADD COLUMN IF NOT EXISTS gender TEXT CHECK (gender IN ('male','female','other')),
   ADD COLUMN IF NOT EXISTS activity_level TEXT, -- sedentary|light|moderate|very|super
   ADD COLUMN IF NOT EXISTS goal TEXT, -- maintain|lose|gain
+  ADD COLUMN IF NOT EXISTS workout_level TEXT CHECK (workout_level IN ('beginner','intermediate','advanced','pro')),
   ADD COLUMN IF NOT EXISTS fat_goal_grams INTEGER,
   ADD COLUMN IF NOT EXISTS carbs_goal_grams INTEGER;
 

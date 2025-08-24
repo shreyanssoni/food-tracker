@@ -114,17 +114,31 @@ export default function MePage() {
           const data = await res.json();
           const urls: string[] = Array.isArray(data?.urls) ? data.urls : [];
           if (!cancelled && urls.length) {
-            setImages((prev) => [...prev, ...urls]);
+            setImages((prev) => {
+              const seen = new Set(prev);
+              const uniqueNew = urls.filter((u) => !seen.has(u));
+              return uniqueNew.length ? [...prev, ...uniqueNew] : prev;
+            });
           }
         } else if (!cancelled) {
           // Fallback to client generator for this page
           const start = 0;
-          setImages((prev) => [...prev, ...planned.slice(start, start + pageSize)]);
+          setImages((prev) => {
+            const seen = new Set(prev);
+            const candidates = planned.slice(start, start + pageSize);
+            const uniqueNew = candidates.filter((u) => !seen.has(u));
+            return uniqueNew.length ? [...prev, ...uniqueNew] : prev;
+          });
         }
       } catch {
         if (!cancelled) {
           const start = 0;
-          setImages((prev) => [...prev, ...planned.slice(start, start + pageSize)]);
+          setImages((prev) => {
+            const seen = new Set(prev);
+            const candidates = planned.slice(start, start + pageSize);
+            const uniqueNew = candidates.filter((u) => !seen.has(u));
+            return uniqueNew.length ? [...prev, ...uniqueNew] : prev;
+          });
         }
       } finally {
         if (!cancelled) setLoading(false);

@@ -8,10 +8,9 @@ const items = [
   { href: "/me", label: "Me", icon: HeartIcon },
   { href: "/dashboard", label: "Home", icon: HomeIcon },
   { href: "/food", label: "Log", icon: PlusIcon },
+  { href: "/workouts", label: "Workouts", icon: DumbbellIcon },
   { href: "/suggestions", label: "Suggest", icon: SparklesIcon },
   { href: "/chat", label: "Chat", icon: ChatIcon },
-  { href: "/profile", label: "Profile", icon: UserIcon },
-  { href: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 export default function BottomNav() {
@@ -22,7 +21,7 @@ export default function BottomNav() {
       aria-label="Primary"
       className="fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200/80 dark:border-gray-800/80 bg-white/90 dark:bg-gray-950/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-gray-950/70 md:hidden"
     >
-      <ul className={`grid grid-cols-7 h-16 px-2`}>
+      <ul className={`grid grid-cols-6 h-16 px-2`}>
         {items.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== "/" && pathname?.startsWith(href));
           return (
@@ -93,6 +92,14 @@ function SettingsIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
       <path d="M10 2h4l.6 2.4 2.2 1.2 2.2-1.2 2 3.4-2 1.2V12l2 1.2-2 3.4-2.2-1.2-2.2 1.2L14 22h-4l-.6-2.4-2.2-1.2-2.2 1.2-2-3.4L5 13V11L3 9.8l2-3.4 2.2 1.2 2.2-1.2L10 2Zm2 7a4 4 0 1 0 4 4 4 4 0 0 0-4-4Z" className="stroke-current" fill="none" strokeWidth="1.5"/>
+    </svg>
+  );
+}
+
+function DumbbellIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <path d="M3 9h2v6H3V9Zm4-3h2v12H7V6Zm10 0h-2v12h2V6Zm4 3h-2v6h2V9Zm-13 4h6v-2H8v2Z" className="stroke-current" fill="none" strokeWidth="1.5"/>
     </svg>
   );
 }
