@@ -50,6 +50,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
     }
 
+    // Per-user rate limit (skip if authorized by cron secret): 5/hour, 20/day
+    if (!hasSecret) {
+      const now = new Date();
+      const hourAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+      const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+      const [{ count: hourCount }, { count: dayCount }] = await Promise.all([
+        supabase
+          .from('push_sends')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', targetUserId)
+          .gte('created_at', hourAgo),
+        supabase
+          .from('push_sends')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', targetUserId)
+          .gte('created_at', dayAgo),
+      ]);
+      if ((hourCount ?? 0) >= 5) {
+        return NextResponse.json({ error: 'Rate limit exceeded (5/hour)' }, { status: 429 });
+      }
+      if ((dayCount ?? 0) >= 20) {
+        return NextResponse.json({ error: 'Rate limit exceeded (20/day)' }, { status: 429 });
+      }
+    }
+
     // Fetch all subscriptions for target user
     const { data: subs, error: subErr } = await supabase
       .from('push_subscriptions')

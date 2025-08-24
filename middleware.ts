@@ -1,9 +1,55 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
+
+// Upstash Redis (edge) for rate limiting
+const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+  ? new Redis({ url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN })
+  : null;
+
+const limiterDefault = redis ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(60, '1 m') }) : null; // 60 req/min/IP default
+const limiterAI = redis ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 m') }) : null; // AI endpoints
+const limiterSendTest = redis ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 m') }) : null; // device test
+const limiterSendToUser = redis ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(30, '1 m') }) : null; // targeted sends
+const limiterScheduler = redis ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(2, '1 m') }) : null; // scheduler
+
+function getClientIp(req: NextRequest) {
+  return (
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip') ||
+    (req as any).ip ||
+    '0.0.0.0'
+  );
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Edge rate limiting for API routes (even if public), if Upstash configured
+  if (redis && pathname.startsWith('/api/')) {
+    const ip = getClientIp(request);
+    const isVercelCron = request.headers.get('x-vercel-cron');
+    // Allow Vercel Cron through (still low volume)
+    if (!isVercelCron) {
+      let result: { success: boolean } | null = null;
+      if (pathname.startsWith('/api/ai/')) {
+        result = await limiterAI!.limit(`ai:${ip}`);
+      } else if (pathname.startsWith('/api/push/send-test')) {
+        result = await limiterSendTest!.limit(`sendtest:${ip}`);
+      } else if (pathname.startsWith('/api/push/send-to-user')) {
+        result = await limiterSendToUser!.limit(`senduser:${ip}`);
+      } else if (pathname.startsWith('/api/push/run-scheduler')) {
+        result = await limiterScheduler!.limit(`sched:${ip}`);
+      } else {
+        result = await limiterDefault!.limit(`api:${ip}`);
+      }
+      if (result && !result.success) {
+        return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+      }
+    }
+  }
   
   // Public routes that don't require authentication
   const publicRoutes = [
@@ -28,7 +74,7 @@ export async function middleware(request: NextRequest) {
     pathname === route || pathname.startsWith(route + '/')
   );
 
-  // Skip middleware for public routes and static files
+  // Skip auth gate for public routes and static files
   if (isPublicRoute || 
       pathname.includes('.') || // Skip files with extensions
       pathname.startsWith('/_next/') ||

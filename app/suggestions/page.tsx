@@ -53,7 +53,7 @@ export default function SuggestionsPage() {
   type InvItem = { id: string; name: string; qty: number; unit: string };
   const [inventory, setInventory] = useState<InvItem[]>([]);
   const [newItem, setNewItem] = useState<{ name: string; qty: string; unit: string }>({ name: '', qty: '', unit: 'unit' });
-  const [strictness, setStrictness] = useState<number>(40); // 0 random -> 100 strictly use inventory
+  const [strictness, setStrictness] = useState<number>(80); // 0 random -> 100 strictly use inventory
   const [mealType, setMealType] = useState<string>('auto');
 
   // Weekly chart state

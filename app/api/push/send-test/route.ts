@@ -10,6 +10,28 @@ async function handleSend(slot?: Slot, timezone?: string) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const supabase = createClient();
+    // Per-user rate limit: 3/hour, 8/day
+    const now = new Date();
+    const hourAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const [{ count: hourCount }, { count: dayCount }] = await Promise.all([
+      supabase
+        .from('push_sends')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', hourAgo),
+      supabase
+        .from('push_sends')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', dayAgo),
+    ]);
+    if ((hourCount ?? 0) >= 3) {
+      return NextResponse.json({ error: 'Rate limit exceeded (3/hour)' }, { status: 429 });
+    }
+    if ((dayCount ?? 0) >= 8) {
+      return NextResponse.json({ error: 'Rate limit exceeded (8/day)' }, { status: 429 });
+    }
     const { data, error } = await supabase
       .from('push_subscriptions')
       .select('endpoint, p256dh, auth, expiration_time')

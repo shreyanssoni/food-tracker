@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
           typeof parsed.url === "string" &&
           parsed.url.startsWith("/")
         )
-          url = parsed.url;
+          url = '/suggestions';
       } else {
         body = cleaned.slice(0, 160) || body;
       }

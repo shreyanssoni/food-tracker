@@ -157,7 +157,7 @@ export async function geminiText(prompt: string) {
   }
 
   // Final graceful fallback to avoid breaking routes that rely on AI
-  return 'We are rate-limited right now. Provide a concise, actionable nutrition tip and a protein-forward next meal idea.';
+  return 'We are rate-limited right now.';
 }
 
 // Groq provider (OpenAI-compatible)
