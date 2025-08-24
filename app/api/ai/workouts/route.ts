@@ -96,15 +96,57 @@ Layout (example structure, adapt as needed):
 </div>`;
 }
 
+function buildEditPrompt(params: {
+  current_plan_html: string;
+  change_request: string;
+  profile?: {
+    height_cm?: number | null;
+    weight_kg?: number | null;
+    age?: number | null;
+    gender?: string | null;
+    activity_level?: string | null;
+    goal?: string | null;
+    workout_level?: string | null;
+  } | null;
+}) {
+  const { current_plan_html, change_request, profile } = params;
+  const profileText = profile
+    ? `User profile (for personalization): height_cm=${profile.height_cm ?? 'n/a'}, weight_kg=${profile.weight_kg ?? 'n/a'}, age=${profile.age ?? 'n/a'}, gender=${profile.gender ?? 'n/a'}, activity_level=${profile.activity_level ?? 'n/a'}, goal=${profile.goal ?? 'n/a'}, workout_level=${profile.workout_level ?? 'n/a'}.`
+    : 'No profile available.';
+
+  return `You are an evidence-based strength & conditioning coach and a careful HTML editor.
+
+Update the existing workout plan HTML based on the user's change request. Modify only what is necessary; keep the overall structure, sections, and styling consistent. Prefer swapping exercises with close alternatives that match the same movement pattern and intensity. Maintain time budget and progression notes.
+
+${profileText}
+
+Strict output requirements:
+- Return RAW HTML only (no markdown, no code fences). Use the same Tailwind-style structure: cards, badges, <details>/<summary> expanders.
+- Preserve existing headings and section order. If replacing an exercise, keep its list position but change its content/details appropriately.
+- Do not include <style> or <script> tags. Avoid inline event handlers.
+
+User change request:
+"""${change_request}"""
+
+Current plan HTML:
+<CURRENT_PLAN>
+${current_plan_html}
+</CURRENT_PLAN>
+
+Return the full, updated HTML.`;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = createClient();
     const body = await req.json().catch(() => ({}));
     const type = (body.type as 'home' | 'gym') || 'gym';
     const duration_min = Math.max(15, Math.min(120, Number(body.duration_min) || 45));
-    const muscles: string[] = Array.isArray(body.muscles) ? body.muscles.slice(0, 6) : [];
+    const muscles: string[] = Array.isArray(body.muscles) ? body.muscles.slice(0, 12) : [];
     const intensity = (body.intensity as 'beginner' | 'intermediate' | 'advanced' | 'pro') || 'beginner';
     const instructions = typeof body.instructions === 'string' ? body.instructions : '';
+    const current_plan_html = typeof body.current_plan_html === 'string' ? body.current_plan_html : '';
+    const change_request = typeof body.change_request === 'string' ? body.change_request : '';
 
     // Try to fetch current user and preferences
     const {
@@ -120,7 +162,10 @@ export async function POST(req: NextRequest) {
       profile = data || null;
     }
 
-    const prompt = buildPrompt({ type, duration_min, muscles, intensity, instructions, profile });
+    const isEdit = current_plan_html && change_request;
+    const prompt = isEdit
+      ? buildEditPrompt({ current_plan_html, change_request, profile })
+      : buildPrompt({ type, duration_min, muscles, intensity, instructions, profile });
     let html = await geminiText(prompt);
     // Strip accidental Markdown code fences (```html ... ``` or ``` ... ```)
     if (typeof html === 'string') {
@@ -130,7 +175,7 @@ export async function POST(req: NextRequest) {
       // Also handle leading/trailing fences without trailing newline
       html = html.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```\s*$/, '');
     }
-    return NextResponse.json({ plan_html: html, meta: { type, duration_min, muscles, intensity } });
+    return NextResponse.json({ plan_html: html, meta: { type, duration_min, muscles, intensity, edited: !!isEdit } });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed to generate workout' }, { status: 500 });
   }

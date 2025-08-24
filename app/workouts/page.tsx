@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
+import MultiSelect, { type MultiSelectOption } from "../components/MultiSelect";
 
 type Intensity = 'beginner' | 'intermediate' | 'advanced' | 'pro';
 
@@ -13,22 +14,77 @@ type FormState = {
 };
 
 const MUSCLE_OPTIONS = [
-  'chest',
-  'back',
-  'shoulders',
-  'biceps',
-  'triceps',
+  // Upper body — push
+  'chest-upper',
+  'chest-mid',
+  'chest-lower',
+  'anterior-delts',
+  'medial-delts',
+  'posterior-delts',
+  'triceps-long-head',
+  'triceps-lateral-head',
+  'triceps-medial-head',
+  // Upper body — pull
+  'lats',
+  'upper-back',
+  'mid-back',
+  'lower-back',
+  'traps-upper',
+  'traps-mid',
+  'traps-lower',
+  'biceps-long-head',
+  'biceps-short-head',
+  'forearms',
+  // Lower body
+  'glutes',
   'quads',
   'hamstrings',
-  'glutes',
-  'calves',
-  'core',
+  'adductors',
+  'abductors',
+  'calves-gastrocnemius',
+  'calves-soleus',
+  // Core
+  'abs-rectus',
+  'obliques',
+  'erectors',
+];
+
+const MUSCLE_OPTIONS_GROUPED: MultiSelectOption[] = [
+  { value: 'chest-upper', label: 'Upper Chest', group: 'Upper — Push' },
+  { value: 'chest-mid', label: 'Mid Chest', group: 'Upper — Push' },
+  { value: 'chest-lower', label: 'Lower Chest', group: 'Upper — Push' },
+  { value: 'anterior-delts', label: 'Front Delts', group: 'Upper — Push' },
+  { value: 'medial-delts', label: 'Side Delts', group: 'Upper — Push' },
+  { value: 'posterior-delts', label: 'Rear Delts', group: 'Upper — Push' },
+  { value: 'triceps-long-head', label: 'Triceps (Long Head)', group: 'Upper — Push' },
+  { value: 'triceps-lateral-head', label: 'Triceps (Lateral Head)', group: 'Upper — Push' },
+  { value: 'triceps-medial-head', label: 'Triceps (Medial Head)', group: 'Upper — Push' },
+  { value: 'lats', label: 'Lats', group: 'Upper — Pull' },
+  { value: 'upper-back', label: 'Upper Back', group: 'Upper — Pull' },
+  { value: 'mid-back', label: 'Mid Back', group: 'Upper — Pull' },
+  { value: 'lower-back', label: 'Lower Back', group: 'Upper — Pull' },
+  { value: 'traps-upper', label: 'Traps (Upper)', group: 'Upper — Pull' },
+  { value: 'traps-mid', label: 'Traps (Mid)', group: 'Upper — Pull' },
+  { value: 'traps-lower', label: 'Traps (Lower)', group: 'Upper — Pull' },
+  { value: 'biceps-long-head', label: 'Biceps (Long Head)', group: 'Upper — Pull' },
+  { value: 'biceps-short-head', label: 'Biceps (Short Head)', group: 'Upper — Pull' },
+  { value: 'forearms', label: 'Forearms', group: 'Upper — Pull' },
+  { value: 'glutes', label: 'Glutes', group: 'Lower Body' },
+  { value: 'quads', label: 'Quads', group: 'Lower Body' },
+  { value: 'hamstrings', label: 'Hamstrings', group: 'Lower Body' },
+  { value: 'adductors', label: 'Adductors', group: 'Lower Body' },
+  { value: 'abductors', label: 'Abductors', group: 'Lower Body' },
+  { value: 'calves-gastrocnemius', label: 'Calves (Gastrocnemius)', group: 'Lower Body' },
+  { value: 'calves-soleus', label: 'Calves (Soleus)', group: 'Lower Body' },
+  { value: 'abs-rectus', label: 'Abs (Rectus)', group: 'Core' },
+  { value: 'obliques', label: 'Obliques', group: 'Core' },
+  { value: 'erectors', label: 'Spinal Erectors', group: 'Core' },
 ];
 
 export default function WorkoutsPage() {
   const [form, setForm] = useState<FormState>({
     type: 'gym',
-    duration_min: 45,
+    duration_min: 60,
     muscles: [],
     intensity: 'beginner',
     instructions: '',
@@ -70,13 +126,38 @@ export default function WorkoutsPage() {
     return div.innerHTML;
   };
 
-  const toggleMuscle = (m: string) => {
+  // muscles selection handled by MultiSelect
+
+  const adjustDuration = (delta: number) => {
     setForm((prev) => ({
       ...prev,
-      muscles: prev.muscles.includes(m)
-        ? prev.muscles.filter((x) => x !== m)
-        : [...prev.muscles, m],
+      duration_min: Math.min(120, Math.max(15, prev.duration_min + delta)),
     }));
+  };
+
+  const [changeText, setChangeText] = useState('');
+  const requestChanges = async () => {
+    if (!planHtml || !changeText.trim()) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/ai/workouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          current_plan_html: planHtml,
+          change_request: changeText.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Failed to update');
+      setPlanHtml(String(data.plan_html || ''));
+      setChangeText('');
+    } catch (e: any) {
+      setError(e?.message || 'Failed to update plan');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -117,52 +198,51 @@ export default function WorkoutsPage() {
               <option value="gym">Gym</option>
             </select>
           </label>
-          <label className="text-sm">
+          <div className="text-sm">
             Duration (min)
-            <input
-              type="number"
-              min={15}
-              max={120}
-              className="mt-1 w-full border border-gray-200 dark:border-gray-800 rounded-md px-2 py-2 bg-white dark:bg-gray-900"
-              value={form.duration_min}
-              onChange={(e) => setForm({ ...form, duration_min: Number(e.target.value || 0) })}
-            />
-          </label>
-          <label className="text-sm">
-            Intensity
-            <select
-              className="mt-1 w-full border border-gray-200 dark:border-gray-800 rounded-md px-2 py-2 bg-white dark:bg-gray-900"
-              value={form.intensity}
-              onChange={(e) => setForm({ ...form, intensity: e.target.value as Intensity })}
-            >
-              <option value="beginner">Beginner</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="advanced">Advanced</option>
-              <option value="pro">Pro</option>
-            </select>
-          </label>
-        </div>
-        <div>
-          <div className="text-sm mb-2">Muscles to train (optional)</div>
-          <div className="flex flex-wrap gap-2">
-            {MUSCLE_OPTIONS.map((m) => {
-              const active = form.muscles.includes(m);
-              return (
-                <button
-                  type="button"
-                  key={m}
-                  onClick={() => toggleMuscle(m)}
-                  className={`px-3 py-1 rounded-full text-sm border ${
-                    active
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700'
-                  }`}
-                >
-                  {m}
-                </button>
-              );
-            })}
+            <div className="mt-1 flex items-center gap-2">
+              <button type="button" onClick={() => adjustDuration(-5)} className="px-2 py-1 rounded-md border border-gray-300 dark:border-gray-700">-</button>
+              <input
+                type="range"
+                min={15}
+                max={120}
+                step={5}
+                value={form.duration_min}
+                onChange={(e) => setForm({ ...form, duration_min: Number(e.target.value) })}
+                className="flex-1"
+              />
+              <button type="button" onClick={() => adjustDuration(5)} className="px-2 py-1 rounded-md border border-gray-300 dark:border-gray-700">+</button>
+              <span className="w-10 text-right text-sm">{form.duration_min}</span>
+            </div>
           </div>
+          <div className="text-sm">
+            Intensity
+            <div className="mt-1 flex flex-wrap gap-2">
+              {(['beginner','intermediate','advanced','pro'] as Intensity[]).map((lvl) => (
+                <button
+                  key={lvl}
+                  type="button"
+                  onClick={() => setForm({ ...form, intensity: lvl })}
+                  className={`px-3 py-1 rounded-full text-sm border ${form.intensity===lvl ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700'}`}
+                >
+                  {lvl}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="text-sm">
+          <div className="mb-1">Muscles to train (optional)</div>
+          <MultiSelect
+            options={MUSCLE_OPTIONS_GROUPED}
+            value={form.muscles}
+            onChange={(next) => setForm((p) => ({ ...p, muscles: next }))}
+            placeholder="Select body parts…"
+            searchPlaceholder="Search muscles or groups…"
+            clearText="Clear"
+            className="w-full"
+            groupsOrder={["Upper — Push","Upper — Pull","Lower Body","Core","Other"]}
+          />
         </div>
         <label className="text-sm">
           Instructions (optional, high priority)
@@ -211,6 +291,19 @@ export default function WorkoutsPage() {
             >
               Collapse all
             </button>
+          </div>
+          <div className="grid gap-2">
+            <label className="text-sm">Request changes to this plan</label>
+            <textarea
+              rows={3}
+              placeholder="e.g., I don't have a lat pulldown machine; please swap with a suitable alternative."
+              className="w-full border border-gray-200 dark:border-gray-800 rounded-md px-3 py-2 bg-white dark:bg-gray-900"
+              value={changeText}
+              onChange={(e)=>setChangeText(e.target.value)}
+            />
+            <div>
+              <button type="button" disabled={loading || !changeText.trim()} onClick={requestChanges} className="px-4 py-2 rounded-md bg-emerald-600 text-white disabled:opacity-60">{loading ? 'Updating…' : 'Send request'}</button>
+            </div>
           </div>
           <div
             ref={planRef}
