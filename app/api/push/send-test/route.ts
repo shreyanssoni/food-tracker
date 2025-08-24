@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { getCurrentUser } from '@/utils/auth';
 import { sendWebPush, type WebPushSubscription } from '@/utils/push';
+import { generateMessageFor, type Slot } from '@/utils/broadcast';
 
-export async function POST() {
+async function handleSend(slot?: Slot, timezone?: string) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -29,11 +30,12 @@ export async function POST() {
       keys: { p256dh: data.p256dh, auth: data.auth },
     };
 
-    const res = await sendWebPush(subscription, {
-      title: 'Test notification',
-      body: 'If you see this, push is working!',
-      url: '/suggestions',
-    });
+    // Build payload: if slot provided, generate slot-specific; else use fixed test
+    const payload = slot
+      ? await generateMessageFor(slot, timezone || 'Asia/Kolkata')
+      : { title: 'Test notification', body: 'If you see this, push is working!', url: '/suggestions' };
+
+    const res = await sendWebPush(subscription, payload);
 
     if (!res.ok) {
       const status = res.statusCode;
@@ -44,14 +46,23 @@ export async function POST() {
       return NextResponse.json({ error: 'Send failed', status }, { status: 502 });
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, slot: slot || null });
   } catch (e) {
     console.error('send-test error', e);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
-// Allow triggering via simple GET (useful on mobile without console)
-export async function GET() {
-  return POST();
+export async function POST(req: NextRequest) {
+  const body = (await req.json().catch(() => ({}))) as Partial<{ slot: Slot; timezone: string }>;
+  return handleSend(body.slot, body.timezone);
+}
+
+// Allow triggering via simple GET (useful on mobile without console). Supports query ?slot=morning&timezone=Asia/Kolkata
+export async function GET(req: NextRequest) {
+  const slotParam = (req.nextUrl.searchParams.get('slot') || '').trim() as Slot;
+  const tzParam = (req.nextUrl.searchParams.get('timezone') || '').trim();
+  const valid = ['morning','midday','evening','night'] as const;
+  const slot = (valid as readonly string[]).includes(slotParam) ? (slotParam as Slot) : undefined;
+  return handleSend(slot, tzParam || undefined);
 }
