@@ -39,7 +39,8 @@ Strict output requirements:
 - OUTPUT STRICTLY VALID, SEMANTIC HTML (no markdown). Do not include <style> or <script> tags. Use only standard tags and Tailwind utility classes.
 - Use Tailwind classes so it renders like a polished plan similar to Hevy: clear sections, cards, badges, spacing.
 - Avoid inline event handlers and external links.
-- USE <details> WITH <summary> TO MAKE SECTIONS COLLAPSIBLE. EACH EXERCISE IN "Main Sets" SHOULD BE A <details> ITEM WITH A <summary> HEADER CONTAINING THE NAME AND SET/REP SUMMARY.
+- Use <details> with <summary> to make sections collapsible. Each exercise in "Main Sets" should be a <details> item with a <summary> header containing the name and set/rep summary.
+- Do not format the HTML with code blocks. Return raw HTML only.
 
 Layout (example structure, adapt as needed):
 <div class="space-y-4">
@@ -120,7 +121,15 @@ export async function POST(req: NextRequest) {
     }
 
     const prompt = buildPrompt({ type, duration_min, muscles, intensity, instructions, profile });
-    const html = await geminiText(prompt);
+    let html = await geminiText(prompt);
+    // Strip accidental Markdown code fences (```html ... ``` or ``` ... ```)
+    if (typeof html === 'string') {
+      const fenceRegex = /^```[a-zA-Z]*\n([\s\S]*?)\n```\s*$/;
+      const m = html.match(fenceRegex);
+      if (m && m[1]) html = m[1];
+      // Also handle leading/trailing fences without trailing newline
+      html = html.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```\s*$/, '');
+    }
     return NextResponse.json({ plan_html: html, meta: { type, duration_min, muscles, intensity } });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed to generate workout' }, { status: 500 });
