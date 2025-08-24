@@ -19,7 +19,12 @@ export async function GET() {
       return NextResponse.json({ error: 'DB error' }, { status: 500 });
     }
 
-    return NextResponse.json({ user: { id: user.id, ...data } });
+    if (!data) {
+      // User is authenticated with NextAuth but not present in app_users
+      return NextResponse.json({ user: null }, { status: 404 });
+    }
+
+    return NextResponse.json({ user: data });
   } catch (e) {
     console.error('me route error', e);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

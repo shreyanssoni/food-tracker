@@ -69,7 +69,7 @@ async function handleSend(slot?: Slot, timezone?: string) {
       const res = await sendWebPush(subscription, payload);
       if (!res.ok) {
         const status = res.statusCode;
-        if (status === 404 || status === 410) {
+        if (status === 404 || status === 410 || status === 403) {
           // prune expired
           await supabase.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint);
         }

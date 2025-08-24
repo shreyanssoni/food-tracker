@@ -132,18 +132,31 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [mobileOpen]);
 
-  // Fetch admin flag
+  // Fetch admin flag and auto-logout if the app user record is missing
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Fetch admin flag when authenticated
     if (status === 'authenticated') {
-      fetch('/api/me')
-        .then((r) => r.json())
-        .then((j) => {
-          setIsAdmin(Boolean(j?.user?.is_sys_admin));
-        })
-        .catch(() => setIsAdmin(false));
+      (async () => {
+        try {
+          const res = await fetch('/api/me');
+          if (res.status === 404) {
+            // App user was deleted; clean up this device's push and sign out
+            try { await disableNotifications(); } catch {}
+            await signOut({ callbackUrl: '/' });
+            return;
+          }
+          const j = await res.json().catch(() => ({}));
+          if (!j?.user) {
+            try { await disableNotifications(); } catch {}
+            await signOut({ callbackUrl: '/' });
+            return;
+          }
+          setIsAdmin(Boolean(j.user.is_sys_admin));
+        } catch {
+          setIsAdmin(false);
+        }
+      })();
     } else {
       setIsAdmin(false);
     }
