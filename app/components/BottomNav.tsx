@@ -19,9 +19,9 @@ export default function BottomNav() {
     <nav
       role="navigation"
       aria-label="Primary"
-      className="fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200/80 dark:border-gray-800/80 bg-white/90 dark:bg-gray-950/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-gray-950/70 md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200/70 dark:border-gray-800/70 bg-white/80 dark:bg-gray-950/70 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-950/60 shadow-[0_-1px_0_0_rgba(0,0,0,0.04)] md:hidden"
     >
-      <ul className={`grid grid-cols-6 h-16 px-2`}>
+      <ul className={`grid grid-cols-6 h-[4.25rem] px-2 pb-[env(safe-area-inset-bottom)]`}>
         {items.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== "/" && pathname?.startsWith(href));
           return (
@@ -29,12 +29,14 @@ export default function BottomNav() {
               <Link
                 href={{ pathname: href }}
                 className={cn(
-                  "flex-1 flex flex-col items-center justify-center text-xs gap-1",
-                  active ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                  "flex-1 mx-1 my-1 flex flex-col items-center justify-center text-[11px] gap-1 rounded-full transition-colors",
+                  active
+                    ? "text-white bg-gradient-to-tr from-blue-600 to-emerald-500 shadow"
+                    : "text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100/70 dark:hover:bg-white/5"
                 )}
                 aria-current={active ? "page" : undefined}
               >
-                <Icon aria-hidden className={cn("h-6 w-6", active && "fill-blue-50 dark:fill-blue-950")}/>
+                <Icon aria-hidden className={cn("h-6 w-6", active && "fill-white/20")}/>
                 <span className="leading-none">{label}</span>
               </Link>
             </li>

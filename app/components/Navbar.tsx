@@ -69,10 +69,10 @@ export default function Navbar() {
   const NavLink = ({ path, label }: NavItem) => (
     <Link
       href={path as unknown as Route}
-      className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+      className={`inline-flex items-center px-3 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
         isActive(path)
-          ? 'bg-blue-600 text-white'
-          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800'
+          ? 'bg-gradient-to-tr from-blue-600 to-emerald-500 text-white shadow-sm'
+          : 'text-gray-700/90 dark:text-gray-200/90 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/70 dark:hover:bg-white/5'
       }`}
     >
       {label}
@@ -94,7 +94,7 @@ export default function Navbar() {
   const AuthLink = ({ path, label, className }: AuthItem) => (
     <Link
       href={path as unknown as Route}
-      className={`inline-flex items-center px-4 py-2 border text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${className}`}
+      className={`inline-flex items-center px-4 py-2 border text-sm font-medium rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${className}`}
     >
       {label}
     </Link>
@@ -179,12 +179,12 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="bg-white dark:bg-gray-950 shadow-sm border-b border-gray-200 dark:border-gray-800">
+    <nav className="sticky top-0 z-40 bg-white/70 dark:bg-gray-950/60 backdrop-blur supports-[backdrop-filter]:bg-white/50 dark:supports-[backdrop-filter]:bg-gray-950/50 border-b border-gray-200/70 dark:border-gray-800/60 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Left: Brand */}
           <div className="flex items-center gap-6">
-            <Link href="/" className="text-xl font-bold text-blue-600">Nourish</Link>
+            <Link href="/" className="text-xl font-bold bg-gradient-to-r from-blue-600 to-emerald-500 bg-clip-text text-transparent">Nourish</Link>
             <div className="hidden sm:flex items-center gap-2">
               {navItems.map((item) => (
                 <NavLink key={item.path} {...item} />
@@ -198,7 +198,7 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={sendTest}
-                className="px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="px-3 py-1.5 text-sm rounded-full border border-gray-200/80 dark:border-gray-800/80 hover:bg-gray-100/80 dark:hover:bg-white/5"
               >
                 Send test
               </button>
@@ -207,7 +207,7 @@ export default function Navbar() {
               <div className="relative" ref={dropdownRef}>
                 <button
                   type="button"
-                  className="bg-white dark:bg-gray-900 rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="bg-white/70 dark:bg-gray-900/70 rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 border border-gray-200/70 dark:border-gray-800/70"
                   aria-haspopup="true"
                   aria-expanded={dropdownOpen}
                   onClick={() => setDropdownOpen((v) => !v)}
@@ -220,11 +220,11 @@ export default function Navbar() {
                   />
                 </button>
                 {dropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-900 ring-1 ring-black ring-opacity-5 focus:outline-none z-20">
+                  <div className="absolute right-0 mt-2 w-56 rounded-xl shadow-xl bg-white/90 dark:bg-gray-900/90 backdrop-blur border border-gray-200/70 dark:border-gray-800/70 focus:outline-none z-20">
                     <div className="py-1">
                       {/* Notifications toggle */}
                       <button
-                        className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50/80 dark:hover:bg-white/5"
                         onClick={async () => {
                           if (notifPending) return;
                           if (notifEnabled) {
@@ -242,7 +242,7 @@ export default function Navbar() {
                           aria-hidden
                         >
                           <span
-                            className={`${notifEnabled ? 'translate-x-5' : 'translate-x-1'} inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+                            className={`${notifEnabled ? 'translate-x-5' : 'translate-x-1'} inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform`}
                           />
                         </span>
                       </button>
@@ -251,7 +251,7 @@ export default function Navbar() {
                       ))}
                       <button
                         onClick={() => signOut({ callbackUrl: '/' })}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50/80 dark:hover:bg-white/5"
                       >
                         Sign out
                       </button>
@@ -317,15 +317,15 @@ export default function Navbar() {
         id="mobile-menu"
         ref={mobileMenuRef}
       >
-        <div className="space-y-1 px-4 pt-2 pb-3 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800">
+        <div className="space-y-1 px-4 pt-2 pb-3 bg-white/90 dark:bg-gray-950/90 backdrop-blur border-b border-gray-200/70 dark:border-gray-800/70">
           {navItems.map((item) => (
             <Link
               key={item.path}
               href={item.path as unknown as Route}
-              className={`block px-3 py-2 rounded-md text-base font-medium ${
+              className={`block px-3 py-2 rounded-full text-base font-medium ${
                 isActive(item.path)
-                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800'
+                  ? 'bg-gradient-to-tr from-blue-600/90 to-emerald-500/90 text-white shadow'
+                  : 'text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5'
               }`}
               onClick={() => setMobileOpen(false)}
             >
@@ -333,7 +333,7 @@ export default function Navbar() {
             </Link>
           ))}
         </div>
-        <div className="border-t border-gray-200 dark:border-gray-800 px-4 py-3 bg-white dark:bg-gray-950">
+        <div className="border-t border-gray-200/70 dark:border-gray-800/70 px-4 py-3 bg-white/90 dark:bg-gray-950/90 backdrop-blur">
           {status === 'authenticated' ? (
             <>
               <div className="flex items-center gap-3">
@@ -345,18 +345,18 @@ export default function Navbar() {
               </div>
               <div className="mt-3 space-y-1">
                 {dropdownItems.map((item) => (
-                  <Link key={item.path} href={item.path as unknown as Route} className="block px-3 py-2 rounded-md text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setMobileOpen(false)}>
+                  <Link key={item.path} href={item.path as unknown as Route} className="block px-3 py-2 rounded-full text-base font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5" onClick={() => setMobileOpen(false)}>
                     {item.label}
                   </Link>
                 ))}
-                <button onClick={() => signOut({ callbackUrl: '/' })} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800">
+                <button onClick={() => signOut({ callbackUrl: '/' })} className="block w-full text-left px-3 py-2 rounded-full text-base font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5">
                   Sign out
                 </button>
               </div>
             </>
           ) : (
             <div className="space-y-1">
-              <Link href="/auth/signin" className="block w-full px-3 py-2 rounded-md text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setMobileOpen(false)}>
+              <Link href="/auth/signin" className="block w-full px-3 py-2 rounded-full text-base font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5" onClick={() => setMobileOpen(false)}>
                 Sign in
               </Link>
             </div>

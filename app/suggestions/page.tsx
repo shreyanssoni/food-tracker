@@ -578,11 +578,11 @@ export default function SuggestionsPage() {
       )}
 
       {/* Greeting + Next Meal */}
-      <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-6 border border-gray-100 dark:border-gray-800">
-        <h2 className="text-xl font-semibold mb-1">Hello{suggestion?.greeting ? `, ${suggestion.greeting}` : ''}!</h2>
+      <div className="bg-white/80 dark:bg-gray-950/70 backdrop-blur rounded-2xl shadow-sm p-6 border border-gray-100/70 dark:border-gray-800/70">
+        <h2 className="text-xl font-semibold mb-1 bg-gradient-to-r from-blue-600 to-emerald-500 bg-clip-text text-transparent">Hello{suggestion?.greeting ? `, ${suggestion.greeting}` : ''}!</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Here’s a plan tailored for the rest of your {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}.</p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-lg border border-gray-100 dark:border-gray-800 p-4">
+          <div className="rounded-xl border border-gray-100/70 dark:border-gray-800/70 p-4 bg-white/70 dark:bg-gray-900/60 backdrop-blur">
             <h3 className="font-medium mb-2">Next meal idea</h3>
             {genLoading ? (
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300" role="status" aria-busy>
@@ -597,13 +597,13 @@ export default function SuggestionsPage() {
             )}
             <div className="mt-3">
               <div className="flex flex-wrap items-center gap-2">
-                <button onClick={generateMeals} className="text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800" disabled={genLoading} aria-busy={genLoading}>
+                <button onClick={generateMeals} className="text-xs px-3 py-1.5 rounded-full bg-gradient-to-tr from-blue-600 to-emerald-500 text-white shadow disabled:opacity-60" disabled={genLoading} aria-busy={genLoading}>
                   {genLoading ? 'Generating…' : '✨ Magic: Generate meals'}
                 </button>
                 {nextMealIdea && (
                   <button
                     onClick={() => router.push(`/recipes?name=${encodeURIComponent(nextMealIdea)}`)}
-                    className="text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800"
+                    className="text-xs px-3 py-1.5 rounded-full border border-gray-300/80 dark:border-gray-700/80 hover:bg-gray-100/70 dark:hover:bg-white/5"
                   >
                     View recipe
                   </button>
@@ -614,7 +614,7 @@ export default function SuggestionsPage() {
                   <span className="w-8 text-right">{strictness}</span>
                 </div>
                 <div className="text-xs">
-                  <select value={mealType} onChange={(e) => setMealType(e.target.value)} className="px-2 py-1 rounded border bg-white dark:bg-gray-900">
+                  <select value={mealType} onChange={(e) => setMealType(e.target.value)} className="px-2 py-1 rounded-lg border border-gray-300/80 dark:border-gray-700/80 bg-white/80 dark:bg-gray-900/70 backdrop-blur">
                     <option value="auto">Auto</option>
                     <option value="snack">Snack</option>
                     <option value="breakfast">Breakfast</option>
@@ -626,7 +626,7 @@ export default function SuggestionsPage() {
               </div>
             </div>
           </div>
-          <div className="rounded-lg border border-gray-100 dark:border-gray-800 p-4">
+          <div className="rounded-xl border border-gray-100/70 dark:border-gray-800/70 p-4 bg-white/70 dark:bg-gray-900/60 backdrop-blur">
             <h3 className="font-medium mb-2">What to aim for</h3>
             {gaps ? (
               <ul className="text-sm text-gray-700 dark:text-gray-200 space-y-1">
@@ -644,20 +644,20 @@ export default function SuggestionsPage() {
 
       {/* AI meal ideas (moved just below generation area) */}
       {generatedMeals.length > 0 && (
-        <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-5 bg-white dark:bg-gray-950">
+        <div className="rounded-2xl border border-gray-100/70 dark:border-gray-800/70 p-5 bg-white/80 dark:bg-gray-950/70 backdrop-blur shadow-sm">
           <h3 className="font-medium text-lg mb-2">AI meal ideas</h3>
           <div className="space-y-3">
             {generatedMeals.map((g, idx) => (
-              <div key={idx} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/40">
+              <div key={idx} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100/70 dark:border-gray-800/70 bg-white/60 dark:bg-gray-900/50 backdrop-blur">
                 <div>
                   <div className="text-sm font-medium">{g.name}</div>
                   {g.why && <div className="text-xs text-gray-500 dark:text-gray-400">{g.why}</div>}
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => router.push(`/recipes?name=${encodeURIComponent(g.name)}`)} className="text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800">
+                  <button onClick={() => router.push(`/recipes?name=${encodeURIComponent(g.name)}`)} className="text-xs px-3 py-1.5 rounded-full border border-gray-300/80 dark:border-gray-700/80 hover:bg-gray-100/70 dark:hover:bg-white/5">
                     View recipe
                   </button>
-                  <button onClick={() => addQuick({ id: `gen-${idx}`, food_name: g.name })} className="text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800">
+                  <button onClick={() => addQuick({ id: `gen-${idx}`, food_name: g.name })} className="text-xs px-3 py-1.5 rounded-full border border-gray-300/80 dark:border-gray-700/80 hover:bg-gray-100/70 dark:hover:bg-white/5">
                     Add
                   </button>
                 </div>
@@ -668,18 +668,18 @@ export default function SuggestionsPage() {
       )}
 
       {/* Progress • Weekly chart */}
-      <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-6 border border-gray-100 dark:border-gray-800">
+      <div className="bg-white/80 dark:bg-gray-950/70 backdrop-blur rounded-2xl shadow-sm p-6 border border-gray-100/70 dark:border-gray-800/70">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-          <h3 className="font-medium text-lg order-1">Progress</h3>
+          <h3 className="font-medium text-lg order-1 bg-gradient-to-r from-blue-600 to-emerald-500 bg-clip-text text-transparent">Progress</h3>
           <div className="order-2 sm:order-1 flex items-center gap-2 self-start sm:self-auto">
             <button
               onClick={() => setWeekOffset((v) => v + 1)}
-              className="text-xs px-2 py-1 rounded border hover:bg-gray-50 dark:hover:bg-gray-800"
+              className="text-xs px-2 py-1 rounded-full border border-gray-300/80 dark:border-gray-700/80 hover:bg-gray-100/70 dark:hover:bg-white/5"
               title="Previous week"
             >← Prev</button>
             <button
               onClick={() => setWeekOffset((v) => Math.max(0, v - 1))}
-              className="text-xs px-2 py-1 rounded border hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+              className="text-xs px-2 py-1 rounded-full border border-gray-300/80 dark:border-gray-700/80 hover:bg-gray-100/70 dark:hover:bg-white/5 disabled:opacity-50"
               disabled={weekOffset === 0}
               title="Next week"
             >Next →</button>

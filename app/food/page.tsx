@@ -85,38 +85,46 @@ export default function FoodPage() {
   }, [logs]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {toast && (
         <div role="status" aria-live="polite" className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm px-4 py-2 rounded-full shadow-lg">
           {toast}
         </div>
       )}
       <HabitBanner />
-      <div className="bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 shadow-soft rounded-xl p-4">
-        <div className="flex items-baseline justify-between">
-          <h1 className="text-lg font-semibold">Log your meal</h1>
+      <div className="relative overflow-hidden rounded-2xl border border-gray-200/70 dark:border-gray-800/70 bg-white/80 dark:bg-gray-950/70 backdrop-blur shadow-sm">
+        <div className="absolute inset-0 -z-10 opacity-[0.12] pointer-events-none">
+          <div className="absolute -top-12 -left-10 h-40 w-40 rounded-full bg-blue-500 blur-3xl" />
+          <div className="absolute -bottom-16 -right-10 h-40 w-40 rounded-full bg-emerald-500 blur-3xl" />
         </div>
-        <div className="mt-2">
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1" htmlFor="log-date">Date</label>
-          <input
-            id="log-date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full border rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-900"
-          />
+        <div className="p-4 sm:p-5">
+          <div className="flex items-baseline justify-between">
+            <h1 className="text-xl font-semibold bg-gradient-to-r from-blue-600 to-emerald-500 bg-clip-text text-transparent">Log your meal</h1>
+          </div>
         </div>
+        <div className="px-4 sm:px-5 pb-4">
+          <div className="mt-2">
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1" htmlFor="log-date">Date</label>
+            <input
+              id="log-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-full border border-gray-200/70 dark:border-gray-800/70 rounded-lg px-3 py-2 text-sm bg-white/80 dark:bg-gray-900/70 backdrop-blur"
+            />
+          </div>
 
-        {/* Quick text log */}
-        <div className="mt-4">
-          <h2 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Quick log</h2>
-          <FoodForm onLogged={onLogged} />
+          {/* Quick text log */}
+          <div className="mt-4">
+            <h2 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Quick log</h2>
+            <FoodForm onLogged={onLogged} />
+          </div>
+
+          {/* Collapsible photo upload */}
+          <PhotoUploadSection onLogged={onLogged} />
+
+          <p className="text-xs text-gray-500 mt-4">{userEmail ? `Signed in as ${userEmail}` : 'You can log anonymously; sign in to sync across devices.'}</p>
         </div>
-
-        {/* Collapsible photo upload */}
-        <PhotoUploadSection onLogged={onLogged} />
-
-        <p className="text-xs text-gray-500 mt-4">{userEmail ? `Signed in as ${userEmail}` : 'You can log anonymously; sign in to sync across devices.'}</p>
       </div>
 
       {targets ? (
@@ -159,7 +167,7 @@ function PhotoUploadSection({ onLogged }: { onLogged: (log: any) => void }) {
       <button
         type="button"
         onClick={() => setOpen((v: boolean) => !v)}
-        className="w-full flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-800 px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+        className="w-full flex items-center justify-between rounded-xl border border-gray-200/70 dark:border-gray-800/70 px-3 py-2 text-sm hover:bg-gray-50/80 dark:hover:bg-white/5"
         aria-expanded={open}
         aria-controls="photo-upload-panel"
       >
@@ -179,7 +187,7 @@ function PhotoUploadSection({ onLogged }: { onLogged: (log: any) => void }) {
 
 function SkeletonLogCard() {
   return (
-    <div className="bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 shadow-soft rounded-xl p-4">
+    <div className="bg-white/80 dark:bg-gray-950/70 backdrop-blur border border-gray-200/70 dark:border-gray-800/70 shadow-sm rounded-2xl p-4">
       <div className="flex items-start gap-3">
         <div className="h-12 w-12 skeleton-circle" />
         <div className="flex-1 space-y-2">

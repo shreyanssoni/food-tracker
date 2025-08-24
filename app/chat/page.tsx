@@ -90,16 +90,16 @@ export default function ChatPage() {
         </div>
       )}
 
-      <header className="sticky top-0 z-20 mb-3 pt-4 pb-3 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b border-gray-100 dark:border-gray-800">
+      <header className="sticky top-0 z-20 mb-3 pt-4 pb-3 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b border-gray-100/70 dark:border-gray-800/70">
         <div className="flex items-center justify-between gap-3 px-px">
           <div>
-            <h1 className="text-lg font-semibold leading-tight">Coach</h1>
+            <h1 className="text-lg font-semibold leading-tight bg-gradient-to-r from-blue-600 to-emerald-500 bg-clip-text text-transparent">Coach</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400">Quick, practical guidance for meals, macros, and habits.</p>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={clearHistory}
-              className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 dark:border-gray-800 px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-800"
+              className="inline-flex items-center gap-1.5 rounded-full border border-gray-200/80 dark:border-gray-800/80 px-3 py-1.5 text-xs hover:bg-gray-100/70 dark:hover:bg-white/5"
               aria-label="Clear conversation"
               aria-busy={initialLoading || undefined}
             >
@@ -137,7 +137,7 @@ export default function ChatPage() {
           {loading && (
             <div className="flex gap-2 items-end text-sm text-gray-500 dark:text-gray-400">
               <div className="h-8 w-8 rounded-full bg-blue-50 dark:bg-blue-950 grid place-items-center text-blue-600 dark:text-blue-300">🤖</div>
-              <div className="px-3 py-2 rounded-2xl bg-gray-100 dark:bg-gray-800">
+              <div className="px-3 py-2 rounded-2xl bg-white/70 dark:bg-gray-900/60 border border-gray-200/60 dark:border-gray-800/60 backdrop-blur">
                 typing…
               </div>
             </div>
@@ -147,7 +147,7 @@ export default function ChatPage() {
 
         <div className="fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] md:bottom-4 z-50">
           <div className="mx-auto max-w-3xl px-4">
-            <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-lg p-2 flex items-end gap-2">
+            <div className="rounded-2xl border border-gray-200/70 dark:border-gray-800/70 bg-white/80 dark:bg-gray-900/70 backdrop-blur shadow-sm p-2 flex items-end gap-2">
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -165,7 +165,7 @@ export default function ChatPage() {
               <button
                 onClick={send}
                 disabled={loading || !input.trim()}
-                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 text-white text-sm font-medium px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[.99]"
+                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-tr from-blue-600 to-emerald-500 text-white text-sm font-medium px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[.99] shadow"
                 aria-busy={loading || undefined}
                 aria-live="polite"
               >
@@ -191,7 +191,7 @@ function Bubble({ role, timestamp, children }: { role: "user" | "assistant"; tim
       {!isUser && (
         <div className="h-8 w-8 rounded-full bg-blue-50 dark:bg-blue-950 grid place-items-center text-blue-600 dark:text-blue-300">🤖</div>
       )}
-      <div className={`max-w-[82%] md:max-w-[70%] px-3 py-2 rounded-2xl text-sm ${isUser ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-bl-sm'}`}>
+      <div className={`max-w-[82%] md:max-w-[70%] px-3 py-2 rounded-2xl text-sm ${isUser ? 'bg-gradient-to-tr from-blue-600 to-emerald-500 text-white shadow rounded-br-sm' : 'bg-white/80 dark:bg-gray-900/70 text-gray-900 dark:text-gray-50 rounded-bl-sm border border-gray-200/70 dark:border-gray-800/70 backdrop-blur'}`}>
         <p className="whitespace-pre-wrap">{children}</p>
         {ts && <span className={`mt-1 block text-[10px] opacity-75 ${isUser ? 'text-blue-100' : 'text-gray-400'}`}>{ts}</span>}
       </div>

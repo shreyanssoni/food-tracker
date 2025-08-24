@@ -191,13 +191,13 @@ export default function WorkoutsPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-semibold mb-4">Get Workouts</h1>
+      <h1 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-blue-600 to-emerald-500 bg-clip-text text-transparent">Get Workouts</h1>
       <form onSubmit={onSubmit} className="grid gap-4 mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <label className="text-sm">
             Type
             <select
-              className="mt-1 w-full border border-gray-200 dark:border-gray-800 rounded-md px-2 py-2 bg-white dark:bg-gray-900"
+              className="mt-1 w-full border border-gray-200/70 dark:border-gray-800/70 rounded-lg px-2 py-2 bg-white/80 dark:bg-gray-900/70 backdrop-blur"
               value={form.type}
               onChange={(e) => setForm({ ...form, type: e.target.value as any })}
             >
@@ -208,7 +208,7 @@ export default function WorkoutsPage() {
           <div className="text-sm">
             Duration (min)
             <div className="mt-1 flex items-center gap-2">
-              <button type="button" onClick={() => adjustDuration(-5)} className="px-2 py-1 rounded-md border border-gray-300 dark:border-gray-700">-</button>
+              <button type="button" onClick={() => adjustDuration(-5)} className="px-2 py-1 rounded-full border border-gray-300/80 dark:border-gray-700/80 hover:bg-gray-100/70 dark:hover:bg-white/5">-</button>
               <input
                 type="range"
                 min={15}
@@ -218,7 +218,7 @@ export default function WorkoutsPage() {
                 onChange={(e) => setForm({ ...form, duration_min: Number(e.target.value) })}
                 className="flex-1"
               />
-              <button type="button" onClick={() => adjustDuration(5)} className="px-2 py-1 rounded-md border border-gray-300 dark:border-gray-700">+</button>
+              <button type="button" onClick={() => adjustDuration(5)} className="px-2 py-1 rounded-full border border-gray-300/80 dark:border-gray-700/80 hover:bg-gray-100/70 dark:hover:bg-white/5">+</button>
               <span className="w-10 text-right text-sm">{form.duration_min}</span>
             </div>
           </div>
@@ -230,7 +230,7 @@ export default function WorkoutsPage() {
                   key={lvl}
                   type="button"
                   onClick={() => setForm({ ...form, intensity: lvl })}
-                  className={`px-3 py-1 rounded-full text-sm border ${form.intensity===lvl ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700'}`}
+                  className={`px-3 py-1 rounded-full text-sm border ${form.intensity===lvl ? 'bg-gradient-to-tr from-blue-600 to-emerald-500 text-white border-transparent shadow' : 'bg-white/80 dark:bg-gray-900/70 text-gray-700 dark:text-gray-200 border-gray-300/80 dark:border-gray-700/80 hover:bg-gray-100/70 dark:hover:bg-white/5'}`}
                 >
                   {lvl}
                 </button>
@@ -241,10 +241,10 @@ export default function WorkoutsPage() {
         <div className="text-sm">
           <div className="mb-1">Muscles to train (optional)</div>
           <div className="mb-2 flex flex-wrap gap-2">
-            <button type="button" onClick={presetPush} className="px-3 py-1 rounded-full text-sm border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800">Push</button>
-            <button type="button" onClick={presetPull} className="px-3 py-1 rounded-full text-sm border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800">Pull</button>
-            <button type="button" onClick={presetLegs} className="px-3 py-1 rounded-full text-sm border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800">Legs</button>
-            <button type="button" onClick={presetFull} className="px-3 py-1 rounded-full text-sm border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800">Full</button>
+            <button type="button" onClick={presetPush} className="px-3 py-1 rounded-full text-sm border border-gray-300/80 dark:border-gray-700/80 hover:bg-gray-100/70 dark:hover:bg-white/5">Push</button>
+            <button type="button" onClick={presetPull} className="px-3 py-1 rounded-full text-sm border border-gray-300/80 dark:border-gray-700/80 hover:bg-gray-100/70 dark:hover:bg-white/5">Pull</button>
+            <button type="button" onClick={presetLegs} className="px-3 py-1 rounded-full text-sm border border-gray-300/80 dark:border-gray-700/80 hover:bg-gray-100/70 dark:hover:bg-white/5">Legs</button>
+            <button type="button" onClick={presetFull} className="px-3 py-1 rounded-full text-sm border border-gray-300/80 dark:border-gray-700/80 hover:bg-gray-100/70 dark:hover:bg-white/5">Full</button>
           </div>
           <MultiSelect
             options={MUSCLE_OPTIONS_GROUPED}
@@ -262,7 +262,7 @@ export default function WorkoutsPage() {
           <textarea
             rows={4}
             placeholder="e.g., Focus on posterior chain; avoid overhead pressing; include a heavy top set then backoffs; keep under 40 minutes."
-            className="mt-1 w-full border border-gray-200 dark:border-gray-800 rounded-md px-3 py-2 bg-white dark:bg-gray-900"
+            className="mt-1 w-full border border-gray-200/70 dark:border-gray-800/70 rounded-lg px-3 py-2 bg-white/80 dark:bg-gray-900/70 backdrop-blur"
             value={form.instructions}
             onChange={(e) => setForm({ ...form, instructions: e.target.value })}
           />
@@ -271,7 +271,7 @@ export default function WorkoutsPage() {
           <button
             type="submit"
             disabled={loading}
-            className="px-4 py-2 rounded-md bg-blue-600 text-white disabled:opacity-60"
+            className="px-4 py-2 rounded-full bg-gradient-to-tr from-blue-600 to-emerald-500 text-white disabled:opacity-60 shadow"
           >
             {loading ? 'Generating…' : 'Generate plan'}
           </button>
@@ -289,7 +289,7 @@ export default function WorkoutsPage() {
                 if (!root) return;
                 root.querySelectorAll('details').forEach((d) => { (d as HTMLDetailsElement).open = true; });
               }}
-              className="px-3 py-1 rounded-md border border-gray-300 dark:border-gray-700"
+              className="px-3 py-1 rounded-full border border-gray-300/80 dark:border-gray-700/80 hover:bg-gray-100/70 dark:hover:bg-white/5"
             >
               Expand all
             </button>
@@ -300,7 +300,7 @@ export default function WorkoutsPage() {
                 if (!root) return;
                 root.querySelectorAll('details').forEach((d) => { (d as HTMLDetailsElement).open = false; });
               }}
-              className="px-3 py-1 rounded-md border border-gray-300 dark:border-gray-700"
+              className="px-3 py-1 rounded-full border border-gray-300/80 dark:border-gray-700/80 hover:bg-gray-100/70 dark:hover:bg-white/5"
             >
               Collapse all
             </button>
@@ -310,17 +310,17 @@ export default function WorkoutsPage() {
             <textarea
               rows={3}
               placeholder="e.g., I don't have a lat pulldown machine; please swap with a suitable alternative."
-              className="w-full border border-gray-200 dark:border-gray-800 rounded-md px-3 py-2 bg-white dark:bg-gray-900"
+              className="w-full border border-gray-200/70 dark:border-gray-800/70 rounded-lg px-3 py-2 bg-white/80 dark:bg-gray-900/70 backdrop-blur"
               value={changeText}
               onChange={(e)=>setChangeText(e.target.value)}
             />
             <div>
-              <button type="button" disabled={loading || !changeText.trim()} onClick={requestChanges} className="px-4 py-2 rounded-md bg-emerald-600 text-white disabled:opacity-60">{loading ? 'Updating…' : 'Send request'}</button>
+              <button type="button" disabled={loading || !changeText.trim()} onClick={requestChanges} className="px-4 py-2 rounded-full bg-emerald-600 text-white disabled:opacity-60 shadow">{loading ? 'Updating…' : 'Send request'}</button>
             </div>
           </div>
           <div
             ref={planRef}
-            className="max-w-none border border-gray-200 dark:border-gray-800 rounded-lg p-4"
+            className="max-w-none border border-gray-200/70 dark:border-gray-800/70 rounded-2xl p-4 bg-white/80 dark:bg-gray-950/70 backdrop-blur shadow-sm"
             dangerouslySetInnerHTML={{ __html: sanitize(planHtml) }}
           />
         </div>
