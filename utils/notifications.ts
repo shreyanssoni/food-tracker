@@ -13,6 +13,27 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
+// Ensure the server has the current subscription associated to the signed-in user.
+// Useful after sign-in when permission is already granted and a subscription exists.
+export async function syncSubscriptionWithServer() {
+  try {
+    if (typeof window === 'undefined') return;
+    if (!('serviceWorker' in navigator)) return;
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
+    if (sub) {
+      const payload = sub.toJSON();
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
+      // notify any listeners that subscription may have changed
+      try { window.dispatchEvent(new Event(EVT)); } catch {}
+    }
+  } catch {}
+}
+
 async function getIsSubscribed(): Promise<boolean> {
   if (typeof window === 'undefined') return false;
   if (!('serviceWorker' in navigator)) return false;

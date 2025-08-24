@@ -50,6 +50,16 @@ async function handleSend(slot?: Slot, timezone?: string) {
       : { title: 'Test notification', body: 'If you see this, push is working!', url: '/suggestions' };
 
     let sent = 0;
+    const results: Array<{ endpoint: string; success: boolean; status: number | null }> = [];
+    const logs: Array<{
+      user_id: string;
+      slot: string;
+      title: string;
+      body: string;
+      url: string;
+      success: boolean;
+      status_code: number | null;
+    }> = [];
     for (const s of subs) {
       const subscription: WebPushSubscription = {
         endpoint: s.endpoint,
@@ -63,12 +73,35 @@ async function handleSend(slot?: Slot, timezone?: string) {
           // prune expired
           await supabase.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint);
         }
+        results.push({ endpoint: s.endpoint.slice(-12), success: false, status: status ?? null });
+        logs.push({
+          user_id: user.id,
+          slot: slot || 'midday',
+          title: payload.title,
+          body: payload.body,
+          url: payload.url || '/',
+          success: false,
+          status_code: status ?? null,
+        });
       } else {
         sent += 1;
+        results.push({ endpoint: s.endpoint.slice(-12), success: true, status: 201 });
+        logs.push({
+          user_id: user.id,
+          slot: slot || 'midday',
+          title: payload.title,
+          body: payload.body,
+          url: payload.url || '/',
+          success: true,
+          status_code: 201,
+        });
       }
     }
+    if (logs.length) {
+      await supabase.from('push_sends').insert(logs);
+    }
 
-    return NextResponse.json({ ok: true, attempted: subs.length, sent, slot: slot || null });
+    return NextResponse.json({ ok: true, attempted: subs.length, sent, slot: slot || null, results });
   } catch (e) {
     console.error('send-test error', e);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

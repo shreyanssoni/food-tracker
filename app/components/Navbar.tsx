@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import type { Route } from 'next';
 import { useEffect, useRef, useState } from 'react';
-import { useNotifications } from '@/utils/notifications';
+import { useNotifications, syncSubscriptionWithServer } from '@/utils/notifications';
 
 // Define route types as string literals
 type NavPath = '/me' | '/dashboard' | '/food' | '/groceries' | '/suggestions' | '/chat' | '/workouts';
@@ -154,6 +154,8 @@ export default function Navbar() {
     if (typeof window === 'undefined') return;
     if (!('Notification' in window)) return;
     if (status !== 'authenticated') return;
+    // Ensure current subscription is associated to this user (covers reuse of same FCM endpoint)
+    syncSubscriptionWithServer();
     if (Notification.permission === 'default') {
       // Fire and forget; errors are handled inside
       enableNotifications();
