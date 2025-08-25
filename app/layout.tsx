@@ -3,6 +3,7 @@ import { ReactNode } from 'react';
 import { Inter } from 'next/font/google';
 import { auth } from '@/auth';
 import { Providers } from './providers';
+import { Toaster } from 'sonner';
 import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import ProfilePrompt from './components/ProfilePrompt';
@@ -29,7 +30,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const session = await auth();
 
   return (
-    <html lang="en" className="h-full bg-gray-50 dark:bg-gray-900">
+    <html lang="en" className="h-full bg-gray-50 dark:bg-gray-900" suppressHydrationWarning>
       <head>
         <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
         <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1220" />
@@ -64,6 +65,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <ProfilePrompt />
           {/* PWA install prompt */}
           <InstallPrompt />
+          {/* Global toaster */}
+          <Toaster richColors position="top-center" theme="system" />
           <footer className="hidden md:block bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 mt-8">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
               <p className="text-center text-sm text-gray-500 dark:text-gray-400">

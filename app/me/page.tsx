@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
+import { toast } from 'sonner';
 
 // Simple gender resolver: 'male' | 'female' | 'mix' when unknown
 function useGender(): "male" | "female" | "mix" {
@@ -135,6 +136,8 @@ export default function MePage() {
   // Rate limit handling
   const rateLimitUntil = useRef<number>(0);
   const lastRateToastAt = useRef<number>(0);
+  // Two-tap confirm for destructive UI actions
+  const clearConfirmRef = useRef<number>(0);
   const pushToast = (message: string, tone: 'info'|'warning'|'error' = 'info') => {
     const id = Math.random().toString(36).slice(2);
     setToasts((t) => [...t, { id, message, tone }]);
@@ -256,7 +259,7 @@ export default function MePage() {
         await navigator.share({ title: 'Gym Motivation', text: 'Found this motivating!', url });
       } else {
         await navigator.clipboard.writeText(url);
-        alert('Link copied to clipboard');
+        toast.success('Link copied to clipboard');
       }
     } catch {}
   };
@@ -517,7 +520,7 @@ export default function MePage() {
       <header className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">Motivate Me</span>
+            <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">Motivation</span>
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
             One step a day. One% daily.
@@ -651,7 +654,17 @@ export default function MePage() {
           <div className="text-gray-700 dark:text-gray-200">Liked images: {likedList.length}</div>
           {likedList.length > 0 && (
             <button
-              onClick={() => { if (confirm('Clear all liked images?')) setLikes({}); }}
+              onClick={() => {
+                const now = Date.now();
+                if (!clearConfirmRef.current || now - clearConfirmRef.current > 4000) {
+                  clearConfirmRef.current = now;
+                  toast.warning('Tap again to clear all saved images');
+                  return;
+                }
+                setLikes({});
+                toast.success('Cleared all saved images');
+                clearConfirmRef.current = 0;
+              }}
               className="rounded-md bg-red-600 text-white px-2.5 py-1 hover:bg-red-700"
             >Clear all</button>
           )}

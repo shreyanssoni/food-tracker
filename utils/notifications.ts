@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { toast } from 'sonner';
 
 export type NotifStatus = 'granted' | 'denied' | 'default' | 'unsupported';
 
@@ -99,7 +100,7 @@ export function useNotifications() {
       const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY as string;
       if (!key) {
         setEnabled(false);
-        alert('Missing VAPID public key (NEXT_PUBLIC_VAPID_PUBLIC_KEY)');
+        toast.error('Missing VAPID public key (NEXT_PUBLIC_VAPID_PUBLIC_KEY)');
         return;
       }
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) });

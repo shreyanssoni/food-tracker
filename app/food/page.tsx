@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { FoodForm } from '@/components/FoodForm';
 import { PhotoUpload } from '@/components/PhotoUpload';
 import { LogCard } from '@/components/LogCard';
@@ -10,16 +11,15 @@ import type { FoodLog } from '@/types';
 
 export default function FoodPage() {
   const supabase = createBrowserClient();
+  const { data: session } = useSession();
   const [logs, setLogs] = useState<FoodLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0, 10)); // yyyy-mm-dd
   const [targets, setTargets] = useState<{ calories: number; protein_g: number; carbs_g: number; fat_g: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserEmail(data.user?.email ?? null));
-  }, [supabase]);
+  // No longer rely on Supabase auth user for identity; use NextAuth session
+  // session?.user?.id is stored in food_logs.user_id on insert
 
   // Fetch preferences/targets
   useEffect(() => {
@@ -35,17 +35,24 @@ export default function FoodPage() {
       setLoading(true);
       const start = new Date(date + 'T00:00:00');
       const end = new Date(date + 'T23:59:59.999');
-      const { data, error } = await supabase
+      const q = supabase
         .from('food_logs')
         .select('*')
         .gte('eaten_at', start.toISOString())
         .lte('eaten_at', end.toISOString())
         .order('eaten_at', { ascending: false });
+      // Scope to current user to avoid cross-account leakage.
+      // If no session, fetch nothing for privacy.
+      const { data, error } = await (
+        session?.user?.id
+          ? q.eq('user_id', session.user.id)
+          : q.eq('user_id', '__none__') // always empty for anonymous viewers
+      );
       if (!error && data) setLogs(data as any);
       setLoading(false);
     };
     fetchLogs();
-  }, [supabase, date]);
+  }, [supabase, date, session?.user?.id]);
 
   const onLogged = (log: FoodLog) => {
     const logDate = new Date(log.eaten_at).toISOString().slice(0, 10);
@@ -123,7 +130,7 @@ export default function FoodPage() {
           {/* Collapsible photo upload */}
           <PhotoUploadSection onLogged={onLogged} />
 
-          <p className="text-xs text-gray-500 mt-4">{userEmail ? `Signed in as ${userEmail}` : 'You can log anonymously; sign in to sync across devices.'}</p>
+          <p className="text-xs text-gray-500 mt-4">{session?.user?.email ? `Signed in as ${session.user.email}` : 'Sign in to view and sync your logs across devices.'}</p>
         </div>
       </div>
 

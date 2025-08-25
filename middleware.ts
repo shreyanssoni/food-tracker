@@ -27,6 +27,14 @@ function getClientIp(req: NextRequest) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Redirect old /me route to /motivation (preserve subpaths and query)
+  if (pathname === '/me' || pathname.startsWith('/me/')) {
+    const target = pathname.replace(/^\/me(\/|$)/, '/motivation$1');
+    const url = new URL(request.url);
+    url.pathname = target;
+    return NextResponse.redirect(url);
+  }
+
   // Edge rate limiting for API routes (even if public), if Upstash configured
   if (redis && pathname.startsWith('/api/')) {
     const ip = getClientIp(request);

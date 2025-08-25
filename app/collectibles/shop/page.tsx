@@ -1,0 +1,154 @@
+"use client";
+import { useEffect, useState } from 'react';
+import { Gift } from 'lucide-react';
+import { toast } from 'sonner';
+
+export default function CollectiblesShopPage() {
+  const [items, setItems] = useState<any[]>([]);
+  const [diamonds, setDiamonds] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = async () => {
+    const res = await fetch('/api/collectibles/store');
+    const j = await res.json();
+    if (res.ok) {
+      setItems(j.items || []);
+      setDiamonds(j.diamonds || 0);
+    }
+  };
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        await load();
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const purchase = async (store_id: string) => {
+    try {
+      setBusy(store_id);
+      const res = await fetch('/api/collectibles/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ store_id })
+      });
+      const j = await res.json();
+      if (!res.ok) {
+        if (j.code === 'ALREADY_OWNED') {
+          toast.info('Already owned. Redirecting to My Collectibles');
+          window.location.href = '/collectibles';
+          return;
+        }
+        toast.error(j.error || 'Purchase failed');
+        return;
+      }
+      toast.success('Purchased!');
+      setDiamonds(j.diamonds);
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Collectibles Shop</h1>
+        <div className="text-sm px-3 py-1.5 rounded-full border border-gray-200/70 dark:border-gray-800/70 bg-white/70 dark:bg-gray-900/70 shadow-sm">
+          Diamonds: {diamonds}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white/60 dark:bg-gray-950/50 p-3 animate-pulse h-28" />
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {items.length === 0 && (
+            <div className="col-span-full text-center text-sm text-gray-600 dark:text-gray-400">
+              No items available yet. Progress your level or unlock requirements to see more.
+            </div>
+          )}
+          {items.map((i: any) => {
+            const c = i.collectible || {};
+            const icon = c.icon && (c.icon.startsWith('http') || c.icon.startsWith('/')) ? c.icon : (c.icon ? `/images/collectibles/${c.icon}.svg` : null);
+            const rarity = (c.rarity || 'common').toLowerCase();
+            const rarityClass =
+              rarity === 'epic' ? 'from-fuchsia-500 to-amber-400' :
+              rarity === 'rare' ? 'from-blue-500 to-emerald-400' :
+              'from-gray-400 to-gray-300';
+            return (
+              <div
+                key={i.id}
+                className="relative rounded-xl p-3 border border-gray-200/70 dark:border-gray-800/70 bg-white/70 dark:bg-gray-950/60 shadow-sm md:hover:shadow-md transition-all md:hover:-translate-y-0.5"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[13px] font-semibold truncate" title={c.name || 'Collectible'}>{c.name || 'Collectible'}</div>
+                  <span className={`text-[9px] px-2 py-0.5 rounded-full bg-gradient-to-r ${rarityClass} text-white shadow-sm`}>{(c.rarity || 'Common')}</span>
+                </div>
+                <div className="text-[11px] text-gray-600 dark:text-gray-400 mt-0.5">Price: {i.price} 💎</div>
+
+                {/* Badge gate banner */}
+                {!i.owned && !i.can_purchase && i.unavailable_reason === 'badge_required' && (
+                  <div className="mt-2 text-[11px] px-2 py-1.5 rounded-lg border border-amber-300/60 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/30 dark:text-amber-200">
+                    Requires {i.requirements?.required_badge_name || 'a badge'} badge to unlock
+                  </div>
+                )}
+
+                {/* Image */}
+                <div className="mt-2 h-28 rounded-lg border border-gray-200/60 dark:border-gray-800/60 grid place-items-center bg-gray-50 dark:bg-gray-900 overflow-hidden">
+                  {/* Always render an image and fallback to default placeholder if missing or load fails */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={icon || '/images/collectibles/default.svg'}
+                    alt={c.name}
+                    className="h-full w-full object-cover scale-100 md:hover:scale-[1.02] transition-transform"
+                    onError={(e) => {
+                      const fallback = '/images/collectibles/default.svg';
+                      // @ts-ignore
+                      if (!e.currentTarget.src.endsWith(fallback)) {
+                        // @ts-ignore
+                        e.currentTarget.src = fallback;
+                      }
+                    }}
+                  />
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  {i.owned ? (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">Owned</span>
+                  ) : (
+                    <button
+                      className="text-[12px] px-2.5 py-1.5 rounded-full border border-transparent bg-gradient-to-r from-blue-600 to-emerald-500 text-white disabled:opacity-60 disabled:grayscale w-full sm:w-auto"
+                      onClick={() => purchase(i.id)}
+                      disabled={busy === i.id || !i.can_purchase}
+                    >
+                      {busy === i.id ? 'Buying...' : (i.can_purchase ? 'Purchase' : 'Locked')}
+                    </button>
+                  )}
+                </div>
+                {!i.owned && !i.can_purchase && (
+                  <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                    {i.unavailable_reason === 'badge_required' && `Reach the ${i.requirements?.required_badge_name || 'required'} badge to access this item.`}
+                    {i.unavailable_reason === 'level_required' && `Reach level ${i.requirements?.min_level ?? 1} to access this item.`}
+                    {i.unavailable_reason === 'not_available_yet' && 'Keep progressing on your goal to unlock this reward!'}
+                    {i.unavailable_reason === 'inactive' && 'This item is not currently available.'}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

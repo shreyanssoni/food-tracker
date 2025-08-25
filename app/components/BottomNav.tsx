@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/utils/cn";
 
 const items = [
-  { href: "/me", label: "Me", icon: HeartIcon },
   { href: "/dashboard", label: "Home", icon: HomeIcon },
+  { href: "/tasks", label: "Tasks", icon: TasksIcon },
   { href: "/food", label: "Log", icon: PlusIcon },
-  { href: "/workouts", label: "Workouts", icon: DumbbellIcon },
+  { href: "/goals", label: "Goals", icon: TasksIcon },
   { href: "/suggestions", label: "Suggest", icon: SparklesIcon },
   { href: "/chat", label: "Chat", icon: ChatIcon },
 ];
@@ -102,6 +102,14 @@ function DumbbellIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
       <path d="M3 9h2v6H3V9Zm4-3h2v12H7V6Zm10 0h-2v12h2V6Zm4 3h-2v6h2V9Zm-13 4h6v-2H8v2Z" className="stroke-current" fill="none" strokeWidth="1.5"/>
+    </svg>
+  );
+}
+
+function TasksIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <path d="M4 6h12M4 12h12M4 18h12M18 5l3 3M18 11l3 3M18 17l3 3" className="stroke-current" fill="none" strokeWidth="1.5"/>
     </svg>
   );
 }
