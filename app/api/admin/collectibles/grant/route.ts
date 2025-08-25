@@ -60,31 +60,63 @@ export async function POST(req: NextRequest) {
       const title = 'Collectible granted';
       const body = col?.name ? `You received "${col.name}" for free` : 'You received a collectible for free';
 
-      if (origin && secret) {
-        const res = await fetch(`${origin}/api/notify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-cron-secret': secret },
-          body: JSON.stringify({ userId: user_id, focused: true, push: true, title, body, url: '/collectibles' })
-        });
-        if (!res.ok) {
-          const txt = await res.text().catch(() => '');
-          console.error('notify call failed', { status: res.status, body: txt });
-          // Fallback: still create focused message directly so the user sees something
+      let notified = false;
+      let lastError: any = null;
+
+      if (origin) {
+        // 1) Preferred: call /api/notify using current admin session (for both focused + push)
+        try {
+          const cookieHeader = (req.headers.get('cookie') || '').trim();
+          const res = await fetch(`${origin}/api/notify`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(cookieHeader ? { cookie: cookieHeader } : {}),
+            },
+            body: JSON.stringify({ userId: user_id, focused: true, push: true, title, body, url: '/collectibles' })
+          });
+          if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            console.warn('[admin grant] notify via session failed', { status: res.status, body: txt });
+          } else {
+            notified = true;
+          }
+        } catch (e) {
+          lastError = e;
+          console.warn('[admin grant] notify via session error', e);
+        }
+
+        // 2) Fallback: if session-based call failed, try CRON_SECRET if available
+        if (!notified && secret) {
           try {
-            const admin = createAdminClient();
-            await admin.from('user_messages').insert({ user_id: user_id, title, body, url: '/collectibles' });
-          } catch (fErr) {
-            console.error('fallback focused insert error', fErr);
+            const res2 = await fetch(`${origin}/api/notify`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-cron-secret': secret },
+              body: JSON.stringify({ userId: user_id, focused: true, push: true, title, body, url: '/collectibles' })
+            });
+            if (!res2.ok) {
+              const txt2 = await res2.text().catch(() => '');
+              console.error('[admin grant] notify via secret failed', { status: res2.status, body: txt2 });
+            } else {
+              notified = true;
+            }
+          } catch (e2) {
+            lastError = e2;
+            console.error('[admin grant] notify via secret error', e2);
           }
         }
       } else {
-        console.warn('notify skipped due to missing origin or CRON_SECRET', { hasOrigin: !!origin, hasSecret: !!secret });
-        // Fallback for local/dev when CRON_SECRET not configured
+        console.warn('[admin grant] missing origin for notify call');
+      }
+
+      // 3) Final fallback: ensure focused in-app message exists even if push failed
+      if (!notified) {
         try {
           const admin = createAdminClient();
           await admin.from('user_messages').insert({ user_id: user_id, title, body, url: '/collectibles' });
+          console.log('[admin grant] inserted focused fallback message');
         } catch (fErr) {
-          console.error('fallback focused insert error (no secret)', fErr);
+          console.error('[admin grant] fallback focused insert error', fErr, { lastError });
         }
       }
     } catch (e) {

@@ -109,17 +109,28 @@ export default function Navbar() {
   const [unreadMsgs, setUnreadMsgs] = useState<Array<{ id: string; title: string; body: string; url?: string | null; created_at: string }>>([]);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  // Throttle guard for unread refreshes to avoid spamming API
+  const lastUnreadFetchRef = useRef<number>(0);
+  const unreadInFlightRef = useRef<boolean>(false);
 
   // Helper: refresh unread count
   const refreshUnreadCount = async () => {
     if (typeof window === 'undefined') return;
     if (status !== 'authenticated') { setUnreadCount(0); return; }
+    // Throttle: no more than once every 10s
+    const now = Date.now();
+    if (unreadInFlightRef.current || (now - lastUnreadFetchRef.current) < 10000) return;
+    unreadInFlightRef.current = true;
     try {
       const res = await fetch('/api/notifications/messages?unread=1', { cache: 'no-store' });
       const j = await res.json().catch(() => ({}));
       if (res.ok && Array.isArray(j.messages)) setUnreadCount(j.messages.length);
       else setUnreadCount(0);
     } catch { setUnreadCount(0); }
+    finally {
+      lastUnreadFetchRef.current = Date.now();
+      unreadInFlightRef.current = false;
+    }
   };
 
   // Focused notifications: load unread when dropdown opens
@@ -131,6 +142,7 @@ export default function Navbar() {
     (async () => {
       try {
         setLoadingMsgs(true);
+        // Reuse throttled fetch for count, but fetch full list here (once per open)
         const res = await fetch('/api/notifications/messages?unread=1', { cache: 'no-store' });
         const j = await res.json().catch(() => ({}));
         if (cancelled) return;
@@ -147,11 +159,15 @@ export default function Navbar() {
     return () => { cancelled = true; };
   }, [dropdownOpen, mobileOpen, status]);
 
+  // Handlers: mark individual/all notifications as read
   const markMsgRead = async (id: string) => {
     try {
       await fetch(`/api/notifications/messages/${id}/read`, { method: 'POST' });
       setUnreadMsgs((prev) => prev.filter((m) => m.id !== id));
       setUnreadCount((c) => Math.max(0, c - 1));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('notifications:updated'));
+      }
     } catch {}
   };
 
@@ -160,6 +176,9 @@ export default function Navbar() {
       await fetch('/api/notifications/messages/read-all', { method: 'POST' });
       setUnreadMsgs([]);
       setUnreadCount(0);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('notifications:updated'));
+      }
     } catch {}
   };
 
@@ -359,7 +378,7 @@ export default function Navbar() {
     return () => clearTimeout(t);
   }, [status, pathname]);
 
-  // After auth, associate any existing browser push subscription with the user
+  // After auth, associate any existing browser push subscription with the user (once)
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (status !== "authenticated") return;
@@ -444,19 +463,19 @@ export default function Navbar() {
       }
     };
     document.addEventListener("visibilitychange", onVis);
-    // fire once
-    void onVis();
+    // Remove immediate call to avoid double heartbeat on mount; it'll run on first visibility change
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [status]);
 
-  // Auto-prompt on sign-in/open if not granted/denied
+  // Auto-prompt on sign-in/open if not granted/denied (once per session)
+  const promptedRef = useRef(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!("Notification" in window)) return;
     if (status !== "authenticated") return;
-    // Ensure current subscription is associated to this user (covers reuse of same FCM endpoint)
-    syncSubscriptionWithServer();
+    if (promptedRef.current) return;
     if (Notification.permission === "default") {
+      promptedRef.current = true;
       // Fire and forget; errors are handled inside
       enableNotifications();
     }
