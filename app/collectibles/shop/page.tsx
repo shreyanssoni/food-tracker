@@ -66,13 +66,13 @@ export default function CollectiblesShopPage() {
       </div>
 
       {loading ? (
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="rounded-xl border border-gray-200/70 dark:border-gray-800/70 bg-white/60 dark:bg-gray-950/50 p-4 animate-pulse h-28" />
           ))}
         </div>
       ) : (
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {items.length === 0 && (
             <div className="col-span-full text-center text-sm text-gray-600 dark:text-gray-400">
               No items available yet. Progress your level or unlock requirements to see more.
@@ -89,30 +89,37 @@ export default function CollectiblesShopPage() {
             return (
               <div
                 key={i.id}
-                className="group relative rounded-xl p-4 border border-gray-200/70 dark:border-gray-800/70 bg-white/70 dark:bg-gray-950/60 shadow-sm transition-all md:hover:shadow-md md:hover:-translate-y-0.5"
+                className="group relative h-full flex flex-col rounded-xl p-4 border border-gray-200/70 dark:border-gray-800/70 bg-white/70 dark:bg-gray-950/60 shadow-sm transition-all md:hover:shadow-md md:hover:-translate-y-0.5"
               >
                 {/* Header */}
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1 md:gap-2">
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold truncate" title={c.name || 'Collectible'}>{c.name || 'Collectible'}</div>
+                    <div
+                      className="text-[15px] sm:text-base font-semibold leading-tight text-gray-900 dark:text-gray-100 whitespace-normal break-words max-h-[2.6rem] overflow-hidden"
+                      title={c.name || 'Collectible'}
+                    >
+                      {c.name || 'Collectible'}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 flex-wrap shrink-0 mt-0.5 md:mt-0">
                     <span className={`text-[10px] px-2 py-0.5 rounded-full bg-gradient-to-r ${rarityClass} text-white shadow-sm capitalize`}>{(c.rarity || 'Common')}</span>
-                    <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-gray-200/70 dark:border-gray-800/70 bg-white/70 dark:bg-gray-900/70 text-gray-700 dark:text-gray-300">
+                    <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-gray-200/70 dark:border-gray-800/70 bg-white/80 dark:bg-gray-900/80 text-gray-800 dark:text-gray-200">
                       <Gem className="h-3.5 w-3.5" /> {i.price}
                     </span>
                   </div>
                 </div>
 
-                {/* Badge gate banner */}
-                {!i.owned && !i.can_purchase && i.unavailable_reason === 'badge_required' && (
-                  <div className="mt-2 text-[11px] px-2 py-1.5 rounded-lg border border-amber-300/60 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/30 dark:text-amber-200">
-                    Requires {i.requirements?.required_badge_name || 'a badge'} badge to unlock
-                  </div>
-                )}
+                {/* Badge gate banner slot (fixed height for alignment) */}
+                <div className="mt-2 min-h-[38px]">
+                  {!i.owned && !i.can_purchase && i.unavailable_reason === 'badge_required' && (
+                    <div className="text-[11px] px-2 py-1.5 rounded-lg border border-amber-300/60 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/30 dark:text-amber-200">
+                      Requires {i.requirements?.required_badge_name || 'a badge'} badge to unlock
+                    </div>
+                  )}
+                </div>
 
                 {/* Image */}
-                <div className="mt-3 h-32 sm:h-36 rounded-lg border border-gray-200/60 dark:border-gray-800/60 grid place-items-center bg-gray-50 dark:bg-gray-900 overflow-hidden">
+                <div className="mt-1 h-32 sm:h-36 rounded-lg border border-gray-200/60 dark:border-gray-800/60 grid place-items-center bg-gray-50 dark:bg-gray-900 overflow-hidden">
                   {/* Always render an image and fallback to default placeholder if missing or load fails */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -146,14 +153,19 @@ export default function CollectiblesShopPage() {
                     </button>
                   )}
                 </div>
-                {!i.owned && !i.can_purchase && (
-                  <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
-                    {i.unavailable_reason === 'badge_required' && `Reach the ${i.requirements?.required_badge_name || 'required'} badge to access this item.`}
-                    {i.unavailable_reason === 'level_required' && `Reach level ${i.requirements?.min_level ?? 1} to access this item.`}
-                    {i.unavailable_reason === 'not_available_yet' && 'Keep progressing on your goal to unlock this reward!'}
-                    {i.unavailable_reason === 'inactive' && 'This item is not currently available.'}
-                  </div>
-                )}
+                {/* Description slot with fixed height for alignment */}
+                <div className="mt-2 min-h-[36px] text-xs text-gray-600 dark:text-gray-400">
+                  {!i.owned && !i.can_purchase ? (
+                    <>
+                      {i.unavailable_reason === 'badge_required' && `Reach the ${i.requirements?.required_badge_name || 'required'} badge to access this item.`}
+                      {i.unavailable_reason === 'level_required' && `Reach level ${i.requirements?.min_level ?? 1} to access this item.`}
+                      {i.unavailable_reason === 'not_available_yet' && 'Keep progressing on your goal to unlock this reward!'}
+                      {i.unavailable_reason === 'inactive' && 'This item is not currently available.'}
+                    </>
+                  ) : (
+                    <span className="opacity-0">.</span>
+                  )}
+                </div>
               </div>
             );
           })}
