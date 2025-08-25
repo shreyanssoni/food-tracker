@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 
 interface Msg {
@@ -99,7 +100,7 @@ export default function NotificationsPage() {
                 <div className="mt-0.5 text-[12px] sm:text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{m.body}</div>
                 <div className="mt-1.5 flex items-center gap-2.5">
                   {m.url && (
-                    <Link href={m.url} className="text-blue-600 dark:text-blue-400 text-[12px] sm:text-sm font-medium underline hover:no-underline">View</Link>
+                    <Link href={m.url as unknown as Route} className="text-blue-600 dark:text-blue-400 text-[12px] sm:text-sm font-medium underline hover:no-underline">View</Link>
                   )}
                   <button onClick={() => markRead(m.id)} className="text-[12px] sm:text-sm font-medium text-gray-700 dark:text-gray-300 hover:underline">Mark read</button>
                 </div>
