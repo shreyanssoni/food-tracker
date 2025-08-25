@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { getCurrentUser } from '@/utils/auth';
 
 // GET /api/notifications/messages
@@ -10,8 +10,8 @@ export async function GET(req: NextRequest) {
     if (!me) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const unreadOnly = req.nextUrl.searchParams.get('unread') === '1';
-    const supabase = createClient();
-    let q = supabase
+    const admin = createAdminClient();
+    let q = admin
       .from('user_messages')
       .select('id, title, body, url, read_at, created_at')
       .eq('user_id', me.id)
@@ -39,8 +39,8 @@ export async function POST(req: NextRequest) {
     const url = (body?.url || '').trim() || null;
     if (!title || !msg) return NextResponse.json({ error: 'title and body required' }, { status: 400 });
 
-    const supabase = createClient();
-    const { data, error } = await supabase
+    const admin = createAdminClient();
+    const { data, error } = await admin
       .from('user_messages')
       .insert({ user_id: me.id, title, body: msg, url })
       .select('id')

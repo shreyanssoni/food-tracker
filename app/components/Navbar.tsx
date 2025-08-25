@@ -126,7 +126,7 @@ export default function Navbar() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (status !== 'authenticated') { setUnreadMsgs([]); return; }
-    if (!dropdownOpen) return;
+    if (!dropdownOpen && !mobileOpen) return;
     let cancelled = false;
     (async () => {
       try {
@@ -145,13 +145,21 @@ export default function Navbar() {
       finally { if (!cancelled) setLoadingMsgs(false); }
     })();
     return () => { cancelled = true; };
-  }, [dropdownOpen, status]);
+  }, [dropdownOpen, mobileOpen, status]);
 
   const markMsgRead = async (id: string) => {
     try {
       await fetch(`/api/notifications/messages/${id}/read`, { method: 'POST' });
       setUnreadMsgs((prev) => prev.filter((m) => m.id !== id));
       setUnreadCount((c) => Math.max(0, c - 1));
+    } catch {}
+  };
+
+  const markAllRead = async () => {
+    try {
+      await fetch('/api/notifications/messages/read-all', { method: 'POST' });
+      setUnreadMsgs([]);
+      setUnreadCount(0);
     } catch {}
   };
 
@@ -169,6 +177,29 @@ export default function Navbar() {
     const t = setInterval(() => { if (mounted) void refreshUnreadCount(); }, 60000);
     return () => { mounted = false; document.removeEventListener('visibilitychange', onVis); clearInterval(t); };
   }, [status]);
+
+  // Listen for global notifications updates to refresh badge/dropdown immediately
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onUpdated = async () => {
+      await refreshUnreadCount();
+      if (dropdownOpen && status === 'authenticated') {
+        try {
+          setLoadingMsgs(true);
+          const res = await fetch('/api/notifications/messages?unread=1', { cache: 'no-store' });
+          const j = await res.json().catch(() => ({}));
+          if (res.ok && Array.isArray(j.messages)) {
+            setUnreadMsgs(j.messages);
+            setUnreadCount(j.messages.length);
+          }
+        } finally {
+          setLoadingMsgs(false);
+        }
+      }
+    };
+    window.addEventListener('notifications:updated', onUpdated as EventListener);
+    return () => window.removeEventListener('notifications:updated', onUpdated as EventListener);
+  }, [dropdownOpen, status]);
 
   // Navigation link component
   const NavLink = ({ path, label }: NavItem) => (
@@ -580,25 +611,44 @@ export default function Navbar() {
                   <div className="absolute right-0 mt-2 w-56 rounded-xl shadow-xl bg-white/90 dark:bg-gray-900/90 backdrop-blur border border-gray-200/70 dark:border-gray-800/70 focus:outline-none z-20">
                     <div className="py-1">
                       {/* Focused notifications list */}
-                      <div className="px-4 py-2 border-b border-gray-200/70 dark:border-gray-800/70">
-                        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Notifications</div>
+                      <div className="px-3 py-2 border-b border-gray-200/70 dark:border-gray-800/70">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">Notifications</div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={markAllRead}
+                              disabled={loadingMsgs || unreadMsgs.length === 0}
+                              className="text-[11px] px-2 py-1 rounded-full border border-gray-200/70 dark:border-gray-800/70 hover:bg-gray-100/70 dark:hover:bg-white/5 disabled:opacity-50"
+                            >
+                              Mark all read
+                            </button>
+                            <Link href={'/notifications' as unknown as Route} onClick={() => setDropdownOpen(false)} className="text-[11px] px-2 py-1 rounded-full border border-gray-200/70 dark:border-gray-800/70 hover:bg-gray-100/70 dark:hover:bg-white/5">
+                              View all
+                            </Link>
+                          </div>
+                        </div>
                         {loadingMsgs ? (
                           <div className="text-xs text-gray-600 dark:text-gray-300">Loading...</div>
                         ) : unreadMsgs.length === 0 ? (
                           <div className="text-xs text-gray-600 dark:text-gray-400">No new notifications</div>
                         ) : (
-                          <ul className="space-y-1 max-h-40 overflow-auto">
+                          <ul className="space-y-2 max-h-56 overflow-auto">
                             {unreadMsgs.slice(0, 5).map((m) => (
-                              <li key={m.id} className="text-xs text-gray-800 dark:text-gray-100">
-                                <div className="font-medium truncate" title={m.title}>{m.title}</div>
-                                <div className="truncate text-gray-600 dark:text-gray-300" title={m.body}>{m.body}</div>
-                                <div className="mt-1 flex gap-2">
-                                  {m.url && (
-                                    <Link href={m.url as Route} className="underline hover:no-underline" onClick={() => setDropdownOpen(false)}>
-                                      View
-                                    </Link>
-                                  )}
-                                  <button className="text-blue-600 dark:text-blue-400 hover:underline" onClick={() => markMsgRead(m.id)}>Mark read</button>
+                              <li key={m.id} className="">
+                                <div className="rounded-2xl border border-gray-200/70 dark:border-gray-800/70 bg-white/80 dark:bg-gray-900/70 shadow-sm p-2.5">
+                                  <div className="flex gap-2">
+                                    <div className="mt-0.5 h-5 w-5 min-w-5 rounded-xl bg-gradient-to-br from-blue-600 to-emerald-500 text-white flex items-center justify-center text-[11px]">🔔</div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-[13px] font-semibold text-gray-900 dark:text-gray-100 truncate" title={m.title}>{m.title}</div>
+                                      <div className="text-[12px] text-gray-700 dark:text-gray-300 truncate" title={m.body}>{m.body}</div>
+                                      <div className="mt-1 flex items-center gap-2">
+                                        {m.url && (
+                                          <Link href={m.url as Route} className="text-[12px] text-blue-600 dark:text-blue-400 underline hover:no-underline" onClick={() => setDropdownOpen(false)}>View</Link>
+                                        )}
+                                        <button className="text-[12px] text-gray-700 dark:text-gray-300 hover:underline" onClick={() => markMsgRead(m.id)}>Mark read</button>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
                               </li>
                             ))}
@@ -669,7 +719,7 @@ export default function Navbar() {
               aria-expanded={mobileOpen}
               aria-label={mobileOpen ? "Close menu" : "Open menu"}
               onClick={() => setMobileOpen((v) => !v)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+              className="relative inline-flex items-center justify-center p-2 rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
             >
               <span className="sr-only">Toggle main menu</span>
               <span className="relative block h-5 w-6">
@@ -689,6 +739,9 @@ export default function Navbar() {
                   }`}
                 />
               </span>
+              {status === 'authenticated' && unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-gray-900" aria-hidden />
+              )}
             </button>
           </div>
           </div>
@@ -720,7 +773,7 @@ export default function Navbar() {
               <Link
                 key={item.path}
                 href={item.path as unknown as Route}
-                className={`block px-3 py-2 rounded-full text-base font-medium ${
+                className={`block px-3 py-2 rounded-full text-sm font-medium ${
                   isActive(item.path)
                     ? "bg-gradient-to-tr from-blue-600/90 to-emerald-500/90 text-white shadow"
                     : "text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5"
@@ -789,12 +842,57 @@ export default function Navbar() {
                   </div>
                 </div>
               </div>
+              {/* Notifications (focused) */}
+              <div className="mt-3 rounded-xl border border-gray-200/80 dark:border-gray-800/80 bg-white/70 dark:bg-gray-900/70 p-2.5">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">Notifications</div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={markAllRead}
+                      disabled={loadingMsgs || unreadMsgs.length === 0}
+                      className="text-[11px] px-2 py-1 rounded-full border border-gray-200/70 dark:border-gray-800/70 hover:bg-gray-100/70 dark:hover:bg-white/5 disabled:opacity-50"
+                    >
+                      Mark all read
+                    </button>
+                    <Link href={'/notifications' as unknown as Route} onClick={() => setMobileOpen(false)} className="text-[11px] px-2 py-1 rounded-full border border-gray-200/70 dark:border-gray-800/70 hover:bg-gray-100/70 dark:hover:bg-white/5">
+                      View all
+                    </Link>
+                  </div>
+                </div>
+                {loadingMsgs ? (
+                  <div className="text-[12px] text-gray-600 dark:text-gray-300">Loading...</div>
+                ) : unreadMsgs.length === 0 ? (
+                  <div className="text-[12px] text-gray-600 dark:text-gray-400">No new notifications</div>
+                ) : (
+                  <ul className="space-y-1.5 max-h-56 overflow-auto">
+                    {unreadMsgs.slice(0, 5).map((m) => (
+                      <li key={m.id} className="">
+                        <div className="rounded-2xl border border-gray-200/70 dark:border-gray-800/70 bg-white/80 dark:bg-gray-900/70 shadow-sm p-2">
+                          <div className="flex gap-2">
+                            <div className="mt-0.5 h-4 w-4 min-w-4 rounded-lg bg-gradient-to-br from-blue-600 to-emerald-500 text-white flex items-center justify-center text-[10px]">🔔</div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[12px] font-semibold text-gray-900 dark:text-gray-100 truncate" title={m.title}>{m.title}</div>
+                              <div className="text-[11px] text-gray-700 dark:text-gray-300 truncate" title={m.body}>{m.body}</div>
+                              <div className="mt-0.5 flex items-center gap-2">
+                                {m.url && (
+                                  <Link href={m.url as Route} className="text-[11px] text-blue-600 dark:text-blue-400 underline hover:no-underline" onClick={() => setMobileOpen(false)}>View</Link>
+                                )}
+                                <button className="text-[11px] text-gray-700 dark:text-gray-300 hover:underline" onClick={() => markMsgRead(m.id)}>Mark read</button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <div className="mt-3 space-y-1">
                 {dropdownItems.map((item) => (
                   <Link
                     key={item.path}
                     href={item.path as unknown as Route}
-                    className="block px-3 py-2 rounded-full text-base font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5"
+                    className="block px-3 py-2 rounded-full text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5"
                     onClick={() => setMobileOpen(false)}
                   >
                     {item.label}
@@ -807,7 +905,7 @@ export default function Navbar() {
                     } catch {}
                     await signOut({ callbackUrl: "/" });
                   }}
-                  className="block w-full text-left px-3 py-2 rounded-full text-base font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5"
+                  className="block w-full text-left px-3 py-2 rounded-full text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5"
                 >
                   Sign out
                 </button>
@@ -817,7 +915,7 @@ export default function Navbar() {
             <div className="space-y-1">
               <Link
                 href="/auth/signin"
-                className="block w-full px-3 py-2 rounded-full text-base font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5"
+                className="block w-full px-3 py-2 rounded-full text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5"
                 onClick={() => setMobileOpen(false)}
               >
                 Sign in
