@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient as createBrowserClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
-import { CheckCircle2, Plus, Pencil, Trash2, Clock, CalendarDays, Search, ChevronDown, ChevronRight, Sun, Moon, Zap, Gem, Flame } from 'lucide-react';
+import { CheckCircle2, Plus, Pencil, Trash2, Clock, CalendarDays, Search, ChevronDown, ChevronRight, Sun, Moon, Zap, Gem, Flame, MoreHorizontal } from 'lucide-react';
 
 interface Task {
   id: string;
@@ -34,6 +34,7 @@ export default function TasksPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
   // Two-tap confirmation tracker for destructive actions
   const pendingDeleteRef = useRef<Record<string, number>>({});
   const [newTask, setNewTask] = useState<{ title: string; description?: string; ep_value: number; min_level: number; schedule?: Partial<Schedule> & { timezone?: string; start_date?: string | null; end_date?: string | null } }>(
@@ -537,6 +538,7 @@ export default function TasksPage() {
               <ul className="divide-y divide-gray-100 dark:divide-gray-900">
                 {grouped.todayList.map((t) => {
                 const s = schedules[t.id];
+                const due = isDueToday(t);
                 return (
                   <li key={t.id} className="p-4">
                     {!editing[t.id] ? (
@@ -545,15 +547,25 @@ export default function TasksPage() {
                           <CheckCircle2 className={`w-5 h-5 ${t.completedToday ? 'text-green-500' : 'text-gray-300 dark:text-gray-700'}`} />
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium text-[15px] sm:text-base flex items-center gap-2">
-                            {t.title}
-                            {t.goal?.title && (
-                              <span className="text-[10px] uppercase tracking-wide bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">Goal: {t.goal.title}</span>
-                            )}
-                            {!t.active && <span className="text-[10px] uppercase tracking-wide bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded">inactive</span>}
+                          {/* Title row with EP pill on the right */}
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-[15px] sm:text-base flex items-center gap-2">
+                                <span className="truncate">{t.title}</span>
+                                {t.goal?.title && (
+                                  <span className="text-[10px] uppercase tracking-wide bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800 whitespace-nowrap">Goal: {t.goal.title}</span>
+                                )}
+                                {!t.active && <span className="text-[10px] uppercase tracking-wide bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded whitespace-nowrap">inactive</span>}
+                              </div>
+                              {t.description && (
+                                <div className="text-[13px] sm:text-sm text-gray-600 dark:text-gray-400 mt-0.5 overflow-hidden" style={{display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
+                                  {t.description}
+                                </div>
+                              )}
+                            </div>
+                            <span className="ml-2 inline-flex items-center gap-1 text-blue-700 dark:text-blue-300 text-[11px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 shrink-0">+{t.ep_value} EP</span>
                           </div>
-                          {t.description && <div className="text-[13px] sm:text-sm text-gray-600 dark:text-gray-400 mt-0.5">{t.description}</div>}
-                          <div className="text-[12px] sm:text-xs text-gray-500 dark:text-gray-500 mt-1 flex items-center gap-2">
+                          <div className="text-[12px] sm:text-xs text-gray-500 dark:text-gray-500 mt-2 flex items-center gap-2">
                             {s ? (
                               <span className="inline-flex items-center gap-1">
                                 {s.frequency === 'daily' && <Sun className="w-3.5 h-3.5"/>}
@@ -565,9 +577,13 @@ export default function TasksPage() {
                                   {s.frequency === 'custom' && 'Custom'}
                                 </span>
                                 {s.frequency === 'weekly' && Array.isArray(s.byweekday) && s.byweekday.length ? (
-                                  <span className="px-2 py-0.5 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">
-                                    {s.byweekday?.map((d) => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d] ?? d).join(', ')}
-                                  </span>
+                                  <div className="flex flex-wrap gap-1">
+                                    {s.byweekday?.map((d) => (
+                                      <span key={d} className="px-1.5 py-0.5 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-[11px]">
+                                        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d] ?? d}
+                                      </span>
+                                    ))}
+                                  </div>
                                 ) : null}
                                 {s.at_time ? (
                                   <span className="px-2 py-0.5 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">{s.at_time}</span>
@@ -576,18 +592,38 @@ export default function TasksPage() {
                             ) : (
                               <span>No schedule</span>
                             )}
-                            <span className="ml-auto inline-flex items-center gap-1 text-blue-700 dark:text-blue-300 text-[11px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">+{t.ep_value} EP</span>
+                            {/* Mobile overflow menu */}
+                            <div className="ml-auto sm:hidden relative">
+                              <button aria-label="Actions" onClick={()=> setMenuOpen(prev => prev===t.id ? null : t.id)} className="h-8 w-8 rounded-md border border-gray-200 dark:border-gray-800 inline-flex items-center justify-center">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </button>
+                              {menuOpen===t.id && (
+                                <div className="absolute right-0 mt-1 w-40 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow-soft z-10">
+                                  <button className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-900 ${!t.completedToday && due ? 'text-blue-700 dark:text-blue-300 font-medium' : ''}`} onClick={()=>{ setMenuOpen(null); if(!t.completedToday) completeTask(t); }} disabled={!!busy || t.completedToday}>{t.completedToday? 'Completed' : 'Complete'}</button>
+                                  <button className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={()=>{ setMenuOpen(null); startEdit(t.id); }}>Edit</button>
+                                  <button className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={()=>{ setMenuOpen(null); deleteTask(t.id); }} disabled={!!busy}>Delete</button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div className="shrink-0 flex flex-col sm:items-end gap-2 mt-2 sm:mt-0">
                           <div className="flex gap-2 w-full sm:w-auto">
-                            <button onClick={() => startEdit(t.id)} className="px-2 py-1 rounded-md bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-xs inline-flex items-center gap-1 flex-1 sm:flex-none"><Pencil className="w-3.5 h-3.5"/>Edit</button>
-                            <button onClick={() => deleteTask(t.id)} disabled={!!busy} className="px-2 py-1 rounded-md bg-red-600 text-white text-xs inline-flex items-center gap-1 disabled:opacity-60 flex-1 sm:flex-none"><Trash2 className="w-3.5 h-3.5"/>Delete</button>
+                            {/* Labeled buttons on sm+ */}
+                            <button onClick={() => startEdit(t.id)} className="px-2 py-1 rounded-md bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-xs hidden sm:inline-flex items-center gap-1"><Pencil className="w-3.5 h-3.5"/>Edit</button>
+                            <button onClick={() => deleteTask(t.id)} disabled={!!busy} className="px-2 py-1 rounded-md bg-red-600 text-white text-xs hidden sm:inline-flex items-center gap-1 disabled:opacity-60"><Trash2 className="w-3.5 h-3.5"/>Delete</button>
+                            {/* Mobile actions moved to overflow menu */}
                           </div>
                           <button
                             disabled={!!busy || t.completedToday}
                             onClick={() => completeTask(t)}
-                            className={`px-2.5 py-1.5 rounded-md text-white text-xs disabled:opacity-60 transition w-full sm:w-auto ${t.completedToday ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'} ${busy===t.id && !t.completedToday ? 'animate-pulse':''}`}
+                            className={`px-2.5 py-1.5 rounded-md text-xs disabled:opacity-60 transition w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-blue-500/60 active:scale-[0.98] ${
+                              t.completedToday
+                                ? 'bg-gray-400 text-white'
+                                : due
+                                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                  : 'border border-blue-300 text-blue-700 dark:text-blue-300 bg-transparent hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                            } ${busy===t.id && !t.completedToday ? 'animate-pulse':''}`}
                           >
                             {t.completedToday ? 'Completed' : busy === t.id ? 'Completing…' : 'Complete'}
                           </button>

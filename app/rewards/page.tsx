@@ -21,8 +21,29 @@ type Reward = {
   } | null;
 };
 
+type GroupItem = {
+  reward_id: string;
+  kind: 'diamond' | 'collectible';
+  amount: number | null;
+  collectible_id?: string | null;
+  collectible?: Reward['collectible'] | null;
+  owned?: boolean;
+  claimed?: boolean;
+};
+
+type RewardGroup = {
+  group_id: string | null;
+  unlock_rule: 'level' | 'total_ep';
+  unlock_level: number | null;
+  unlock_ep: number | null;
+  unlocked: boolean;
+  all_claimed: boolean;
+  items: GroupItem[];
+};
+
 export default function RewardsPage() {
   const [rewards, setRewards] = useState<Reward[]>([]);
+  const [groups, setGroups] = useState<RewardGroup[]>([]);
   const [level, setLevel] = useState<number>(1);
   const [progress, setProgress] = useState<{ level: number; ep_in_level: number; ep_required: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,6 +61,7 @@ export default function RewardsPage() {
         if (!mounted) return;
         if (!rRes.ok) throw new Error(rData.error || 'Failed to load rewards');
         setRewards(rData.rewards || []);
+        setGroups(rData.groups || []);
         setLevel(rData.level || pData?.progress?.level || 1);
         if (pData?.progress) {
           setProgress({ level: pData.progress.level, ep_in_level: pData.progress.ep_in_level ?? 0, ep_required: pData.progress.ep_required });
@@ -129,7 +151,116 @@ export default function RewardsPage() {
         </div>
       ) : (
         <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {[...rewards].sort((a,b)=>a.unlock_level - b.unlock_level).map((r) => {
+          {(groups && groups.length ? groups : [...rewards].sort((a,b)=>a.unlock_level - b.unlock_level)).map((item: any) => {
+            // If groups present, item is RewardGroup; else it's Reward
+            const isGroup = Array.isArray((item as RewardGroup).items);
+            if (isGroup) {
+              const g = item as RewardGroup;
+              const isUnlocked = g.unlocked;
+              const justUnlocked = false; // keep simple for grouped
+              const levelLabel = g.unlock_rule === 'level' ? g.unlock_level : undefined;
+              const anyCollectibleUnlocked = g.items.some(it => it.kind==='collectible' && isUnlocked && !it.owned && !it.claimed);
+              const onClick = () => {
+                if (!anyCollectibleUnlocked) return;
+                router.push('/collectibles/shop');
+              };
+              // Summaries
+              const diamonds = g.items.filter(it=>it.kind==='diamond' && (it.amount ?? 0) > 0) as GroupItem[];
+              const collectibles = g.items.filter(it=>it.kind==='collectible') as GroupItem[];
+              const iconUrl = collectibles[0]?.collectible?.icon ? resolveIcon(collectibles[0]?.collectible?.icon || null) : null;
+              const rarity = (collectibles[0]?.collectible as any)?.rarity as ('common'|'rare'|'epic'|string) | undefined;
+              const rarityStyle = (() => {
+                switch ((rarity || '').toLowerCase()) {
+                  case 'epic': return { label: 'Epic', cls: 'bg-purple-600 text-white', ring: 'ring-purple-500/30' };
+                  case 'rare': return { label: 'Rare', cls: 'bg-blue-600 text-white', ring: 'ring-blue-500/30' };
+                  case 'common':
+                  default: return { label: 'Common', cls: 'bg-gray-600 text-white', ring: 'ring-gray-500/30' };
+                }
+              })();
+              return (
+                <div
+                  key={`${g.group_id ?? g.unlock_rule+':'+(g.unlock_level ?? g.unlock_ep ?? '')}`}
+                  className={`group relative rounded-2xl p-4 shadow-sm transition overflow-hidden border bg-white/70 dark:bg-gray-950/60 h-full flex flex-col ${isUnlocked ? 'border-emerald-500/30 hover:shadow-emerald-500/20' : 'border-gray-200 dark:border-gray-800'} ${anyCollectibleUnlocked ? 'cursor-pointer' : ''}`}
+                  onClick={onClick}
+                  role={anyCollectibleUnlocked ? 'button' : undefined}
+                  aria-disabled={!isUnlocked}
+                >
+                  <div className={`pointer-events-none absolute inset-0 rounded-2xl ${isUnlocked ? 'bg-gradient-to-br from-emerald-500/10 via-blue-500/10 to-transparent' : ''}`} />
+                  <div className="pointer-events-none absolute -right-4 -bottom-4 opacity-[0.07] text-gray-500 dark:text-gray-300">
+                    <Gift className="h-24 w-24"/>
+                  </div>
+                  <div className="relative flex items-start justify-between">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">{g.unlock_rule==='level' ? `Level ${levelLabel}` : `Total EP ${g.unlock_ep}`}</div>
+                      <div className="mt-1 font-semibold flex items-center gap-3 flex-wrap">
+                        {diamonds.map((d, idx)=> (
+                          <span key={`d-${idx}`} className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 truncate">
+                            <Gem className="h-4 w-4" /> {d.amount}
+                          </span>
+                        ))}
+                        {collectibles.map((c, idx)=> (
+                          <span key={`c-${idx}`} className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 truncate">
+                            <Gift className="h-4 w-4" /> <span className="truncate">{c.collectible?.name || 'Collectible'}</span>
+                          </span>
+                        ))}
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">
+                        {collectibles.length ? (collectibles[0]?.collectible?.description || 'Collectible reward') : 'Currency reward'}
+                      </div>
+                    </div>
+                    <div className={`shrink-0 text-xs px-2 py-1 rounded-full border font-medium inline-flex items-center gap-1 ${isUnlocked
+                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                      : 'bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-100 border-gray-500/30'}
+                    `}>
+                      {!isUnlocked && <Lock className="h-3.5 w-3.5"/>}
+                      {isUnlocked ? 'Unlocked' : 'Locked'}
+                    </div>
+                  </div>
+                  <div className="mt-4 grow flex flex-col">
+                    {collectibles.length ? (
+                      <div className="relative">
+                        <div className={`relative h-32 w-full rounded-xl overflow-hidden border border-white/10 bg-gradient-to-br from-gray-100/50 to-gray-200/30 dark:from-gray-900/60 dark:to-gray-800/40 ${justUnlocked ? 'ring-2 ' + rarityStyle.ring : ''}`}>
+                          <div className={`absolute left-0 top-0 m-2 px-2 py-0.5 rounded-full text-[10px] font-semibold ${rarityStyle.cls} shadow`}>{rarityStyle.label}</div>
+                          {iconUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={iconUrl} alt={collectibles[0]?.collectible?.name || 'Collectible'} className={`h-full w-full object-cover ${isUnlocked ? '' : 'opacity-40'}`}
+                              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                          ) : (
+                            <div className="h-full w-full grid place-items-center">
+                              <Gift className={`${isUnlocked ? 'text-emerald-500' : 'text-gray-400'} h-10 w-10`} />
+                            </div>
+                          )}
+                          {(diamonds[0]?.amount ?? 0) > 0 && (
+                            <div className="absolute right-2 top-2 text-xs inline-flex items-center gap-1 px-2 py-0.5 rounded-full border bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30 shadow-sm">
+                              <Gem className="h-3.5 w-3.5"/> +{diamonds[0]?.amount}
+                            </div>
+                          )}
+                        </div>
+                        {collectibles.some(c=>c.owned) ? (
+                          <div className="absolute -bottom-3 left-3 text-xs inline-flex items-center gap-1 px-2 py-1 rounded-full border bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 shadow-sm">
+                            <CheckCircle2 className="h-3.5 w-3.5"/> Owned
+                          </div>
+                        ) : null}
+                        {(!collectibles.some(c=>c.owned) && isUnlocked) ? (
+                          <div className="absolute -bottom-3 right-3 text-xs inline-flex items-center gap-1 px-2 py-1 rounded-full border bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30 shadow-sm">
+                            <Gift className="h-3.5 w-3.5"/> Unlocked
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="mt-1 h-32 w-full rounded-xl border border-white/10 bg-gradient-to-br from-blue-500/10 to-emerald-500/10 grid place-items-center">
+                        {(diamonds[0]?.amount ?? 0) > 0 ? (
+                          <Gem className="h-10 w-10 text-blue-500/70" />
+                        ) : (
+                          <div className="text-xs text-gray-600 dark:text-gray-400">Currency</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+            const r = item as Reward;
             const isUnlocked = r.unlocked;
             const isOwned = r.kind === 'collectible' ? r.owned : undefined;
             const iconUrl = resolveIcon(r.collectible?.icon || null);
@@ -264,7 +395,7 @@ export default function RewardsPage() {
         </div>
       )}
 
-      {!loading && !rewards.length && !error && (
+      {!loading && !error && (groups?.length ? false : !rewards.length) && (
         <p className="mt-6 text-sm text-gray-500">No rewards configured.</p>
       )}
     </div>

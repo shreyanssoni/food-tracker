@@ -216,6 +216,35 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       }
     }
 
+    // Build notifications
+    const origin = (() => {
+      try { return new URL((req as any).url).origin; } catch { return ''; }
+    })();
+    const secret = process.env.CRON_SECRET || '';
+    const notify = async (title: string, body: string, url: string) => {
+      if (!origin || !secret) return;
+      try {
+        await fetch(`${origin}/api/notify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-cron-secret': secret },
+          body: JSON.stringify({ userId: user.id, focused: true, push: true, title, body, url })
+        });
+      } catch {}
+    };
+
+    // Always notify task completion
+    await notify('Task completed', `You earned +${ep_awarded} EP`, '/tasks');
+
+    // Level up notification
+    if (levelsGained > 0) {
+      await notify('Level up!', `You reached level ${curLevel}. +${levelUpDiamonds} diamonds`, '/rewards');
+    }
+
+    // Reward diamonds notification
+    if (rewardDiamonds > 0) {
+      await notify('Reward earned', `You received +${rewardDiamonds} diamonds`, '/rewards');
+    }
+
     return NextResponse.json({
       completion,
       progress: { level: curLevel, ep_in_level: curEp, total_ep: newTotal, diamonds },

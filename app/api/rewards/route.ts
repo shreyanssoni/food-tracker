@@ -22,7 +22,7 @@ export async function GET() {
     // Rewards with collectible metadata
     const { data: rewards, error } = await supabase
       .from('rewards')
-      .select('id, kind, amount, collectible_id, unlock_level, unlock_rule, unlock_ep')
+      .select('id, kind, amount, collectible_id, unlock_level, unlock_rule, unlock_ep, group_id')
       .order('unlock_level');
     if (error) throw error;
 
@@ -51,7 +51,46 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({ rewards: result, level, total_ep, owned: Array.from(ownedSet) });
+    // Build grouped payload for merged cards by group_id (fallback to normalized unlock condition)
+    const groupsMap = new Map<string, any>();
+    for (const r of result) {
+      const key = r.group_id
+        ? `gid:${r.group_id}`
+        : (r.unlock_rule === 'total_ep'
+            ? `total_ep:${r.unlock_ep ?? ''}`
+            : `level:${r.unlock_level ?? ''}`);
+      if (!groupsMap.has(key)) {
+        groupsMap.set(key, {
+          group_id: r.group_id || null,
+          unlock_rule: r.unlock_rule || 'level',
+          unlock_level: (r.unlock_rule || 'level') === 'level' ? r.unlock_level : null,
+          unlock_ep: (r.unlock_rule || 'level') === 'total_ep' ? r.unlock_ep : null,
+          unlocked: r.unlocked,
+          // Consider a group claimed if all items are claimed (can adjust in UI if needed)
+          all_claimed: true,
+          items: [] as any[],
+        });
+      }
+      const g = groupsMap.get(key);
+      g.unlocked = g.unlocked || r.unlocked;
+      g.all_claimed = g.all_claimed && !!r.claimed;
+      g.items.push({
+        reward_id: r.id,
+        kind: r.kind,
+        amount: r.amount,
+        collectible_id: r.collectible_id,
+        collectible: r.collectible,
+        owned: r.owned,
+        claimed: r.claimed,
+      });
+    }
+    const groups = Array.from(groupsMap.values()).sort((a, b) => {
+      if (a.unlock_rule === 'level' && b.unlock_rule === 'level') return (a.unlock_level ?? 0) - (b.unlock_level ?? 0);
+      if (a.unlock_rule === 'total_ep' && b.unlock_rule === 'total_ep') return (a.unlock_ep ?? 0) - (b.unlock_ep ?? 0);
+      return a.unlock_rule.localeCompare(b.unlock_rule);
+    });
+
+    return NextResponse.json({ rewards: result, groups, level, total_ep, owned: Array.from(ownedSet) });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
   }

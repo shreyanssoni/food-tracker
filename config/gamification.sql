@@ -133,6 +133,94 @@ CREATE POLICY "Allow read to all on rewards" ON public.rewards FOR SELECT USING 
 CREATE POLICY "Allow insert to all on rewards" ON public.rewards FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow update to all on rewards" ON public.rewards FOR UPDATE USING (true) WITH CHECK (true);
 
+-- =============================
+-- Group rewards per unlock rule/threshold to have a single record per level/EP threshold
+-- =============================
+
+-- Group table: one row per unlock condition (either by level or total_ep)
+CREATE TABLE IF NOT EXISTS public.level_reward_groups (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  unlock_rule TEXT NOT NULL CHECK (unlock_rule IN ('level','total_ep')),
+  unlock_level INTEGER,
+  unlock_ep BIGINT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(unlock_rule, unlock_level, unlock_ep)
+);
+
+ALTER TABLE public.level_reward_groups ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow read to all on level_reward_groups" ON public.level_reward_groups FOR SELECT USING (true);
+CREATE POLICY "Allow insert to all on level_reward_groups" ON public.level_reward_groups FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow update to all on level_reward_groups" ON public.level_reward_groups FOR UPDATE USING (true) WITH CHECK (true);
+
+-- Add a generated unique key to avoid NULL conflicts in composite unique constraint (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='level_reward_groups' AND column_name='group_key'
+  ) THEN
+    ALTER TABLE public.level_reward_groups
+      ADD COLUMN group_key TEXT GENERATED ALWAYS AS (
+        CASE
+          WHEN unlock_rule = 'level' THEN 'level:' || COALESCE(unlock_level, -1)::text
+          ELSE 'total_ep:' || COALESCE(unlock_ep, -1)::text
+        END
+      ) STORED;
+  END IF;
+  -- Create unique index on group_key
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='level_reward_groups_group_key_uniq'
+  ) THEN
+    CREATE UNIQUE INDEX level_reward_groups_group_key_uniq ON public.level_reward_groups(group_key);
+  END IF;
+END $$;
+
+-- Link existing rewards to a group
+DO $$
+BEGIN
+  -- Add group_id column if missing
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'rewards' AND column_name = 'group_id'
+  ) THEN
+    ALTER TABLE public.rewards ADD COLUMN group_id uuid NULL REFERENCES public.level_reward_groups(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
+-- Backfill groups and set group_id on rewards (idempotent)
+DO $$
+DECLARE
+  _r RECORD;
+  _gid uuid;
+BEGIN
+  -- Ensure groups exist for each distinct unlock condition in rewards
+  INSERT INTO public.level_reward_groups (unlock_rule, unlock_level, unlock_ep)
+  SELECT DISTINCT
+    COALESCE(unlock_rule, 'level') AS unlock_rule,
+    CASE WHEN COALESCE(unlock_rule, 'level') = 'level' THEN unlock_level ELSE NULL END AS unlock_level,
+    CASE WHEN COALESCE(unlock_rule, 'level') = 'total_ep' THEN unlock_ep ELSE NULL END AS unlock_ep
+  FROM public.rewards r
+  ON CONFLICT (unlock_rule, unlock_level, unlock_ep) DO NOTHING;
+
+  -- Assign group_id for rewards missing it
+  FOR _r IN
+    SELECT id, COALESCE(unlock_rule, 'level') AS unlock_rule, unlock_level, unlock_ep
+    FROM public.rewards
+    WHERE group_id IS NULL
+  LOOP
+    SELECT id INTO _gid FROM public.level_reward_groups g
+    WHERE g.unlock_rule = _r.unlock_rule
+      AND (
+        (_r.unlock_rule = 'level' AND g.unlock_level = _r.unlock_level)
+        OR (_r.unlock_rule = 'total_ep' AND g.unlock_ep = _r.unlock_ep)
+      )
+    LIMIT 1;
+    IF _gid IS NOT NULL THEN
+      UPDATE public.rewards SET group_id = _gid WHERE id = _r.id;
+    END IF;
+  END LOOP;
+END $$;
+
 -- Collectibles catalog
 CREATE TABLE IF NOT EXISTS public.collectibles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -176,6 +264,10 @@ CREATE POLICY "Allow read to all on user_collectibles" ON public.user_collectibl
 CREATE POLICY "Allow insert to all on user_collectibles" ON public.user_collectibles FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow delete to all on user_collectibles" ON public.user_collectibles FOR DELETE USING (true);
 
+-- Track how a collectible was obtained (idempotent)
+ALTER TABLE public.user_collectibles
+  ADD COLUMN IF NOT EXISTS source TEXT CHECK (source IN ('purchase','reward','admin_grant'));
+
 -- Collectibles store catalog (items purchasable with diamonds)
 CREATE TABLE IF NOT EXISTS public.collectibles_store (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -189,6 +281,22 @@ ALTER TABLE public.collectibles_store ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow read to all on collectibles_store" ON public.collectibles_store FOR SELECT USING (true);
 CREATE POLICY "Allow insert to all on collectibles_store" ON public.collectibles_store FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow update to all on collectibles_store" ON public.collectibles_store FOR UPDATE USING (true) WITH CHECK (true);
+
+-- Focused in-app notifications
+CREATE TABLE IF NOT EXISTS public.user_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  url TEXT DEFAULT NULL,                         -- optional deep link within app
+  read_at TIMESTAMPTZ DEFAULT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.user_messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow read own messages" ON public.user_messages FOR SELECT USING (auth.uid()::text = user_id);
+CREATE POLICY "Allow insert own messages" ON public.user_messages FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+-- Allow service/admin to insert for any user (bypass via service key or privileged RLS as used elsewhere)
 
 -- Diamonds ledger (transactional record of diamond changes)
 CREATE TABLE IF NOT EXISTS public.diamond_ledger (
@@ -445,6 +553,7 @@ SELECT
   r.unlock_rule,
   r.unlock_level,
   r.unlock_ep,
+  r.group_id,
   c.name AS collectible_name,
   c.icon AS collectible_icon,
   c.rarity AS collectible_rarity
@@ -514,8 +623,8 @@ BEGIN
           UPDATE public.user_progress SET diamonds = diamonds + r.amount WHERE user_id = NEW.user_id;
           INSERT INTO public.diamond_ledger(user_id, delta, reason) VALUES (NEW.user_id, r.amount, 'reward');
         ELSIF r.kind = 'collectible' AND r.collectible_id IS NOT NULL THEN
-          INSERT INTO public.user_collectibles(user_id, collectible_id)
-          VALUES (NEW.user_id, r.collectible_id)
+          INSERT INTO public.user_collectibles(user_id, collectible_id, source)
+          VALUES (NEW.user_id, r.collectible_id, 'reward')
           ON CONFLICT (user_id, collectible_id) DO NOTHING;
         END IF;
         INSERT INTO public.user_reward_claims(user_id, reward_id) VALUES (NEW.user_id, r.id)

@@ -106,6 +106,69 @@ export default function Navbar() {
   const [progLoading, setProgLoading] = useState(false);
   const [topBadge, setTopBadge] = useState<{ name: string; icon?: string } | null>(null);
   const [lifeStreak, setLifeStreak] = useState<{ current: number; longest?: number } | null>(null);
+  const [unreadMsgs, setUnreadMsgs] = useState<Array<{ id: string; title: string; body: string; url?: string | null; created_at: string }>>([]);
+  const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+
+  // Helper: refresh unread count
+  const refreshUnreadCount = async () => {
+    if (typeof window === 'undefined') return;
+    if (status !== 'authenticated') { setUnreadCount(0); return; }
+    try {
+      const res = await fetch('/api/notifications/messages?unread=1', { cache: 'no-store' });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(j.messages)) setUnreadCount(j.messages.length);
+      else setUnreadCount(0);
+    } catch { setUnreadCount(0); }
+  };
+
+  // Focused notifications: load unread when dropdown opens
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (status !== 'authenticated') { setUnreadMsgs([]); return; }
+    if (!dropdownOpen) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingMsgs(true);
+        const res = await fetch('/api/notifications/messages?unread=1', { cache: 'no-store' });
+        const j = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.ok && Array.isArray(j.messages)) {
+          setUnreadMsgs(j.messages);
+          setUnreadCount(j.messages.length);
+        } else {
+          setUnreadMsgs([]);
+          setUnreadCount(0);
+        }
+      } catch { setUnreadMsgs([]); }
+      finally { if (!cancelled) setLoadingMsgs(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [dropdownOpen, status]);
+
+  const markMsgRead = async (id: string) => {
+    try {
+      await fetch(`/api/notifications/messages/${id}/read`, { method: 'POST' });
+      setUnreadMsgs((prev) => prev.filter((m) => m.id !== id));
+      setUnreadCount((c) => Math.max(0, c - 1));
+    } catch {}
+  };
+
+  // Keep unread indicator updated periodically and on visibility
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (status !== 'authenticated') { setUnreadCount(0); return; }
+    let mounted = true;
+    // initial fetch
+    void refreshUnreadCount();
+    // visibility handler
+    const onVis = () => { if (document.visibilityState === 'visible') void refreshUnreadCount(); };
+    document.addEventListener('visibilitychange', onVis);
+    // poll every 60s
+    const t = setInterval(() => { if (mounted) void refreshUnreadCount(); }, 60000);
+    return () => { mounted = false; document.removeEventListener('visibilitychange', onVis); clearInterval(t); };
+  }, [status]);
 
   // Navigation link component
   const NavLink = ({ path, label }: NavItem) => (
@@ -485,11 +548,20 @@ export default function Navbar() {
                 Send test
               </button>
             )}
+            {status === "authenticated" && isAdmin && (
+              <Link
+                href={'/admin/rewards' as unknown as Route}
+                className="px-3 py-1.5 text-sm rounded-full border border-gray-200/80 dark:border-gray-800/80 hover:bg-gray-100/80 dark:hover:bg-white/5"
+                title="Manage Rewards & Collectibles"
+              >
+                Manage rewards
+              </Link>
+            )}
             {status === "authenticated" ? (
               <div className="relative" ref={dropdownRef}>
                 <button
                   type="button"
-                  className="bg-white/70 dark:bg-gray-900/70 rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 border border-gray-200/70 dark:border-gray-800/70"
+                  className="relative bg-white/70 dark:bg-gray-900/70 rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 border border-gray-200/70 dark:border-gray-800/70"
                   aria-haspopup="true"
                   aria-expanded={dropdownOpen}
                   onClick={() => setDropdownOpen((v) => !v)}
@@ -500,10 +572,39 @@ export default function Navbar() {
                     src={session?.user?.image || "/default-avatar.png"}
                     alt={session?.user?.name || "User"}
                   />
+                  {status === 'authenticated' && unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 ring-2 ring-white dark:ring-gray-900" aria-hidden />
+                  )}
                 </button>
                 {dropdownOpen && (
                   <div className="absolute right-0 mt-2 w-56 rounded-xl shadow-xl bg-white/90 dark:bg-gray-900/90 backdrop-blur border border-gray-200/70 dark:border-gray-800/70 focus:outline-none z-20">
                     <div className="py-1">
+                      {/* Focused notifications list */}
+                      <div className="px-4 py-2 border-b border-gray-200/70 dark:border-gray-800/70">
+                        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Notifications</div>
+                        {loadingMsgs ? (
+                          <div className="text-xs text-gray-600 dark:text-gray-300">Loading...</div>
+                        ) : unreadMsgs.length === 0 ? (
+                          <div className="text-xs text-gray-600 dark:text-gray-400">No new notifications</div>
+                        ) : (
+                          <ul className="space-y-1 max-h-40 overflow-auto">
+                            {unreadMsgs.slice(0, 5).map((m) => (
+                              <li key={m.id} className="text-xs text-gray-800 dark:text-gray-100">
+                                <div className="font-medium truncate" title={m.title}>{m.title}</div>
+                                <div className="truncate text-gray-600 dark:text-gray-300" title={m.body}>{m.body}</div>
+                                <div className="mt-1 flex gap-2">
+                                  {m.url && (
+                                    <Link href={m.url as Route} className="underline hover:no-underline" onClick={() => setDropdownOpen(false)}>
+                                      View
+                                    </Link>
+                                  )}
+                                  <button className="text-blue-600 dark:text-blue-400 hover:underline" onClick={() => markMsgRead(m.id)}>Mark read</button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                       {/* Notifications toggle */}
                       <button
                         className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50/80 dark:hover:bg-white/5"

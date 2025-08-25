@@ -125,7 +125,11 @@ export default function CollectiblesShopPage() {
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2">
                   {i.owned ? (
-                    <span className="text-[11px] px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">Owned</span>
+                    i.owned_source === 'admin_grant' ? (
+                      <span className="text-[11px] px-2 py-0.5 rounded-full border bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30" title="Awarded for free by admin">FREE</span>
+                    ) : (
+                      <span className="text-[11px] px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">Owned</span>
+                    )
                   ) : (
                     <button
                       className="text-[12px] px-2.5 py-1.5 rounded-full border border-transparent bg-gradient-to-r from-blue-600 to-emerald-500 text-white disabled:opacity-60 disabled:grayscale w-full sm:w-auto"

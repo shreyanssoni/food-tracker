@@ -103,7 +103,7 @@ export async function POST(req: Request) {
     // Grant collectible and deduct diamonds
     const { error: ucErr } = await supabase
       .from('user_collectibles')
-      .insert({ user_id: user.id, collectible_id: item.collectible_id });
+      .insert({ user_id: user.id, collectible_id: item.collectible_id, source: 'purchase' });
     if (ucErr && (ucErr as any).code !== '23505') throw ucErr;
 
     const newDiamonds = diamonds - item.price;
@@ -113,6 +113,21 @@ export async function POST(req: Request) {
     ]);
     if (dUpdErr) throw dUpdErr;
     if (ledErr) throw ledErr;
+
+    // Notify user about purchase (focused + push)
+    try {
+      const origin = (() => { try { return new URL((req as any).url).origin; } catch { return ''; } })();
+      const secret = process.env.CRON_SECRET || '';
+      if (origin && secret) {
+        const title = 'Purchased collectible';
+        const body = meta?.name ? `You bought "${meta.name}". Diamonds left: ${newDiamonds}` : `Purchase successful. Diamonds left: ${newDiamonds}`;
+        await fetch(`${origin}/api/notify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-cron-secret': secret },
+          body: JSON.stringify({ userId: user.id, focused: true, push: true, title, body, url: '/collectibles' })
+        });
+      }
+    } catch {}
 
     // Return with collectible metadata (use previously fetched)
     const fullMeta = meta;

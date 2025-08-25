@@ -52,9 +52,11 @@ export async function GET() {
 
     const { data: owned } = await supabase
       .from('user_collectibles')
-      .select('collectible_id')
+      .select('collectible_id, source')
       .eq('user_id', user.id);
     const ownedSet = new Set((owned || []).map((r: any) => r.collectible_id));
+    const ownedSource: Record<string, string | null> = {};
+    for (const row of owned || []) ownedSource[row.collectible_id] = row.source || null;
 
     const level = progRow?.level ?? 1;
 
@@ -73,6 +75,7 @@ export async function GET() {
         const meta = metadata[i.collectible_id] || null;
         const rq = reqs[i.collectible_id] || { min_level: 1, required_badge_id: null };
         const owned = ownedSet.has(i.collectible_id);
+        const owned_source = owned ? (ownedSource[i.collectible_id] || null) : null;
         const hasReqBadge = rq.required_badge_id ? ownedSet.has(rq.required_badge_id) : true;
         let goalOk = true;
         if (rq.require_goal_success && rq.required_goal_id) {
@@ -98,6 +101,8 @@ export async function GET() {
           ...i,
           collectible: meta,
           owned,
+          owned_source,
+          free_awarded: owned && owned_source === 'admin_grant',
           can_purchase,
           unavailable_reason,
           requirements: { ...rq, required_badge_name: rq?.required_badge_id ? (badgeMeta[rq.required_badge_id]?.name || null) : null },

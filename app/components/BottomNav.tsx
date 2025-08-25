@@ -8,7 +8,7 @@ const items = [
   { href: "/dashboard", label: "Home", icon: HomeIcon },
   { href: "/tasks", label: "Tasks", icon: TasksIcon },
   { href: "/food", label: "Log", icon: PlusIcon },
-  { href: "/goals", label: "Goals", icon: TasksIcon },
+  { href: "/goals", label: "Goals", icon: TargetIcon },
   { href: "/suggestions", label: "Suggest", icon: SparklesIcon },
   { href: "/chat", label: "Chat", icon: ChatIcon },
 ];
@@ -29,15 +29,15 @@ export default function BottomNav() {
               <Link
                 href={{ pathname: href }}
                 className={cn(
-                  "flex-1 mx-1 my-1 flex flex-col items-center justify-center text-[11px] gap-1 rounded-full transition-colors",
+                  "flex-1 mx-1 my-1 flex flex-col items-center justify-center text-[11px] gap-1 rounded-2xl transition-all",
                   active
-                    ? "text-white bg-gradient-to-tr from-blue-600 to-emerald-500 shadow"
-                    : "text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100/70 dark:hover:bg-white/5"
+                    ? "text-white bg-gradient-to-tr from-blue-600 to-emerald-500 shadow-lg scale-[1.02]"
+                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/70 dark:hover:bg-white/5"
                 )}
                 aria-current={active ? "page" : undefined}
               >
-                <Icon aria-hidden className={cn("h-6 w-6", active && "fill-white/20")}/>
-                <span className="leading-none">{label}</span>
+                <Icon aria-hidden className={cn("h-[22px] w-[22px]", active && "fill-white/20")}/>
+                <span className="leading-none font-medium">{label}</span>
               </Link>
             </li>
           );
@@ -110,6 +110,16 @@ function TasksIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
       <path d="M4 6h12M4 12h12M4 18h12M18 5l3 3M18 11l3 3M18 17l3 3" className="stroke-current" fill="none" strokeWidth="1.5"/>
+    </svg>
+  );
+}
+
+function TargetIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <circle cx="12" cy="12" r="8" className="stroke-current" fill="none" strokeWidth="1.5"/>
+      <circle cx="12" cy="12" r="4" className="stroke-current" fill="none" strokeWidth="1.5"/>
+      <path d="M12 2v4M12 18v4M2 12h4M18 12h4" className="stroke-current" fill="none" strokeWidth="1.5"/>
     </svg>
   );
 }
