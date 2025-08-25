@@ -59,6 +59,10 @@ ALTER TABLE public.user_preferences
   ADD COLUMN IF NOT EXISTS fat_goal_grams INTEGER,
   ADD COLUMN IF NOT EXISTS carbs_goal_grams INTEGER;
 
+-- Track if user has completed the first-time onboarding (idempotent)
+ALTER TABLE public.user_preferences
+  ADD COLUMN IF NOT EXISTS has_seen_onboarding BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- Recreate indexes with TEXT user_id
 CREATE INDEX IF NOT EXISTS food_logs_user_time_idx ON public.food_logs(user_id, eaten_at DESC);
 CREATE INDEX IF NOT EXISTS food_logs_time_idx ON public.food_logs(eaten_at DESC);

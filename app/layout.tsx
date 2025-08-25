@@ -8,6 +8,7 @@ import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import ProfilePrompt from './components/ProfilePrompt';
 import InstallPrompt from './components/InstallPrompt';
+import Onboarding from './components/Onboarding';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -65,6 +66,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <ProfilePrompt />
           {/* PWA install prompt */}
           <InstallPrompt />
+          {/* First-time onboarding modal */}
+          <Onboarding />
           {/* Global toaster */}
           <Toaster richColors position="top-center" theme="system" />
           <footer className="hidden md:block bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 mt-8">

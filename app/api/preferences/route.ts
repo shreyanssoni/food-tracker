@@ -47,15 +47,26 @@ export async function POST(req: NextRequest) {
   const userId = headerUser || user?.id || null;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // Load existing to avoid clobbering when only a subset is sent
+  const { data: existing } = await supabase
+    .from('user_preferences')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
   const upsert = {
     user_id: userId,
-    height_cm: body.height_cm ?? null,
-    weight_kg: body.weight_kg ?? null,
-    age: body.age ?? null,
-    gender: body.gender ?? null,
-    activity_level: body.activity_level ?? 'sedentary',
-    goal: body.goal ?? 'maintain',
-    workout_level: body.workout_level ?? null,
+    height_cm: body.height_cm ?? existing?.height_cm ?? null,
+    weight_kg: body.weight_kg ?? existing?.weight_kg ?? null,
+    age: body.age ?? existing?.age ?? null,
+    gender: body.gender ?? existing?.gender ?? null,
+    activity_level: body.activity_level ?? existing?.activity_level ?? 'sedentary',
+    goal: body.goal ?? existing?.goal ?? 'maintain',
+    workout_level: body.workout_level ?? existing?.workout_level ?? null,
+    fat_goal_grams: body.fat_goal_grams ?? existing?.fat_goal_grams ?? null,
+    carbs_goal_grams: body.carbs_goal_grams ?? existing?.carbs_goal_grams ?? null,
+    // New flag: whether onboarding has been seen
+    has_seen_onboarding: body.has_seen_onboarding ?? existing?.has_seen_onboarding ?? false,
     updated_at: new Date().toISOString(),
   };
 
