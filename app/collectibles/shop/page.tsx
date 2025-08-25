@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
-import { Gift } from 'lucide-react';
+import { Gem } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function CollectiblesShopPage() {
@@ -66,13 +66,13 @@ export default function CollectiblesShopPage() {
       </div>
 
       {loading ? (
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white/60 dark:bg-gray-950/50 p-3 animate-pulse h-28" />
+            <div key={i} className="rounded-xl border border-gray-200/70 dark:border-gray-800/70 bg-white/60 dark:bg-gray-950/50 p-4 animate-pulse h-28" />
           ))}
         </div>
       ) : (
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {items.length === 0 && (
             <div className="col-span-full text-center text-sm text-gray-600 dark:text-gray-400">
               No items available yet. Progress your level or unlock requirements to see more.
@@ -89,14 +89,20 @@ export default function CollectiblesShopPage() {
             return (
               <div
                 key={i.id}
-                className="relative rounded-xl p-3 border border-gray-200/70 dark:border-gray-800/70 bg-white/70 dark:bg-gray-950/60 shadow-sm md:hover:shadow-md transition-all md:hover:-translate-y-0.5"
+                className="group relative rounded-xl p-4 border border-gray-200/70 dark:border-gray-800/70 bg-white/70 dark:bg-gray-950/60 shadow-sm transition-all md:hover:shadow-md md:hover:-translate-y-0.5"
               >
                 {/* Header */}
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-[13px] font-semibold truncate" title={c.name || 'Collectible'}>{c.name || 'Collectible'}</div>
-                  <span className={`text-[9px] px-2 py-0.5 rounded-full bg-gradient-to-r ${rarityClass} text-white shadow-sm`}>{(c.rarity || 'Common')}</span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold truncate" title={c.name || 'Collectible'}>{c.name || 'Collectible'}</div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full bg-gradient-to-r ${rarityClass} text-white shadow-sm capitalize`}>{(c.rarity || 'Common')}</span>
+                    <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-gray-200/70 dark:border-gray-800/70 bg-white/70 dark:bg-gray-900/70 text-gray-700 dark:text-gray-300">
+                      <Gem className="h-3.5 w-3.5" /> {i.price}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-[11px] text-gray-600 dark:text-gray-400 mt-0.5">Price: {i.price} 💎</div>
 
                 {/* Badge gate banner */}
                 {!i.owned && !i.can_purchase && i.unavailable_reason === 'badge_required' && (
@@ -106,13 +112,13 @@ export default function CollectiblesShopPage() {
                 )}
 
                 {/* Image */}
-                <div className="mt-2 h-28 rounded-lg border border-gray-200/60 dark:border-gray-800/60 grid place-items-center bg-gray-50 dark:bg-gray-900 overflow-hidden">
+                <div className="mt-3 h-32 sm:h-36 rounded-lg border border-gray-200/60 dark:border-gray-800/60 grid place-items-center bg-gray-50 dark:bg-gray-900 overflow-hidden">
                   {/* Always render an image and fallback to default placeholder if missing or load fails */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={icon || '/images/collectibles/default.svg'}
                     alt={c.name}
-                    className="h-full w-full object-cover scale-100 md:hover:scale-[1.02] transition-transform"
+                    className="h-full w-full object-contain scale-100 md:group-hover:scale-[1.02] transition-transform"
                     onError={(e) => {
                       const fallback = '/images/collectibles/default.svg';
                       // @ts-ignore
@@ -123,7 +129,7 @@ export default function CollectiblesShopPage() {
                     }}
                   />
                 </div>
-                <div className="mt-2 flex items-center justify-between gap-2">
+                <div className="mt-3 flex items-center justify-between gap-2">
                   {i.owned ? (
                     i.owned_source === 'admin_grant' ? (
                       <span className="text-[11px] px-2 py-0.5 rounded-full border bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30" title="Awarded for free by admin">FREE</span>
@@ -132,7 +138,7 @@ export default function CollectiblesShopPage() {
                     )
                   ) : (
                     <button
-                      className="text-[12px] px-2.5 py-1.5 rounded-full border border-transparent bg-gradient-to-r from-blue-600 to-emerald-500 text-white disabled:opacity-60 disabled:grayscale w-full sm:w-auto"
+                      className="text-[12px] px-3 py-1.5 rounded-full border border-transparent bg-gradient-to-r from-blue-600 to-emerald-500 text-white w-full sm:w-auto disabled:opacity-60 disabled:grayscale"
                       onClick={() => purchase(i.id)}
                       disabled={busy === i.id || !i.can_purchase}
                     >
