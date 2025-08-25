@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { getCurrentUser } from '@/utils/auth';
+import { createAdminClient } from '@/utils/supabase/admin';
 
 // POST /api/admin/collectibles/grant
 // Body: { user_id: string, collectible_id: string }
@@ -56,16 +57,39 @@ export async function POST(req: NextRequest) {
     try {
       const origin = (() => { try { return new URL((req as any).url).origin; } catch { return ''; } })();
       const secret = process.env.CRON_SECRET || '';
+      const title = 'Collectible granted';
+      const body = col?.name ? `You received "${col.name}" for free` : 'You received a collectible for free';
+
       if (origin && secret) {
-        const title = 'Collectible granted';
-        const body = col?.name ? `You received "${col.name}" for free` : 'You received a collectible for free';
-        await fetch(`${origin}/api/notify`, {
+        const res = await fetch(`${origin}/api/notify`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-cron-secret': secret },
           body: JSON.stringify({ userId: user_id, focused: true, push: true, title, body, url: '/collectibles' })
         });
+        if (!res.ok) {
+          const txt = await res.text().catch(() => '');
+          console.error('notify call failed', { status: res.status, body: txt });
+          // Fallback: still create focused message directly so the user sees something
+          try {
+            const admin = createAdminClient();
+            await admin.from('user_messages').insert({ user_id: user_id, title, body, url: '/collectibles' });
+          } catch (fErr) {
+            console.error('fallback focused insert error', fErr);
+          }
+        }
+      } else {
+        console.warn('notify skipped due to missing origin or CRON_SECRET', { hasOrigin: !!origin, hasSecret: !!secret });
+        // Fallback for local/dev when CRON_SECRET not configured
+        try {
+          const admin = createAdminClient();
+          await admin.from('user_messages').insert({ user_id: user_id, title, body, url: '/collectibles' });
+        } catch (fErr) {
+          console.error('fallback focused insert error (no secret)', fErr);
+        }
       }
-    } catch {}
+    } catch (e) {
+      console.error('admin grant notify block error', e);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (e) {
