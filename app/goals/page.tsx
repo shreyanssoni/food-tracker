@@ -504,23 +504,23 @@ function GoalCard({
 
   return (
     <div className="rounded-3xl border border-gray-200/70 dark:border-gray-800/70 bg-white/70 dark:bg-gray-900/60 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <button type="button" onClick={onToggle} className="flex items-start gap-3 flex-1 text-left">
+      <div className="flex items-start justify-between gap-3 flex-wrap sm:flex-nowrap">
+        <button type="button" onClick={onToggle} className="flex items-start gap-3 flex-1 min-w-0 text-left">
           <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-600 to-emerald-500 text-white flex items-center justify-center">
             <Target className="h-5 w-5"/>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1">
-              <div className="text-base font-semibold text-gray-900 dark:text-gray-100">{goal.title}</div>
+              <div className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">{goal.title}</div>
               {expanded ? <ChevronDown className="h-4 w-4 text-gray-400"/> : <ChevronRight className="h-4 w-4 text-gray-400"/>}
             </div>
             <div className="text-xs text-gray-500 mt-1">Deadline: {deadline.toLocaleDateString()} • Days left: {daysLeft}</div>
           </div>
         </button>
-        <div className="flex items-center gap-2">
-          <button onClick={onEdit} className="text-xs px-2 py-1 rounded-full border hover:bg-gray-100/70 dark:hover:bg-white/5">Edit</button>
-          <button onClick={onDelete} className="text-xs px-2 py-1 rounded-full border border-red-300/70 text-red-600 hover:bg-red-50/70">Delete</button>
-          <span className={`px-2 py-1 rounded-full text-xs ${pastDeadline ? "bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300" : "bg-emerald-100 text-emerald-700"}`}>
+        <div className="flex items-center gap-2 w-full sm:w-auto sm:justify-end flex-wrap">
+          <button onClick={onEdit} className="text-[11px] px-2 py-1 rounded-full border hover:bg-gray-100/70 dark:hover:bg-white/5">Edit</button>
+          <button onClick={onDelete} className="text-[11px] px-2 py-1 rounded-full border border-red-300/70 text-red-600 hover:bg-red-50/70">Delete</button>
+          <span className={`px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full text-[10px] sm:text-xs ${pastDeadline ? "bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300" : "bg-emerald-100 text-emerald-700"}`}>
             {pastDeadline ? "Ended" : "In progress"}
           </span>
         </div>
@@ -542,12 +542,12 @@ function GoalCard({
         <div className="mt-4 rounded-2xl border border-gray-200/70 dark:border-gray-800/70 p-3 bg-white/60 dark:bg-gray-900/50">
           {/* Description */}
           {goal.description ? (
-            <div className="text-sm text-gray-700 dark:text-gray-300">{goal.description}</div>
+            <div className="text-[13px] sm:text-sm text-gray-700 dark:text-gray-300">{goal.description}</div>
           ) : null}
 
           {/* Progress from start */}
           <div className="mt-3">
-            <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+            <div className="flex items-center justify-between text-[11px] sm:text-xs text-gray-600 dark:text-gray-400">
               <span>Progress since {start.toLocaleDateString()}</span>
               <span>{success}/{total} weeks ({pct}%)</span>
             </div>
@@ -559,7 +559,7 @@ function GoalCard({
           {/* Streaks (current week) */}
           <div className="mt-4">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">This week</div>
+              <div className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-100">This week</div>
               {streaksLoading ? (
                 <div className="text-xs text-gray-500">Loading…</div>
               ) : null}
@@ -589,16 +589,16 @@ function GoalCard({
                   </div>
                 </div>
                 {/* This week progress */}
-                <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-sm">
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900">
                     <Flame className="w-4 h-4" />
                     {(streaksData.days || []).reduce((s: number, d: any) => s + (d.count || 0), 0)} / {(streaksData.week_quota_current ?? streaksData.week_quota)} this week
                   </span>
                   <span className="text-gray-500">•</span>
-                  <span className="text-gray-600 dark:text-gray-400">Keep going to maintain your streak!</span>
+                  <span className="text-[11px] sm:text-sm text-gray-600 dark:text-gray-400">Keep going to maintain your streak!</span>
                 </div>
                 {/* Streak stats */}
-                <div className="flex items-center gap-2 text-sm flex-wrap">
+                <div className="flex items-center gap-2 text-xs sm:text-sm flex-wrap">
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900">Consecutive weeks: {streaksData.streaks?.consecutiveWeeks ?? 0}</span>
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900">Longest streak: {streaksData.streaks?.longest ?? 0}</span>
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900">Daily: {streaksData.streaks?.dailyCurrent ?? 0} current • {streaksData.streaks?.dailyLongest ?? 0} longest</span>
@@ -606,7 +606,7 @@ function GoalCard({
                 {/* Revive action */}
                 {streaksData.revive?.eligible ? (
                   <div className="pt-1">
-                    <button onClick={onRevive} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-full text-sm bg-blue-600 text-white hover:opacity-95">
+                    <button onClick={onRevive} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-full text-xs sm:text-sm bg-blue-600 text-white hover:opacity-95">
                       <Gem className="w-4 h-4"/>
                       Revive yesterday (-{streaksData.revive?.cost ?? 20} diamonds)
                     </button>
