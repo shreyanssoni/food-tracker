@@ -6,6 +6,7 @@ import { PhotoUpload } from '@/components/PhotoUpload';
 import { LogCard } from '@/components/LogCard';
 import { HabitBanner } from '@/components/HabitBanner';
 import CircularStat from '@/components/CircularStat';
+import CoachSummary from '@/components/CoachSummary';
 import { createClient as createBrowserClient } from '@/utils/supabase/client';
 import type { FoodLog } from '@/types';
 
@@ -149,6 +150,9 @@ export default function FoodPage() {
           <div className="skeleton-circle h-28 w-28 mx-auto hidden sm:block" />
         </div>
       )}
+
+      {/* Coach Summary moved here from Dashboard */}
+      <CoachSummary />
 
       <div className="space-y-3">
         {loading ? (
