@@ -1,4 +1,7 @@
 // Supabase Edge Function (Deno)
+// deno-lint-ignore-file
+// @ts-ignore Deno is provided by the Edge runtime
+declare const Deno: any;
 // Name: pinger
 // Purpose: Ping app cron endpoints. Schedule this function to run every 5 minutes in Supabase.
 // Env (set as Function secrets): PUBLIC_BASE_URL, CRON_SECRET
@@ -49,7 +52,7 @@ export const handler = async (req: Request): Promise<Response> => {
   const only = urlObj.searchParams.get('only');
   const allTargets = {
     push: `${base}/api/push/run-scheduler?secret=${encodeURIComponent(secret)}`,
-    eod: `${base}/api/life-streak/run-eod?secret=${encodeURIComponent(secret)}`,
+    eod: `${base}/api/life-streak/finalize?secret=${encodeURIComponent(secret)}`,
     'pre-eod': `${base}/api/streaks/pre-eod-reminder?secret=${encodeURIComponent(secret)}`,
     reminders: `${base}/api/tasks/reminders/run?secret=${encodeURIComponent(secret)}`,
   } as const;

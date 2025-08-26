@@ -49,6 +49,7 @@ export default function DashboardPage() {
     canRevive: boolean;
     reviveCost: number;
     week?: Array<{ day: string; status: 'counted' | 'revived' | 'missed' | 'none' }>;
+    weekly?: { consecutive: number; longest: number; currentWeekDays?: number };
   } | null>(null);
   // Goals overview
   const [goals, setGoals] = useState<any[]>([]);
@@ -117,8 +118,8 @@ export default function DashboardPage() {
               maxLong = 0;
             for (const j of chunks) {
               if (!j || j.error) continue;
-              const cur = Number(j?.streaks?.dailyCurrent || 0);
-              const lng = Number(j?.streaks?.dailyLongest || 0);
+              const cur = Number(j?.streaks?.consecutiveWeeks || 0);
+              const lng = Number(j?.streaks?.longest || 0);
               if (cur > maxCur) maxCur = cur;
               if (lng > maxLong) maxLong = lng;
             }
@@ -297,8 +298,8 @@ export default function DashboardPage() {
                 maxLong = 0;
               for (const j of chunks) {
                 if (!j || j.error) continue;
-                const cur = Number(j?.streaks?.dailyCurrent || 0);
-                const lng = Number(j?.streaks?.dailyLongest || 0);
+                const cur = Number(j?.streaks?.consecutiveWeeks || 0);
+                const lng = Number(j?.streaks?.longest || 0);
                 if (cur > maxCur) maxCur = cur;
                 if (lng > maxLong) maxLong = lng;
               }
@@ -868,7 +869,9 @@ export default function DashboardPage() {
                 <div className="mt-3">
                   <div className="flex items-center justify-between mb-1">
                     <div className="text-xs font-medium text-slate-700 dark:text-slate-300">Weekly consistency</div>
-                    <div className="text-[11px] text-slate-500">Longest {streakMax?.longest ?? 0}</div>
+                    <div className="text-[11px] text-slate-500">
+                      Current {lifeStreak?.weekly?.currentWeekDays ?? 0} • Longest {lifeStreak?.weekly?.longest ?? 0}
+                    </div>
                   </div>
                   <div className="flex gap-1.5">
                     {Array.isArray(lifeStreak?.week) && (lifeStreak!.week as any[]).length === 7 ? (

@@ -75,8 +75,9 @@ async function getStreakDays(supabase: any, userId: string) {
   return data || [];
 }
 
-function computeCurrentAndLongest(days: Array<{ day: string; counted: boolean }>, todayKey: string) {
-  const set = new Set(days.filter(d => d.counted).map(d => d.day));
+function computeCurrentAndLongest(days: Array<{ day: string; counted?: boolean; revived?: boolean }>, todayKey: string) {
+  // Count a day if it was either normally counted or revived
+  const set = new Set(days.filter(d => d.counted || d.revived).map(d => d.day));
   // current: count backwards from today
   let cur = 0;
   let d = new Date(todayKey);
@@ -125,15 +126,7 @@ export async function GET() {
     // Ensure table exists gracefully (skip if not created yet)
     let days = await getStreakDays(supabase, user.id);
 
-    // Auto-count today if all scheduled tasks are completed and not counted yet
-    const todayRow = days.find((d: any) => d.day === todayKey);
-    if (!todayRow) {
-      const { eligible, allDone } = await allTasksCompletedForDate(supabase, user.id, now);
-      if (eligible && allDone) {
-        await supabase.from('life_streak_days').insert({ user_id: user.id, day: todayKey, counted: true, revived: false });
-        days = await getStreakDays(supabase, user.id);
-      }
-    }
+    // Do not mutate streaks here; finalization happens via /api/life-streak/finalize cron
 
     // Compute current/longest streaks
     const { current, longest } = computeCurrentAndLongest(days as any, todayKey);
@@ -195,6 +188,51 @@ export async function GET() {
       week.push({ day: key, status });
     }
 
+    // Compute weekly streaks for the last ~12 weeks based on life-streak (all tasks) logic
+    // A week is a success if on every eligible day in that week up to 'today', the user has either counted or revived.
+    const weeksBack = 12;
+    const weeksFlags: boolean[] = [];
+    for (let w = weeksBack - 1; w >= 0; w--) {
+      const ws = new Date(sow);
+      ws.setUTCDate(sow.getUTCDate() - w * 7);
+      const we = new Date(ws);
+      we.setUTCDate(ws.getUTCDate() + 6);
+      let eligibleDays = 0;
+      let satisfied = 0;
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(ws);
+        d.setUTCDate(ws.getUTCDate() + i);
+        const key = isoDay(d);
+        // Ignore days before account creation and future days
+        const todayOnly = isoDay(now);
+        if (key < createdKey || key > todayOnly) continue;
+        // Do not require today's completion in the current week
+        if (w === 0 && key === todayOnly) continue;
+        try {
+          const { eligible } = await allTasksCompletedForDate(supabase, user.id, d);
+          if (!eligible) continue;
+          eligibleDays++;
+          const row = daysByKey[key];
+          if (row?.counted || row?.revived) satisfied++;
+        } catch {}
+      }
+      const success = eligibleDays > 0 && satisfied === eligibleDays;
+      // Do NOT include the current (ongoing) week in streak calculations
+      if (w !== 0) {
+        weeksFlags.push(success);
+      }
+    }
+    // consecutive = trailing successes; longest = max run
+    let weeklyConsecutive = 0;
+    for (let i = weeksFlags.length - 1; i >= 0; i--) {
+      if (weeksFlags[i]) weeklyConsecutive++; else break;
+    }
+    let weeklyLongest = 0, runW = 0;
+    for (const f of weeksFlags) { if (f) { runW++; weeklyLongest = Math.max(weeklyLongest, runW); } else runW = 0; }
+
+    // Count counted/revived days in current week for display
+    const currentWeekDays = week.filter((d) => d.status === 'counted' || d.status === 'revived').length;
+
     // Revive eligibility: yesterday missed (eligible day) and not counted nor revived
     const yKey = isoDay(yesterday);
     const yRow = (days as any).find((d: any) => d.day === yKey);
@@ -204,7 +242,7 @@ export async function GET() {
       if (eligible && !allDone) canRevive = true;
     }
 
-    return NextResponse.json({ lifeStreak: { current, longest, canRevive, reviveCost: 10, week } });
+    return NextResponse.json({ lifeStreak: { current, longest, canRevive, reviveCost: 10, week, weekly: { consecutive: weeklyConsecutive, longest: weeklyLongest, currentWeekDays } } });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
   }
