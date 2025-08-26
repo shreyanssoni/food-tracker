@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { FoodForm } from '@/components/FoodForm';
 import { PhotoUpload } from '@/components/PhotoUpload';
@@ -7,6 +8,7 @@ import { LogCard } from '@/components/LogCard';
 import { HabitBanner } from '@/components/HabitBanner';
 import CircularStat from '@/components/CircularStat';
 import CoachSummary from '@/components/CoachSummary';
+import { MessageSquareText, Sparkles } from 'lucide-react';
 import { createClient as createBrowserClient } from '@/utils/supabase/client';
 import type { FoodLog } from '@/types';
 
@@ -100,6 +102,33 @@ export default function FoodPage() {
         </div>
       )}
       <HabitBanner />
+      {/* Chat with Coach pill CTA */}
+      <Link
+        href="/chat"
+        className="group block"
+        aria-label="Chat with your coach now"
+      >
+        <div className="relative overflow-hidden rounded-full border border-gray-200/70 dark:border-gray-800/70 bg-gradient-to-r from-blue-600 to-emerald-500 p-[2px] shadow-sm">
+          <div className="flex items-center justify-between rounded-full bg-white/90 dark:bg-gray-950/70 backdrop-blur px-3.5 py-2 sm:px-4 sm:py-2.5">
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <span className="inline-flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-white bg-gradient-to-tr from-blue-600 to-emerald-500 shadow ring-1 ring-black/5">
+                <MessageSquareText className="h-4 w-4" aria-hidden />
+              </span>
+              <div className="leading-tight">
+                <p className="text-[13px] sm:text-sm font-semibold text-gray-900 dark:text-white">Chat with your coach</p>
+                <p className="text-[10px] sm:text-[11px] text-gray-600 dark:text-gray-300">Get instant tips or log via chat</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="relative inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-emerald-600 to-teal-500 text-white px-2.5 py-0.5 text-[10px] sm:px-3 sm:py-1 sm:text-[11px] font-semibold shadow-lg ring-1 ring-black/5 max-[340px]:hidden">
+                {/* <span className=\"h-2 w-2 rounded-full bg-white/90 shadow-inner animate-pulse\" aria-hidden></span> */}
+                <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5 opacity-90" aria-hidden />
+                Power Up
+              </span>
+            </div>
+          </div>
+        </div>
+      </Link>
       <div className="relative overflow-hidden rounded-2xl border border-gray-200/70 dark:border-gray-800/70 bg-white/80 dark:bg-gray-950/70 backdrop-blur shadow-sm">
         <div className="absolute inset-0 -z-10 opacity-[0.12] pointer-events-none">
           <div className="absolute -top-12 -left-10 h-40 w-40 rounded-full bg-blue-500 blur-3xl" />
