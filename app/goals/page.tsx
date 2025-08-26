@@ -580,7 +580,7 @@ function GoalCard({
                       const iconCls = d.revived ? 'text-blue-500' : d.completed ? 'text-amber-500' : d.missed ? 'text-red-400' : 'text-gray-400';
                       return (
                         <div key={d.date}
-                             className={`flex flex-col items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl border ${cls}`}>
+                             className={`flex flex-col items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl border ${cls}`}>
                           <span className="text-[10px]">{['S','M','T','W','T','F','S'][idx]}</span>
                           <Gem className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${iconCls}`}/>
                         </div>
@@ -589,25 +589,25 @@ function GoalCard({
                   </div>
                 </div>
                 {/* This week progress */}
-                <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-sm">
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900">
-                    <Flame className="w-4 h-4" />
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[10px] sm:text-sm">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900">
+                    <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     {(streaksData.days || []).reduce((s: number, d: any) => s + (d.count || 0), 0)} / {(streaksData.week_quota_current ?? streaksData.week_quota)} this week
                   </span>
                   <span className="text-gray-500">•</span>
-                  <span className="text-[11px] sm:text-sm text-gray-600 dark:text-gray-400">Keep going to maintain your streak!</span>
+                  <span className="text-[10px] sm:text-sm text-gray-600 dark:text-gray-400">Keep going to maintain your streak!</span>
                 </div>
                 {/* Streak stats */}
-                <div className="flex items-center gap-2 text-xs sm:text-sm flex-wrap">
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900">Consecutive weeks: {streaksData.streaks?.consecutiveWeeks ?? 0}</span>
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900">Longest streak: {streaksData.streaks?.longest ?? 0}</span>
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900">Daily: {streaksData.streaks?.dailyCurrent ?? 0} current • {streaksData.streaks?.dailyLongest ?? 0} longest</span>
+                <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-sm flex-wrap">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900">Consecutive weeks: {streaksData.streaks?.consecutiveWeeks ?? 0}</span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900">Longest streak: {streaksData.streaks?.longest ?? 0}</span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900">Daily: {streaksData.streaks?.dailyCurrent ?? 0} current • {streaksData.streaks?.dailyLongest ?? 0} longest</span>
                 </div>
                 {/* Revive action */}
                 {streaksData.revive?.eligible ? (
                   <div className="pt-1">
-                    <button onClick={onRevive} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-full text-xs sm:text-sm bg-blue-600 text-white hover:opacity-95">
-                      <Gem className="w-4 h-4"/>
+                    <button onClick={onRevive} className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-full text-xs sm:text-sm bg-blue-600 text-white hover:opacity-95">
+                      <Gem className="w-3.5 h-3.5 sm:w-4 sm:h-4"/>
                       Revive yesterday (-{streaksData.revive?.cost ?? 20} diamonds)
                     </button>
                   </div>

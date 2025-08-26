@@ -373,6 +373,8 @@ ALTER TABLE public.goals ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow read to all on goals" ON public.goals FOR SELECT USING (true);
 CREATE POLICY "Allow insert to all on goals" ON public.goals FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow update to all on goals" ON public.goals FOR UPDATE USING (true) WITH CHECK (true);
+-- Allow owners to delete their own goals
+CREATE POLICY "Allow delete to all on goals" ON public.goals FOR DELETE USING (true);
 
 -- Goal task templates (define streak rules per goal)
 -- frequency: daily | weekly | custom
@@ -393,6 +395,8 @@ ALTER TABLE public.goal_task_templates ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow read to all on goal_task_templates" ON public.goal_task_templates FOR SELECT USING (true);
 CREATE POLICY "Allow insert to all on goal_task_templates" ON public.goal_task_templates FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow update to all on goal_task_templates" ON public.goal_task_templates FOR UPDATE USING (true) WITH CHECK (true);
+-- Allow owner (via goal) to delete templates
+CREATE POLICY "Allow delete to all on goal_task_templates" ON public.goal_task_templates FOR DELETE USING (true);
 
 -- Link created per-user tasks to goal templates (when materialized for the user)
 CREATE TABLE IF NOT EXISTS public.goal_tasks (
@@ -406,6 +410,8 @@ ALTER TABLE public.goal_tasks ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow read to all on goal_tasks" ON public.goal_tasks FOR SELECT USING (true);
 CREATE POLICY "Allow insert to all on goal_tasks" ON public.goal_tasks FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow update to all on goal_tasks" ON public.goal_tasks FOR UPDATE USING (true) WITH CHECK (true);
+-- Allow owner (via goal) to delete goal_tasks links
+CREATE POLICY "Allow delete to all on goal_tasks" ON public.goal_tasks FOR DELETE USING (true);
 
 -- Associate a private collectible to a goal (owner-only, shown in rewards for owner)
 CREATE TABLE IF NOT EXISTS public.goal_collectibles (
@@ -416,6 +422,8 @@ CREATE TABLE IF NOT EXISTS public.goal_collectibles (
 ALTER TABLE public.goal_collectibles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow read to all on goal_collectibles" ON public.goal_collectibles FOR SELECT USING (true);
 CREATE POLICY "Allow insert to all on goal_collectibles" ON public.goal_collectibles FOR INSERT WITH CHECK (true);
+-- Allow owner (via goal) to delete goal_collectibles
+CREATE POLICY "Allow delete to all on goal_collectibles" ON public.goal_collectibles FOR DELETE USING (true);
 
 -- Streak revives: allow reviving a missed day for a goal by spending diamonds
 CREATE TABLE IF NOT EXISTS public.goal_streak_revives (

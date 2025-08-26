@@ -427,12 +427,12 @@ export default function TasksPage() {
       </div>
 
       {/* Streaks Panel */}
-      <div className="mt-4 rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-white dark:bg-gray-950 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Gem className="w-4 h-4 text-amber-500" />
+      <div className="mt-4 rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-white dark:bg-gray-950 p-3 sm:p-4">
+        <div className="flex items-center gap-1.5 sm:gap-2 mb-2.5 sm:mb-3">
+          <Gem className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
           <div className="font-semibold">Streaks</div>
           <div className="ml-auto">
-            <select value={selectedGoalId} onChange={(e)=>setSelectedGoalId(e.target.value)} className="px-2 py-1.5 rounded-lg bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm">
+            <select value={selectedGoalId} onChange={(e)=>setSelectedGoalId(e.target.value)} className="px-2 py-1 sm:py-1.5 rounded-lg bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-xs sm:text-sm">
               <option value="">Select goal…</option>
               {goalsForSelect.map(g=> (<option key={g.id} value={g.id}>{g.title}</option>))}
             </select>
@@ -445,29 +445,29 @@ export default function TasksPage() {
         ) : !streaksData ? (
           <div className="text-sm text-gray-600 dark:text-gray-400">No data.</div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2.5 sm:space-y-3">
             {/* Weekly heatmap (current week) */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               {streaksData.days.map((d, idx) => (
-                <div key={d.date} className={`flex flex-col items-center justify-center w-10 h-10 rounded-xl border ${d.completed? 'bg-gradient-to-br from-amber-100 to-emerald-100 dark:from-amber-900/30 dark:to-emerald-900/20 border-amber-200 dark:border-amber-900 text-emerald-700 dark:text-emerald-300':'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-500'}`}>
+                <div key={d.date} className={`flex flex-col items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl border ${d.completed? 'bg-gradient-to-br from-amber-100 to-emerald-100 dark:from-amber-900/30 dark:to-emerald-900/20 border-amber-200 dark:border-amber-900 text-emerald-700 dark:text-emerald-300':'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-500'}`}>
                   <span className="text-[10px]">{['S','M','T','W','T','F','S'][idx]}</span>
-                  <Gem className={`w-4 h-4 ${d.completed? 'text-amber-500':'text-gray-400'}`} />
+                  <Gem className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${d.completed? 'text-amber-500':'text-gray-400'}`} />
                 </div>
               ))}
             </div>
             {/* This week progress */}
-            <div className="flex items-center gap-2 text-sm">
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900">
-                <Flame className="w-4 h-4" />
+            <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900">
+                <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 {streaksData.days.reduce((s, d) => s + (d.count || 0), 0)} / {(streaksData.week_quota_current ?? streaksData.week_quota)} this week
               </span>
               <span className="text-gray-500">•</span>
               <span className="text-gray-600 dark:text-gray-400">Keep going to maintain your streak!</span>
             </div>
             {/* Streak stats */}
-            <div className="flex items-center gap-2 text-sm">
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900">Consecutive weeks: {streaksData.streaks.consecutiveWeeks}</span>
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900">Longest streak: {streaksData.streaks.longest}</span>
+            <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900">Consecutive weeks: {streaksData.streaks.consecutiveWeeks}</span>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900">Longest streak: {streaksData.streaks.longest}</span>
             </div>
           </div>
         )}

@@ -309,12 +309,37 @@ export async function DELETE(req: Request) {
     if (gErr) throw gErr;
     if (!goal || goal.user_id !== user.id) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const { error: dErr } = await supabase
+    // 1) Delete tasks that were created for this goal (via goal_tasks link)
+    // Note: FK in goal_tasks points to tasks (ON DELETE CASCADE), so deleting tasks first
+    // will also clean up goal_tasks rows. Then we delete the goal to cascade the rest.
+    const { data: links, error: linkErr } = await supabase
+      .from('goal_tasks')
+      .select('task_id')
+      .eq('goal_id', id);
+    if (linkErr) throw linkErr;
+    const taskIds = (links || []).map((r: any) => r.task_id).filter(Boolean);
+    if (taskIds.length > 0) {
+      const { data: deletedTasks, error: delTasksErr } = await supabase
+        .from('tasks')
+        .delete()
+        .in('id', taskIds)
+        .eq('user_id', user.id)
+        .select('id');
+      if (delTasksErr) throw delTasksErr;
+      // Optional: you could check if some tasks failed to delete; we won't hard-fail here
+    }
+
+    // 2) Delete the goal (will cascade goal_task_templates, goal_collectibles, etc.)
+    const { data: deletedGoals, error: dErr } = await supabase
       .from('goals')
       .delete()
       .eq('id', id)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .select('id');
     if (dErr) throw dErr;
+    if (!deletedGoals || deletedGoals.length === 0) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
     return NextResponse.json({ ok: true });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
