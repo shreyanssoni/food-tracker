@@ -47,6 +47,9 @@ export default function DashboardPage() {
     canRevive: boolean;
     reviveCost: number;
   } | null>(null);
+  // Goals overview
+  const [goals, setGoals] = useState<any[]>([]);
+  const [goalSummaries, setGoalSummaries] = useState<Record<string, { totalWeeks: number; successWeeks: number }>>({});
   const [reviving, setReviving] = useState(false);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [nextUp, setNextUp] = useState<null | { task: any; when: Date | null }>(null);
@@ -94,6 +97,8 @@ export default function DashboardPage() {
         // Compute max daily streak across goals
         if (!gData.error) {
           const goals: any[] = gData.goals || [];
+          setGoals(goals);
+          setGoalSummaries(gData.summaries || {});
           const ids = goals.map((g: any) => g.id).filter(Boolean);
           if (ids.length) {
             const chunks = await Promise.all(
@@ -245,6 +250,8 @@ export default function DashboardPage() {
             setLifeStreak(lsData.lifeStreak);
           if (!gData.error) {
             const goals: any[] = gData.goals || [];
+            setGoals(goals);
+            setGoalSummaries(gData.summaries || {});
             const ids = goals.map((g: any) => g.id).filter(Boolean);
             if (ids.length) {
               const chunks = await Promise.all(
@@ -839,6 +846,68 @@ export default function DashboardPage() {
             </Link>
           </div>
         </div>
+      </section>
+
+      {/* Goals Overview */}
+      <section className="space-y-3" aria-labelledby="goals-overview-heading">
+        <h2 id="goals-overview-heading" className="text-md font-semibold text-slate-900 dark:text-slate-100">
+          Goals Overview
+        </h2>
+        {goals && goals.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {goals.map((g: any) => {
+              const summary = goalSummaries[g.id] || { totalWeeks: 0, successWeeks: 0 };
+              const total = Number(summary.totalWeeks || 0);
+              const success = Number(summary.successWeeks || 0);
+              const pct = total > 0 ? Math.round((success / total) * 100) : 0;
+              const now = new Date();
+              const deadline = new Date(g.deadline);
+              const daysLeft = Math.max(
+                0,
+                Math.ceil(
+                  (deadline.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) /
+                    (1000 * 60 * 60 * 24)
+                )
+              );
+              return (
+                <div key={g.id} className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-950/60 backdrop-blur-sm p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold truncate">{g.title}</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">Deadline: {deadline.toLocaleDateString()} • Days left: {daysLeft}</div>
+                    </div>
+                    <Link href="/goals" className="text-[11px] px-2 py-1 rounded-full border hover:bg-slate-100/70 dark:hover:bg-slate-900/50">
+                      View
+                    </Link>
+                  </div>
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400">
+                      <span>Weekly streak</span>
+                      <span>
+                        {success}/{total} weeks ({pct}%)
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-2.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                      <div
+                        className="h-2.5 rounded-full bg-gradient-to-r from-blue-600 to-emerald-500"
+                        style={{ width: `${Math.max(5, Math.min(100, pct))}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-950/60 backdrop-blur-sm p-5 text-center">
+            <div className="text-sm text-slate-600 dark:text-slate-400">No goals yet. Create your first goal to start tracking progress.</div>
+            <div className="mt-3">
+              <Link href="/goals" className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-600 text-white">
+                Create a goal
+              </Link>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Macros */}
