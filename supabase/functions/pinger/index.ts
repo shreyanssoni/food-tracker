@@ -4,7 +4,7 @@
 // Env (set as Function secrets): PUBLIC_BASE_URL, CRON_SECRET
 
 // deno-lint-ignore no-explicit-any
-export const handler = async (_req: Request): Promise<Response> => {
+export const handler = async (req: Request): Promise<Response> => {
   const base = (Deno.env.get('PUBLIC_BASE_URL') || '').replace(/\/$/, '');
   const secret = Deno.env.get('CRON_SECRET') || '';
 
@@ -20,25 +20,72 @@ export const handler = async (_req: Request): Promise<Response> => {
     'Accept': 'application/json',
   } as const;
 
-  const targets = [
-    `${base}/api/push/run-scheduler?secret=${encodeURIComponent(secret)}`,
-    `${base}/api/life-streak/run-eod?secret=${encodeURIComponent(secret)}`,
-    `${base}/api/streaks/pre-eod-reminder?secret=${encodeURIComponent(secret)}`,
-  ];
+  // Add a per-request timeout to avoid hanging if any target stalls
+  const TIMEOUT_MS = 4000; // 4s per request
+  const OVERALL_TIMEOUT_MS = 12000; // 12s hard cap for the whole function
+  const fetchWithTimeout = async (url: string) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(url, { method: 'GET', headers, signal: controller.signal });
+      const text = await res.text();
+      return { url, status: res.status, ok: res.ok, body: text.slice(0, 500) } as const;
+    } catch (e) {
+      return { url, status: 0, ok: false, error: String(e) } as const;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
 
-  const results = await Promise.all(
-    targets.map(async (url) => {
-      try {
-        const res = await fetch(url, { method: 'GET', headers });
-        const text = await res.text();
-        return { url, status: res.status, ok: res.ok, body: text.slice(0, 500) };
-      } catch (e) {
-        return { url, status: 0, ok: false, error: String(e) };
-      }
-    }),
-  );
+  // Allow running a single target via query param ?only=push|eod|pre
+  const urlObj = new URL(req.url);
+  const only = urlObj.searchParams.get('only');
+  const allTargets = {
+    push: `${base}/api/push/run-scheduler?secret=${encodeURIComponent(secret)}`,
+    eod: `${base}/api/life-streak/run-eod?secret=${encodeURIComponent(secret)}`,
+    'pre-eod': `${base}/api/streaks/pre-eod-reminder?secret=${encodeURIComponent(secret)}`,
+  } as const;
+
+  let targets: string[];
+  switch (only) {
+    case 'push':
+      targets = [allTargets.push];
+      break;
+    case 'eod':
+      targets = [allTargets.eod];
+      break;
+    case 'pre':
+    case 'pre-eod':
+      targets = [allTargets['pre-eod']];
+      break;
+    default:
+      targets = [allTargets.push, allTargets.eod, allTargets['pre-eod']];
+  }
+
+  console.time?.('pinger_total');
+  const allPromise = Promise.allSettled(targets.map(fetchWithTimeout));
+  const overallTimeout = new Promise<PromiseSettledResult<unknown>[]>((resolve) => {
+    setTimeout(() => {
+      resolve(
+        targets.map((url) => ({ status: 'rejected', reason: `overall-timeout-${OVERALL_TIMEOUT_MS}ms: ${url}` })) as PromiseSettledResult<unknown>[]
+      );
+    }, OVERALL_TIMEOUT_MS);
+  });
+  const settled = await Promise.race([allPromise, overallTimeout]);
+  console.timeEnd?.('pinger_total');
+
+  // Normalize results
+  const results = settled.map((item, i) => {
+    const url = targets[i];
+    if (item && item['status'] === 'fulfilled') {
+      return item['value'] as { url: string; status: number; ok: boolean; body?: string; error?: string };
+    }
+    return { url, status: 0, ok: false, error: String((item as any)?.reason ?? 'unknown') };
+  });
 
   const anyFailure = results.some((r) => !r.ok);
+  // Emit concise log for observability in Dashboard
+  console.log('pinger results', JSON.stringify(results));
   return new Response(JSON.stringify({ ok: !anyFailure, results }, null, 2), {
     status: anyFailure ? 207 : 200, // multi-status on partial failures
     headers: { 'Content-Type': 'application/json' },
