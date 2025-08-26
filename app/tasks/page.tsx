@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createClient as createBrowserClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
 import { CheckCircle2, Plus, Pencil, Trash2, Clock, CalendarDays, Search, ChevronDown, ChevronRight, Sun, Moon, Zap, Gem, Flame, MoreHorizontal } from 'lucide-react';
+import TimezoneMismatchPrompt from '@/app/components/TimezoneMismatchPrompt';
 
 interface Task {
   id: string;
@@ -354,6 +355,8 @@ export default function TasksPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
+      {/* Timezone mismatch modal */}
+      <TimezoneMismatchPrompt />
       {/* Header / Toolbar */}
       <div className="sticky top-0 z-10 -mx-4 sm:mx-0 bg-gray-50/70 dark:bg-gray-900/70 backdrop-blur supports-[backdrop-filter]:bg-gray-50/60 dark:supports-[backdrop-filter]:bg-gray-900/60 border-b border-gray-200 dark:border-gray-800 px-4 py-3">
         <div className="flex items-center gap-2">

@@ -7,6 +7,11 @@
 export const handler = async (req: Request): Promise<Response> => {
   const base = (Deno.env.get('PUBLIC_BASE_URL') || '').replace(/\/$/, '');
   const secret = Deno.env.get('CRON_SECRET') || '';
+  try {
+    console.log('pinger start', { now: new Date().toISOString(), baseSet: !!base, hasSecret: !!secret, url: req.url });
+  } catch (_) {
+    // ignore
+  }
 
   if (!base || !secret) {
     return new Response(JSON.stringify({ ok: false, error: 'Missing PUBLIC_BASE_URL or CRON_SECRET' }), {
@@ -21,16 +26,18 @@ export const handler = async (req: Request): Promise<Response> => {
   } as const;
 
   // Add a per-request timeout to avoid hanging if any target stalls
-  const TIMEOUT_MS = 4000; // 4s per request
-  const OVERALL_TIMEOUT_MS = 12000; // 12s hard cap for the whole function
+  const TIMEOUT_MS = 2500; // 2.5s per request
+  const OVERALL_TIMEOUT_MS = 9000; // 9s hard cap for the whole function (avoid 10s edge timeout)
   const fetchWithTimeout = async (url: string) => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
+      console.log('pinger fetch ->', url);
       const res = await fetch(url, { method: 'GET', headers, signal: controller.signal });
       const text = await res.text();
       return { url, status: res.status, ok: res.ok, body: text.slice(0, 500) } as const;
     } catch (e) {
+      console.error('pinger fetch error', url, String(e));
       return { url, status: 0, ok: false, error: String(e) } as const;
     } finally {
       clearTimeout(timeout);
@@ -44,6 +51,7 @@ export const handler = async (req: Request): Promise<Response> => {
     push: `${base}/api/push/run-scheduler?secret=${encodeURIComponent(secret)}`,
     eod: `${base}/api/life-streak/run-eod?secret=${encodeURIComponent(secret)}`,
     'pre-eod': `${base}/api/streaks/pre-eod-reminder?secret=${encodeURIComponent(secret)}`,
+    reminders: `${base}/api/tasks/reminders/run?secret=${encodeURIComponent(secret)}`,
   } as const;
 
   let targets: string[];
@@ -57,6 +65,9 @@ export const handler = async (req: Request): Promise<Response> => {
     case 'pre':
     case 'pre-eod':
       targets = [allTargets['pre-eod']];
+      break;
+    case 'reminders':
+      targets = [allTargets.reminders];
       break;
     default:
       targets = [allTargets.push, allTargets.eod, allTargets['pre-eod']];
@@ -94,3 +105,20 @@ export const handler = async (req: Request): Promise<Response> => {
 
 // Default export for Supabase Edge Functions
 export default handler;
+
+// Ensure the HTTP server is started in the Edge runtime
+// Without this, the function may boot but never receive requests
+try {
+  // Deno.serve is available in the Supabase Edge runtime
+  // Only register once per isolate
+  // deno-lint-ignore no-explicit-any
+  const g: any = globalThis as any;
+  if (!g.__pinger_started__) {
+    g.__pinger_started__ = true;
+    Deno.serve(handler);
+    // minimal boot log
+    console.log('pinger: Deno.serve registered');
+  }
+} catch (_) {
+  // ignore if not available (e.g., during type-checking)
+}

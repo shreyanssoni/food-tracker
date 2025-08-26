@@ -26,9 +26,15 @@ export default function TimezoneSetup() {
       if (status !== "authenticated") return;
       try {
         const res = await fetch("/api/preferences", { cache: "no-store" });
-        const j = await res.json();
+        if (!res.ok) {
+          // Do NOT show the popup on rate limit or any API failure
+          // Only show when we positively know timezone is missing
+          return;
+        }
+        const j = await res.json().catch(() => ({}));
         const tz = j?.profile?.timezone as string | undefined;
         if (cancelled) return;
+        // Open only if preferences exist but timezone missing OR preferences row missing entirely
         if (!tz) {
           setCurrentTz(guessed);
           setOpen(true);
