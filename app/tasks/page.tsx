@@ -449,7 +449,15 @@ export default function TasksPage() {
               />
             </div>
           )}
-          <input className="border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 rounded-lg px-3 py-2 text-sm" placeholder="At time (HH:MM)" onChange={(e) => setNewTask((t) => ({ ...t, schedule: { ...(t.schedule||{} as any), at_time: e.target.value } }))} />
+          <input
+            type="time"
+            className="border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 rounded-lg px-3 py-2 text-sm"
+            value={String((newTask.schedule as any)?.at_time || '').slice(0,5)}
+            onChange={(e) => setNewTask((t) => ({ ...t, schedule: { ...(t.schedule||{} as any), at_time: e.target.value } }))}
+            step={60}
+            min="00:00"
+            max="23:59"
+          />
         </div>
         <div className="mt-3">
           <button

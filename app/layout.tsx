@@ -59,7 +59,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <div className="fixed inset-0 -z-10 bg-gray-50 dark:bg-gray-900" aria-hidden />
         <Providers session={session}>
           <Navbar />
-          <main className="flex-1 pb-20 md:pb-0">
+          <main className="flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
               {children}
             </div>

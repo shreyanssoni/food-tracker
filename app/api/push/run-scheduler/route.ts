@@ -33,8 +33,9 @@ export async function GET(req: NextRequest) {
     const results: Array<{ timezone: string; slot: Slot; sent: number }> = [];
     for (const tz of finalTzs) {
       const hour = hourInTimezone(tz);
-      const slot = slotFromExactHour(hour);
-      if (!slot) continue; // only send at exact hours 8,13,18,22
+      const minute = new Date().getMinutes();
+      const slot = minute >= 56 || minute < 5 ? slotFromExactHour(hour) : null;
+      if (!slot) continue; // only send at exact hours 8-22:56, 23:00-23:04
       const res = await broadcastToTimezone(slot, tz);
       results.push({ timezone: tz, slot, sent: res.sent });
     }

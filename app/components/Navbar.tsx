@@ -994,7 +994,7 @@ export default function Navbar() {
             <div className="flex items-center sm:hidden ml-auto">
               <Link
                 href="/auth/signin"
-                className="inline-flex items:center rounded-full px-3 py-1.5 text-sm font-semibold text-white bg-gradient-to-tr from-blue-600 to-emerald-500 shadow-sm"
+                className="inline-flex items-center rounded-full px-3 py-1.5 text-sm font-semibold text-white bg-gradient-to-tr from-blue-600 to-emerald-500 shadow-sm"
               >
                 Join
               </Link>
