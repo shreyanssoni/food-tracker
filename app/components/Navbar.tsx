@@ -820,82 +820,9 @@ export default function Navbar() {
         ref={mobileMenuRef}
       >
         <div className="max-h-[calc(100vh-4rem)] overflow-y-auto scroll-smooth">
-          <div className="space-y-1 px-4 pt-2 pb-3 bg-white/90 dark:bg-gray-950/90 backdrop-blur border-b border-gray-200/70 dark:border-gray-800/70">
-            {[...primaryNav, ...moreNav].map((item) => (
-              <Link
-                key={item.path}
-                href={item.path as unknown as Route}
-                className={`block px-3 py-2 rounded-full text-sm font-medium ${
-                  isActive(item.path)
-                    ? "bg-gradient-to-tr from-blue-600/90 to-emerald-500/90 text-white shadow"
-                    : "text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5"
-                }`}
-                onClick={() => setMobileOpen(false)}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
-          <div className="border-t border-gray-200/70 dark:border-gray-800/70 px-4 py-3 bg-white/90 dark:bg-gray-950/90 backdrop-blur">
-          {status === "authenticated" ? (
-            <>
-              <div className="flex items-center gap-3">
-                <img
-                  className="h-10 w-10 rounded-full"
-                  src={session?.user?.image || "/default-avatar.png"}
-                  alt={session?.user?.name || "User"}
-                />
-                <div>
-                  <div className="text-base font-medium text-gray-800 dark:text-gray-100">
-                    {session?.user?.name}
-                  </div>
-                  <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    {session?.user?.email}
-                  </div>
-                </div>
-              </div>
-              {/* Level card */
-              }
-              <div className="mt-3 rounded-xl border border-gray-200/80 dark:border-gray-800/80 bg-white/70 dark:bg-gray-900/70 p-3">
-                <div className="flex items-center gap-3">
-                  <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-blue-600 to-emerald-500 text-white flex items-center justify-center">
-                    <Sparkles className="h-4 w-4" />
-                  </div>
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="text-sm font-medium text-gray-800 dark:text-gray-100">Level {progress?.level ?? '--'}</div>
-                    {topBadge && (
-                      <div className="flex items-center gap-1 min-w-0">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={(() => {
-                            const ic = topBadge.icon;
-                            if (!ic) return '/images/collectibles/default.svg';
-                            if (ic.startsWith('http') || ic.startsWith('/')) return ic;
-                            return `/images/collectibles/${ic}.svg`;
-                          })()}
-                          onError={(e) => {
-                            const fb = '/images/collectibles/default.svg';
-                            // @ts-ignore
-                            if (!e.currentTarget.src.endsWith(fb)) {
-                              // @ts-ignore
-                              e.currentTarget.src = fb;
-                            }
-                          }}
-                          alt={topBadge.name}
-                          className="h-5 w-5 rounded-sm"
-                        />
-                        <span className="text-[12px] text-gray-600 dark:text-gray-300 truncate" title={topBadge.name}>{topBadge.name}</span>
-                      </div>
-                    )}
-                    <span className="ml-1 inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full border bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30">
-                      <Gem className="h-3.5 w-3.5" />
-                      <span className="tabular-nums">{progress?.diamonds ?? 0}</span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-              {/* Notifications (focused) */}
-              <div className="mt-3 rounded-xl border border-gray-200/80 dark:border-gray-800/80 bg-white/70 dark:bg-gray-900/70 p-2.5">
+          {status === "authenticated" && (
+            <div className="px-4 pt-3">
+              <div className="rounded-xl border border-gray-200/80 dark:border-gray-800/80 bg-white/70 dark:bg-gray-900/70 p-2.5">
                 <div className="flex items-center justify-between mb-1">
                   <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">Notifications</div>
                   <div className="flex items-center gap-1.5">
@@ -938,6 +865,81 @@ export default function Navbar() {
                     ))}
                   </ul>
                 )}
+              </div>
+            </div>
+          )}
+          <div className="space-y-1 px-4 pt-2 pb-3 bg-white/90 dark:bg-gray-950/90 backdrop-blur border-b border-gray-200/70 dark:border-gray-800/70">
+            {[...primaryNav, ...moreNav].map((item) => (
+              <Link
+                key={item.path}
+                href={item.path as unknown as Route}
+                className={`block px-3 py-2 rounded-full text-sm font-medium ${
+                  isActive(item.path)
+                    ? "bg-gradient-to-tr from-blue-600/90 to-emerald-500/90 text-white shadow"
+                    : "text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5"
+                }`}
+                onClick={() => setMobileOpen(false)}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+          <div className="border-t border-gray-200/70 dark:border-gray-800/70 px-4 py-3 bg-white/90 dark:bg-gray-950/90 backdrop-blur">
+          {status === "authenticated" ? (
+            <>
+              <div className="flex items-center gap-3">
+                <img
+                  className="h-10 w-10 rounded-full"
+                  src={session?.user?.image || "/default-avatar.png"}
+                  alt={session?.user?.name || "User"}
+                />
+                <div>
+                  <div className="text-base font-medium text-gray-800 dark:text-gray-100">
+                    {session?.user?.name}
+                  </div>
+                  <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {session?.user?.email}
+                  </div>
+                </div>
+              </div>
+              {/* Level card */}
+              <div className="mt-3 rounded-xl border border-gray-200/80 dark:border-gray-800/80 bg-white/70 dark:bg-gray-900/70 p-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-blue-600 to-emerald-500 text-white flex items-center justify-center">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="text-sm font-medium text-gray-800 dark:text-gray-100">Level {progress?.level ?? '--'}</div>
+                    {topBadge && (
+                      <div className="flex items-center gap-1 min-w-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={(() => {
+                            const ic = topBadge.icon;
+                            if (!ic) return '/images/collectibles/default.svg';
+                            if (ic.startsWith('http') || ic.startsWith('/')) return ic;
+                            return `/images/collectibles/${ic}.svg`;
+                          })()}
+                          onError={(e) => {
+                            const fb = '/images/collectibles/default.svg';
+                            // @ts-ignore
+                            if (!e.currentTarget.src.endsWith(fb)) {
+                              // @ts-ignore
+                              e.currentTarget.src = fb;
+                            }
+                          }}
+                          alt={topBadge.name}
+                          className="h-5 w-5 rounded-sm"
+                        />
+                        <span className="text-[12px] text-gray-600 dark:text-gray-300 truncate" title={topBadge.name}>{topBadge.name}</span>
+                      </div>
+                    )}
+                    <span className="ml-1 inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full border bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30">
+                      <Gem className="h-3.5 w-3.5" />
+                      <span className="tabular-nums">{progress?.diamonds ?? 0}</span>
+                    </span>
+                  </div>
+                </div>
               </div>
               <div className="mt-3 space-y-1">
                 {dropdownItems.map((item) => (

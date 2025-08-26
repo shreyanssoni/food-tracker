@@ -89,14 +89,26 @@ const config: NextAuthConfig = {
           return false;
         }
 
-        // 3) Ensure default preferences row exists for normalized id
-        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        // 3) Ensure default preferences row exists for normalized id, but
+        // do NOT overwrite timezone with server's timezone (often 'UTC').
+        // Preserve existing timezone if present; otherwise, set only if it's a non-UTC IANA zone.
+        const serverTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const { data: existingPrefs } = await supabase
+          .from('user_preferences')
+          .select('timezone')
+          .eq('user_id', normalizedId)
+          .maybeSingle();
+
+        const keepExistingTz = existingPrefs?.timezone || null;
+        const detectedIsValid = !!(serverTZ && serverTZ.toUpperCase() !== 'UTC' && serverTZ.includes('/'));
+        const tzToSave = keepExistingTz ?? (detectedIsValid ? serverTZ : null);
+
         const { error: prefsErr } = await supabase
           .from('user_preferences')
           .upsert(
             {
               user_id: normalizedId,
-              timezone,
+              timezone: tzToSave,
               updated_at: new Date().toISOString(),
             },
             { onConflict: 'user_id' }

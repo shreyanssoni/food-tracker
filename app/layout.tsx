@@ -10,6 +10,7 @@ import ProfilePrompt from './components/ProfilePrompt';
 import InstallPrompt from './components/InstallPrompt';
 import Onboarding from './components/Onboarding';
 import TimezoneSetup from './components/TimezoneSetup';
+import TimezoneMismatchPrompt from './components/TimezoneMismatchPrompt';
 import AutoEnableNotifications from './components/AutoEnableNotifications';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -72,6 +73,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <Onboarding />
           {/* Timezone setup prompt when missing */}
           <TimezoneSetup />
+          {/* Prompt if saved timezone mismatches current device timezone */}
+          <TimezoneMismatchPrompt />
           {/* Auto-enable/sync notifications on login */}
           <AutoEnableNotifications />
           {/* Global toaster */}
