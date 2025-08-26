@@ -560,7 +560,7 @@ export default function DashboardPage() {
                 <div className="text-sm text-slate-600 dark:text-slate-400">No tasks due today. Enjoy a rest or log a quick win.</div>
                 <div className="mt-3">
                   <Link
-                    href="/food"
+                    href="/tasks"
                     className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-600 text-white"
                     onClick={() => {
                       try {
