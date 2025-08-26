@@ -25,6 +25,7 @@ export async function GET(_req: NextRequest) {
       .from('collectibles')
       .select(`
         id, name, icon, rarity, is_badge, is_private, owner_user_id,
+        public_slug, lore, story_title, story_md, og_image_url,
         collectibles_store(id, price, active, created_at),
         collectibles_requirements!collectibles_requirements_collectible_id_fkey(collectible_id, min_level, required_badge_id, required_goal_id, require_goal_success)
       `)
@@ -70,6 +71,11 @@ export async function POST(req: NextRequest) {
       is_badge: Boolean(body?.is_badge) || false,
       is_private: false,
       owner_user_id: null,
+      public_slug: body?.public_slug ?? null,
+      lore: body?.lore ?? null,
+      story_title: body?.story_title ?? null,
+      story_md: body?.story_md ?? null,
+      og_image_url: body?.og_image_url ?? null,
     } as const;
 
     const { data: created, error: cErr } = await supabase

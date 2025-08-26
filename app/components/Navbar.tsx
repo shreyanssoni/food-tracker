@@ -620,11 +620,11 @@ export default function Navbar() {
             )}
             {status === "authenticated" && isAdmin && (
               <Link
-                href={'/admin/rewards' as unknown as Route}
+                href={'/admin' as unknown as Route}
                 className="px-3 py-1.5 text-sm rounded-full border border-gray-200/80 dark:border-gray-800/80 hover:bg-gray-100/80 dark:hover:bg-white/5"
-                title="Manage Rewards & Collectibles"
+                title="Admin"
               >
-                Manage rewards
+                Admin
               </Link>
             )}
             {status === "authenticated" ? (

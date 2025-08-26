@@ -44,9 +44,10 @@ export async function POST(req: Request) {
     if (owned) return NextResponse.json({ error: 'Already owned', code: 'ALREADY_OWNED' }, { status: 409 });
 
     // Fetch collectible meta and requirements
-    const [{ data: meta }, { data: reqs }] = await Promise.all([
+    const [{ data: meta }, { data: reqs }, { data: meRow }] = await Promise.all([
       supabase.from('collectibles').select('*').eq('id', item.collectible_id).maybeSingle(),
       supabase.from('collectibles_requirements').select('*').eq('collectible_id', item.collectible_id).maybeSingle(),
+      supabase.from('app_users').select('name').eq('id', user.id).maybeSingle(),
     ]);
 
     // Disallow purchasing badges; they are granted as rewards
@@ -101,9 +102,16 @@ export async function POST(req: Request) {
     if (diamonds < item.price) return NextResponse.json({ error: 'Insufficient diamonds' }, { status: 400 });
 
     // Grant collectible and deduct diamonds
+    const sharePath = meta?.public_slug ? `/api/collectibles/share/${encodeURIComponent(meta.public_slug)}` : null;
     const { error: ucErr } = await supabase
       .from('user_collectibles')
-      .insert({ user_id: user.id, collectible_id: item.collectible_id, source: 'purchase' });
+      .insert({
+        user_id: user.id,
+        collectible_id: item.collectible_id,
+        source: 'purchase',
+        awarded_to_name: meRow?.name || null,
+        share_image_url: sharePath,
+      });
     if (ucErr && (ucErr as any).code !== '23505') throw ucErr;
 
     const newDiamonds = diamonds - item.price;

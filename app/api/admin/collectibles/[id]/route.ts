@@ -26,6 +26,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (body.icon !== undefined) patch.icon = body.icon;
     if (body.rarity !== undefined) patch.rarity = body.rarity;
     if (body.is_badge !== undefined) patch.is_badge = !!body.is_badge;
+    if (body.public_slug !== undefined) patch.public_slug = body.public_slug || null;
+    if (body.lore !== undefined) patch.lore = body.lore || null;
+    if (body.story_title !== undefined) patch.story_title = body.story_title || null;
+    if (body.story_md !== undefined) patch.story_md = body.story_md || null;
+    if (body.og_image_url !== undefined) patch.og_image_url = body.og_image_url || null;
 
     if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
 

@@ -43,10 +43,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Private collectible is owned by another user' }, { status: 400 });
     }
 
+    // Enrich with user name and share path
+    const [{ data: userRow }, { data: slugRow }] = await Promise.all([
+      supabase.from('app_users').select('name').eq('id', user_id).maybeSingle(),
+      supabase.from('collectibles').select('public_slug').eq('id', collectible_id).maybeSingle(),
+    ]);
+
     // Grant (idempotent)
+    const sharePath = slugRow?.public_slug ? `/api/collectibles/share/${encodeURIComponent(slugRow.public_slug)}` : null;
     const { error: insErr } = await supabase
       .from('user_collectibles')
-      .insert({ user_id, collectible_id, source: 'admin_grant' })
+      .insert({ user_id, collectible_id, source: 'admin_grant', awarded_to_name: userRow?.name || null, share_image_url: sharePath })
       .select('user_id')
       .maybeSingle();
 

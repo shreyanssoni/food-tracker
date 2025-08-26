@@ -251,6 +251,28 @@ CREATE POLICY "Allow read to all on collectibles" ON public.collectibles FOR SEL
 CREATE POLICY "Allow insert to all on collectibles" ON public.collectibles FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow update to all on collectibles" ON public.collectibles FOR UPDATE USING (true) WITH CHECK (true);
 
+-- Extend collectibles with lore/story and public slug for deep links (idempotent)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='collectibles') THEN
+    BEGIN
+      ALTER TABLE public.collectibles ADD COLUMN IF NOT EXISTS public_slug TEXT;
+      ALTER TABLE public.collectibles ADD COLUMN IF NOT EXISTS lore TEXT;              -- short lore snippet
+      ALTER TABLE public.collectibles ADD COLUMN IF NOT EXISTS story_title TEXT;       -- heading for the story
+      ALTER TABLE public.collectibles ADD COLUMN IF NOT EXISTS story_md TEXT;          -- rich text/markdown story
+      ALTER TABLE public.collectibles ADD COLUMN IF NOT EXISTS og_image_url TEXT;      -- optional share image template
+    EXCEPTION WHEN duplicate_column THEN
+      NULL;
+    END;
+    -- Unique index on slug
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='collectibles_public_slug_uniq'
+    ) THEN
+      CREATE UNIQUE INDEX collectibles_public_slug_uniq ON public.collectibles(public_slug);
+    END IF;
+  END IF;
+END $$;
+
 -- Ownership of collectibles by users
 CREATE TABLE IF NOT EXISTS public.user_collectibles (
   user_id TEXT NOT NULL,
@@ -263,6 +285,19 @@ ALTER TABLE public.user_collectibles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow read to all on user_collectibles" ON public.user_collectibles FOR SELECT USING (true);
 CREATE POLICY "Allow insert to all on user_collectibles" ON public.user_collectibles FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow delete to all on user_collectibles" ON public.user_collectibles FOR DELETE USING (true);
+
+-- Add sharing metadata on ownership (idempotent)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='user_collectibles') THEN
+    BEGIN
+      ALTER TABLE public.user_collectibles ADD COLUMN IF NOT EXISTS awarded_to_name TEXT;
+      ALTER TABLE public.user_collectibles ADD COLUMN IF NOT EXISTS share_image_url TEXT;
+    EXCEPTION WHEN duplicate_column THEN
+      NULL;
+    END;
+  END IF;
+END $$;
 
 -- Track how a collectible was obtained (idempotent)
 ALTER TABLE public.user_collectibles
