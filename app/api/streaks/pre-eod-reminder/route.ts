@@ -42,6 +42,9 @@ function taskScheduledOnYmd(schedule: any, ymd: string, tz: string, dow: number)
     const arr = Array.isArray(byweekday) ? byweekday : [];
     return arr.includes(dow);
   }
+  if (frequency === 'once') {
+    return !!start_date && ymd === start_date;
+  }
   return false;
 }
 

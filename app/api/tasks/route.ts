@@ -158,12 +158,19 @@ export async function POST(req: Request) {
 
     if (schedule) {
       const { frequency, byweekday = null, at_time = null, timezone = 'UTC', start_date = null, end_date = null } = schedule;
-      if (!['daily', 'weekly', 'custom'].includes(frequency)) {
+      if (!['daily', 'weekly', 'custom', 'once'].includes(frequency)) {
         return NextResponse.json({ error: 'Invalid frequency' }, { status: 400 });
+      }
+      if (frequency === 'once') {
+        const dateOk = typeof start_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(start_date);
+        const timeOk = typeof at_time === 'string' && /^\d{2}:\d{2}$/.test(String(at_time).slice(0,5));
+        if (!dateOk || !timeOk) {
+          return NextResponse.json({ error: "For one-time tasks, start_date (YYYY-MM-DD) and at_time (HH:MM) are required." }, { status: 400 });
+        }
       }
       const { error: sErr } = await supabase
         .from('task_schedules')
-        .insert({ task_id: inserted.id, frequency, byweekday, at_time, timezone, start_date, end_date });
+        .insert({ task_id: inserted.id, frequency, byweekday, at_time, timezone, start_date, end_date: end_date || start_date });
       if (sErr) throw sErr;
     }
 

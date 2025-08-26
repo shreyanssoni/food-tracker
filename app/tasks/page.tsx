@@ -21,9 +21,11 @@ interface Task {
 
 interface Schedule {
   task_id: string;
-  frequency: 'daily' | 'weekly' | 'custom';
+  frequency: 'daily' | 'weekly' | 'custom' | 'once';
   byweekday?: number[] | null;
   at_time?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
 }
 
 export default function TasksPage() {
@@ -59,7 +61,7 @@ export default function TasksPage() {
   // UI state
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all'|'active'|'inactive'>('all');
-  const [freqFilter, setFreqFilter] = useState<'all'|'daily'|'weekly'|'custom'>('all');
+  const [freqFilter, setFreqFilter] = useState<'all'|'daily'|'weekly'|'custom'|'once'>('all');
   const [sectionsOpen, setSectionsOpen] = useState<{today:boolean; inactive:boolean}>({ today: true, inactive: false });
 
   useEffect(() => {
@@ -168,6 +170,17 @@ export default function TasksPage() {
       setCreating(true);
       const payload: any = { title: newTask.title, description: newTask.description, ep_value: newTask.ep_value };
       if (newTask.schedule && newTask.schedule.frequency) {
+        // client-side validation for one-time tasks
+        if ((newTask.schedule as any).frequency === 'once') {
+          const sd = (newTask.schedule as any).start_date as string | undefined;
+          const at = (newTask.schedule as any).at_time as string | undefined;
+          const dateOk = typeof sd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(sd);
+          const timeOk = typeof at === 'string' && /^\d{2}:\d{2}$/.test(String(at).slice(0,5));
+          if (!dateOk || !timeOk) {
+            toast.error('One time tasks need a date (YYYY-MM-DD) and time (HH:MM)');
+            return;
+          }
+        }
         payload.schedule = newTask.schedule;
       }
       const res = await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -206,6 +219,17 @@ export default function TasksPage() {
       }
       const se = schedEdits[id];
       if (se && se.frequency) {
+        // client-side validation for one-time schedule updates
+        if (se.frequency === 'once') {
+          const sd = (se as any).start_date as string | undefined;
+          const at = (se as any).at_time as string | undefined;
+          const dateOk = typeof sd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(sd);
+          const timeOk = typeof at === 'string' && /^\d{2}:\d{2}$/.test(String(at).slice(0,5));
+          if (!dateOk || !timeOk) {
+            toast.error('One time tasks need a date (YYYY-MM-DD) and time (HH:MM)');
+            return;
+          }
+        }
         const res2 = await fetch(`/api/tasks/${id}/schedule`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(se) });
         const d2 = await res2.json();
         if (!res2.ok) throw new Error(d2.error || 'Failed to update schedule');
@@ -306,6 +330,7 @@ export default function TasksPage() {
     }
     if (s.frequency === 'daily') return true;
     if (s.frequency === 'weekly') return Array.isArray(s.byweekday) && s.byweekday.includes(today);
+    if (s.frequency === 'once') return Boolean(s.start_date) && s.start_date === new Date().toISOString().slice(0,10);
     return false; // custom (not displayed as due today by default)
   };
 
@@ -357,6 +382,7 @@ export default function TasksPage() {
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
             <option value="custom">Custom</option>
+            <option value="once">One time</option>
           </select>
           {/* Mini create inline inputs (mobile) */}
           <input value={newTask.title} onChange={(e)=>setNewTask(t=>({...t,title:e.target.value}))} placeholder="Quick add: title" className="px-2 py-1.5 rounded-lg bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm" />
@@ -381,6 +407,7 @@ export default function TasksPage() {
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
               <option value="custom">Custom</option>
+              <option value="once">One time</option>
             </select>
           </div>
           {(newTask.schedule as any)?.frequency === 'weekly' && (
@@ -409,10 +436,35 @@ export default function TasksPage() {
               })}
             </div>
           )}
+          {(newTask.schedule as any)?.frequency === 'once' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                className="border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 rounded-lg px-3 py-2 text-sm"
+                value={(newTask.schedule as any)?.start_date || ''}
+                onChange={(e)=> setNewTask(t=> ({...t, schedule: { ...(t.schedule as any), start_date: e.target.value, end_date: e.target.value }}))}
+              />
+            </div>
+          )}
           <input className="border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 rounded-lg px-3 py-2 text-sm" placeholder="At time (HH:MM)" onChange={(e) => setNewTask((t) => ({ ...t, schedule: { ...(t.schedule||{} as any), at_time: e.target.value } }))} />
         </div>
         <div className="mt-3">
-          <button disabled={creating || !newTask.title} onClick={createTask} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-60 transition-colors">{creating ? 'Creating…' : 'Create'}</button>
+          <button
+            disabled={(() => {
+              if (creating || !newTask.title) return true;
+              const s: any = newTask.schedule || {};
+              if (s.frequency === 'once') {
+                const sd = s.start_date as string | undefined;
+                const at = s.at_time as string | undefined;
+                const dateOk = typeof sd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(sd);
+                const timeOk = typeof at === 'string' && /^\d{2}:\d{2}$/.test(String(at).slice(0,5));
+                return !(dateOk && timeOk);
+              }
+              return false;
+            })()}
+            onClick={createTask}
+            className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-60 transition-colors"
+          >{creating ? 'Creating…' : 'Create'}</button>
         </div>
       </div>
 
@@ -530,7 +582,7 @@ export default function TasksPage() {
                 const s = schedules[t.id];
                 const due = isDueToday(t);
                 return (
-                  <li key={t.id} className="p-4">
+                  <li key={t.id} className={`p-4 ${schedules[t.id]?.frequency==='once' ? 'bg-amber-50/40 dark:bg-amber-900/10' : ''}`}>
                     {!editing[t.id] ? (
                       <div className="flex flex-col sm:flex-row sm:items-start gap-3">
                         <div className="mt-1 shrink-0">
@@ -555,28 +607,33 @@ export default function TasksPage() {
                             </div>
                             <span className="ml-2 inline-flex items-center gap-1 text-blue-700 dark:text-blue-300 text-[11px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 shrink-0">+{t.ep_value} EP</span>
                           </div>
-                          <div className="text-[12px] sm:text-xs text-gray-500 dark:text-gray-500 mt-2 flex items-center gap-2">
+                          <div className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-500 mt-2 flex items-center gap-1.5 sm:gap-2 flex-wrap">
                             {s ? (
-                              <span className="inline-flex items-center gap-1">
+                              <span className="inline-flex items-center gap-1 flex-wrap">
                                 {s.frequency === 'daily' && <Sun className="w-3.5 h-3.5"/>}
                                 {s.frequency === 'weekly' && <CalendarDays className="w-3.5 h-3.5"/>}
                                 {s.frequency === 'custom' && <Clock className="w-3.5 h-3.5"/>}
-                                <span className="px-2 py-0.5 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+                                {s.frequency === 'once' && <CalendarDays className="w-3.5 h-3.5"/>}
+                                <span className="px-1.5 py-0.5 sm:px-2 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">
                                   {s.frequency === 'daily' && 'Daily'}
                                   {s.frequency === 'weekly' && 'Weekly'}
                                   {s.frequency === 'custom' && 'Custom'}
+                                  {s.frequency === 'once' && 'One time'}
                                 </span>
                                 {s.frequency === 'weekly' && Array.isArray(s.byweekday) && s.byweekday.length ? (
                                   <div className="flex flex-wrap gap-1">
                                     {s.byweekday?.map((d) => (
-                                      <span key={d} className="px-1.5 py-0.5 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-[11px]">
+                                      <span key={d} className="px-1.5 py-0.5 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-[10px] sm:text-[11px]">
                                         {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d] ?? d}
                                       </span>
                                     ))}
                                   </div>
                                 ) : null}
                                 {s.at_time ? (
-                                  <span className="px-2 py-0.5 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">{s.at_time}</span>
+                                  <span className="px-1.5 py-0.5 sm:px-2 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">{String(s.at_time).slice(0,5)}</span>
+                                ) : null}
+                                {s.frequency === 'once' && s.start_date ? (
+                                  <span className="px-1.5 py-0.5 sm:px-2 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">{s.start_date}</span>
                                 ) : null}
                               </span>
                             ) : (

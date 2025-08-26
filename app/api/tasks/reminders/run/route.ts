@@ -139,6 +139,8 @@ export async function GET(req: NextRequest) {
           if (s.frequency === 'weekly') {
             const by = Array.isArray(s.byweekday) ? s.byweekday : [];
             if (!by.includes(dow)) return false;
+          } else if (s.frequency === 'once') {
+            if (!s.start_date || s.start_date !== todayLocal) return false;
           } else if (s.frequency !== 'daily') {
             return false;
           }

@@ -34,4 +34,8 @@ jobs:
           curl -sS -f "${BASE_URL%/}/api/tasks/reminders/run?secret=${CRON_SECRET}" \
             -H "User-Agent: github-actions/cron" \
             -H "Accept: application/json" || true
+          echo "Calling ${BASE_URL%/}/api/tasks/maintenance/once"
+          curl -sS -f "${BASE_URL%/}/api/tasks/maintenance/once?secret=${CRON_SECRET}" \
+            -H "User-Agent: github-actions/cron" \
+            -H "Accept: application/json" || true
 

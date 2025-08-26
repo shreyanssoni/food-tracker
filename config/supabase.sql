@@ -261,3 +261,22 @@ ALTER TABLE public.device_sessions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY IF NOT EXISTS "Allow select to all on device_sessions" ON public.device_sessions FOR SELECT USING (true);
 CREATE POLICY IF NOT EXISTS "Allow insert to all on device_sessions" ON public.device_sessions FOR INSERT WITH CHECK (true);
 CREATE POLICY IF NOT EXISTS "Allow update to all on device_sessions" ON public.device_sessions FOR UPDATE USING (true) WITH CHECK (true);
+
+-- 1) Allow 'once' frequency in the frequency check
+alter table task_schedules
+  drop constraint if exists task_schedules_frequency_check;
+
+alter table task_schedules
+  add constraint task_schedules_frequency_check
+  check (frequency in ('daily','weekly','custom','once'));
+
+-- 2) Enforce that 'once' schedules have start_date and at_time
+alter table task_schedules
+  drop constraint if exists task_schedules_once_requires_fields;
+
+alter table task_schedules
+  add constraint task_schedules_once_requires_fields
+  check (
+    frequency <> 'once'
+    or (start_date is not null and at_time is not null)
+  );
