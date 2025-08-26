@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
     );
     const finalTzs = tzs.length
       ? tzs
-      : [process.env.DEFAULT_TIMEZONE || "Asia/Kolkata"];
+      : [process.env.DEFAULT_TIMEZONE || "Asia/Calcutta"];
 
     const results: Array<{
       timezone: string;
@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
 
     // Lead window: notify about tasks starting in ~10–15 minutes
     const LEAD_MIN = 15;
-    const WINDOW_MIN = 15;
+    const WINDOW_MIN = 10;
 
     for (const tz of finalTzs) {
       const todayLocal = todayInTimezone(tz);
