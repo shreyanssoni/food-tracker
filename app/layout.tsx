@@ -9,6 +9,7 @@ import BottomNav from './components/BottomNav';
 import ProfilePrompt from './components/ProfilePrompt';
 import InstallPrompt from './components/InstallPrompt';
 import Onboarding from './components/Onboarding';
+import TimezoneSetup from './components/TimezoneSetup';
 import AutoEnableNotifications from './components/AutoEnableNotifications';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -69,6 +70,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <InstallPrompt />
           {/* First-time onboarding modal */}
           <Onboarding />
+          {/* Timezone setup prompt when missing */}
+          <TimezoneSetup />
           {/* Auto-enable/sync notifications on login */}
           <AutoEnableNotifications />
           {/* Global toaster */}

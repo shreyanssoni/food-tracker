@@ -64,6 +64,21 @@ export async function PUT(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Resolve timezone: prefer payload, else user's saved preference, else default
+    let tz = String(timezone || '').trim();
+    if (!tz || tz === 'UTC') {
+      try {
+        const { data: pref } = await supabase
+          .from('user_preferences')
+          .select('timezone')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        tz = String(pref?.timezone || '').trim() || process.env.DEFAULT_TIMEZONE || 'Asia/Kolkata';
+      } catch {
+        tz = process.env.DEFAULT_TIMEZONE || 'Asia/Kolkata';
+      }
+    }
+
     // Upsert schedule (PK = task_id)
     const { data, error } = await supabase
       .from("task_schedules")
@@ -73,7 +88,7 @@ export async function PUT(
           frequency,
           byweekday,
           at_time,
-          timezone,
+          timezone: tz,
           start_date,
           end_date,
         },

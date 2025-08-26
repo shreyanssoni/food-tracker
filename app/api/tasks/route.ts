@@ -168,9 +168,24 @@ export async function POST(req: Request) {
           return NextResponse.json({ error: "For one-time tasks, start_date (YYYY-MM-DD) and at_time (HH:MM) are required." }, { status: 400 });
         }
       }
+      // Resolve timezone: prefer provided value; else user's preference; else DEFAULT_TIMEZONE; else Asia/Kolkata
+      let tz = String(timezone || '').trim();
+      if (!tz || tz === 'UTC') {
+        try {
+          const { data: pref } = await supabase
+            .from('user_preferences')
+            .select('timezone')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          tz = String(pref?.timezone || '').trim() || process.env.DEFAULT_TIMEZONE || 'Asia/Kolkata';
+        } catch {
+          tz = process.env.DEFAULT_TIMEZONE || 'Asia/Kolkata';
+        }
+      }
+
       const { error: sErr } = await supabase
         .from('task_schedules')
-        .insert({ task_id: inserted.id, frequency, byweekday, at_time, timezone, start_date, end_date: end_date || start_date });
+        .insert({ task_id: inserted.id, frequency, byweekday, at_time, timezone: tz, start_date, end_date: end_date || start_date });
       if (sErr) throw sErr;
     }
 

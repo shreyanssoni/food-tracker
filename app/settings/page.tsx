@@ -12,6 +12,10 @@ export default function SettingsPage() {
   const [units, setUnits] = useState<Units>('metric');
   const [theme, setTheme] = useState<Theme>('system');
   const [dietary, setDietary] = useState('');
+  // server-backed timezone preference
+  const [timezone, setTimezone] = useState<string>('');
+  const [tzLoading, setTzLoading] = useState<boolean>(true);
+  const [tzSaving, setTzSaving] = useState<boolean>(false);
   const { enabled: notifications, status: notifStatus, pending, toggle, enable, disable } = useNotifications();
 
   // load from localStorage
@@ -28,6 +32,28 @@ export default function SettingsPage() {
       applyTheme(lt);
     } catch {}
   }, []);
+
+  // Load timezone from server preferences
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!session) return;
+        const res = await fetch('/api/preferences', { cache: 'no-store' });
+        const j = await res.json();
+        if (cancelled) return;
+        const tz = j?.profile?.timezone as string | undefined;
+        setTimezone(tz || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+      } catch {
+        setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+      } finally {
+        if (!cancelled) setTzLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
 
   // helpers
   const applyTheme = (t: Theme) => {
@@ -65,6 +91,23 @@ export default function SettingsPage() {
     if (v) await enable(); else await disable();
   };
 
+  const saveTimezone = async () => {
+    if (!timezone) return;
+    setTzSaving(true);
+    try {
+      const res = await fetch('/api/user/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timezone }),
+      });
+      if (!res.ok) throw new Error('Failed to save timezone');
+    } catch {
+      // no-op; could toast
+    } finally {
+      setTzSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <h1 className="text-lg font-semibold">Settings</h1>
@@ -73,6 +116,45 @@ export default function SettingsPage() {
           <>
             <p className="text-sm text-gray-700 dark:text-gray-300">Signed in as {session.user?.email}</p>
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Timezone (server preference) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Timezone</label>
+                <div className="mt-1 flex items-center gap-2">
+                  <select
+                    className="input !px-3 !py-2 text-sm"
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                    disabled={tzLoading}
+                  >
+                    {/* Lightweight curated list + detected */}
+                    {(() => {
+                      const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                      const list = [
+                        detected,
+                        'Asia/Kolkata',
+                        'Asia/Dubai',
+                        'Asia/Singapore',
+                        'Europe/London',
+                        'Europe/Berlin',
+                        'America/New_York',
+                        'America/Los_Angeles',
+                        'UTC',
+                      ].filter((v, i, a) => !!v && a.indexOf(v) === i);
+                      return list.map((tz) => (
+                        <option key={tz} value={tz}>{tz}{tz===detected?' (device)':''}</option>
+                      ));
+                    })()}
+                  </select>
+                  <button
+                    className="px-3 py-1.5 rounded-full text-xs font-medium bg-blue-600 text-white disabled:opacity-60"
+                    onClick={saveTimezone}
+                    disabled={tzSaving || tzLoading}
+                  >
+                    {tzSaving ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Used to schedule reminders at local times.</p>
+              </div>
               {/* Units */}
               <div>
                 <div className="flex items-center justify-between">
