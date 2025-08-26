@@ -4,9 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import CircularStat from "@/components/CircularStat";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
+import { useNotifications } from "@/utils/notifications";
+import { track } from "@/utils/analytics";
 
 export default function DashboardPage() {
   const supabase = createBrowserClient();
+  const { enabled: pushEnabled } = useNotifications();
   const [targets, setTargets] = useState<{
     calories: number;
     protein_g: number;
@@ -45,6 +48,9 @@ export default function DashboardPage() {
     reviveCost: number;
   } | null>(null);
   const [reviving, setReviving] = useState(false);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [nextUp, setNextUp] = useState<null | { task: any; when: Date | null }>(null);
+  const nudgeSentRef = useRef<string | null>(null);
 
   useEffect(() => {
     fetch("/api/preferences")
@@ -55,38 +61,68 @@ export default function DashboardPage() {
       .then(setSummary);
   }, []);
 
-  const clearContext = async () => {
-    if (clearing) return;
-    setClearing(true);
-    try {
-      const res = await fetch("/api/ai/coach", { method: "DELETE" });
-      // no-op UI here; chat is on dedicated page
-    } catch {}
-    setClearing(false);
-  };
-
-  const reviveLifeStreak = async () => {
-    if (!lifeStreak?.canRevive || reviving) return;
-    try {
-      setReviving(true);
-      const res = await fetch("/api/life-streak/revive", { method: "POST" });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error || "Revive failed");
-      // refresh life streak + diamonds
-      const [lsRes, pRes] = await Promise.all([
-        fetch("/api/life-streak"),
-        fetch("/api/progress"),
-      ]);
-      const [lsData, pData] = await Promise.all([lsRes.json(), pRes.json()]);
-      if (!lsData.error && lsData.lifeStreak) setLifeStreak(lsData.lifeStreak);
-      if (!pData.error && pData.progress) setProgress(pData.progress);
-      toast.success("Streak revived 🔥");
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setReviving(false);
-    }
-  };
+  useEffect(() => {
+    const loadGamification = async () => {
+      try {
+        setTasksLoading(true);
+        const [tRes, pRes, gRes, lsRes] = await Promise.all([
+          fetch("/api/tasks"),
+          fetch("/api/progress"),
+          fetch("/api/goals"),
+          fetch("/api/life-streak"),
+        ]);
+        const [tData, pData, gData, lsData] = await Promise.all([
+          tRes.json(),
+          pRes.json(),
+          gRes.json(),
+          lsRes.json(),
+        ]);
+        if (!tData.error) {
+          setTasks(tData.tasks || []);
+          const schedMap: Record<string, any> = {};
+          (tData.schedules || []).forEach((s: any) => {
+            schedMap[s.task_id] = s;
+          });
+          setSchedules(schedMap);
+        }
+        if (!pData.error) {
+          setProgress(pData.progress);
+        }
+        if (!lsData?.error && lsData?.lifeStreak) {
+          setLifeStreak(lsData.lifeStreak);
+        }
+        // Compute max daily streak across goals
+        if (!gData.error) {
+          const goals: any[] = gData.goals || [];
+          const ids = goals.map((g: any) => g.id).filter(Boolean);
+          if (ids.length) {
+            const chunks = await Promise.all(
+              ids.map((id: string) =>
+                fetch(`/api/goals/${id}/streaks`)
+                  .then((r) => r.json())
+                  .catch(() => null)
+              )
+            );
+            let maxCur = 0,
+              maxLong = 0;
+            for (const j of chunks) {
+              if (!j || j.error) continue;
+              const cur = Number(j?.streaks?.dailyCurrent || 0);
+              const lng = Number(j?.streaks?.dailyLongest || 0);
+              if (cur > maxCur) maxCur = cur;
+              if (lng > maxLong) maxLong = lng;
+            }
+            setStreakMax({ current: maxCur, longest: maxLong });
+          } else {
+            setStreakMax({ current: 0, longest: 0 });
+          }
+        }
+      } catch {} finally {
+        setTasksLoading(false);
+      }
+    };
+    loadGamification();
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -258,6 +294,39 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const clearContext = async () => {
+    if (clearing) return;
+    setClearing(true);
+    try {
+      const res = await fetch("/api/ai/coach", { method: "DELETE" });
+      // no-op UI here; chat is on dedicated page
+    } catch {}
+    setClearing(false);
+  };
+
+  const reviveLifeStreak = async () => {
+    if (!lifeStreak?.canRevive || reviving) return;
+    try {
+      setReviving(true);
+      const res = await fetch("/api/life-streak/revive", { method: "POST" });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Revive failed");
+      // refresh life streak + diamonds
+      const [lsRes, pRes] = await Promise.all([
+        fetch("/api/life-streak"),
+        fetch("/api/progress"),
+      ]);
+      const [lsData, pData] = await Promise.all([lsRes.json(), pRes.json()]);
+      if (!lsData.error && lsData.lifeStreak) setLifeStreak(lsData.lifeStreak);
+      if (!pData.error && pData.progress) setProgress(pData.progress);
+      toast.success("Streak revived 🔥");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setReviving(false);
+    }
+  };
+
   const completeTask = async (taskId: string, epValue: number) => {
     try {
       setBusy(taskId);
@@ -269,6 +338,10 @@ export default function DashboardPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to complete");
       toast.success(`+${data?.completion?.ep_awarded || epValue} EP`);
+      // analytics: task_complete
+      try {
+        track("task_complete", { taskId, ep: data?.completion?.ep_awarded || epValue });
+      } catch {}
       // refresh tasks + progress + life streak (which auto-updates on GET)
       const [tRes, pRes, lsRes] = await Promise.all([
         fetch("/api/tasks"),
@@ -317,6 +390,69 @@ export default function DashboardPage() {
     return true;
   };
 
+  // Helpers to evaluate time-of-day based due-ness with timezone awareness
+  const nowInTZ = (tz?: string) => {
+    try {
+      return tz ? new Date(new Date().toLocaleString("en-US", { timeZone: tz })) : new Date();
+    } catch {
+      return new Date();
+    }
+  };
+
+  const todayAtInTZ = (tz: string | undefined, atTime: string | null | undefined) => {
+    if (!atTime) return null;
+    const n = nowInTZ(tz);
+    const [hh, mm = "0", ss = "0"] = String(atTime).split(":");
+    const d = new Date(n.getFullYear(), n.getMonth(), n.getDate(), Number(hh) || 0, Number(mm) || 0, Number(ss) || 0, 0);
+    return d;
+  };
+
+  // Determine if a task is due now (time reached) or later today (time in future)
+  const classifyToday = (task: any) => {
+    const s = schedules[task.id];
+    if (!s) return { dueNow: false, later: false, when: null as Date | null };
+    if (!isDueToday(task.id)) return { dueNow: false, later: false, when: null };
+    const when = todayAtInTZ(s.timezone, s.at_time);
+    if (!when) {
+      // No specific time, treat as due now
+      return { dueNow: true, later: false, when: null };
+    }
+    const n = nowInTZ(s.timezone);
+    return { dueNow: n >= when, later: n < when, when };
+  };
+
+  // Compute Next Up whenever tasks/schedules change
+  useEffect(() => {
+    const dueToday = tasks.filter((t) => isDueToday(t.id) && !t.completedToday);
+    const withMeta = dueToday.map((t) => ({ t, meta: classifyToday(t) }));
+    const later = withMeta.filter((x) => x.meta.later);
+    later.sort((a: any, b: any) => (a.meta.when?.getTime?.() ?? 0) - (b.meta.when?.getTime?.() ?? 0));
+    if (later.length > 0) setNextUp({ task: later[0].t, when: later[0].meta.when || null });
+    else setNextUp(null);
+  }, [tasks, schedules]);
+
+  // Notifications timing hook: send a gentle nudge if user opted in and next task is upcoming
+  useEffect(() => {
+    if (!pushEnabled || !nextUp?.task) return;
+    const id = nextUp.task.id as string;
+    const when = nextUp.when;
+    if (!when) return;
+    const now = new Date();
+    const msUntil = when.getTime() - now.getTime();
+    // only nudge when within the next 45 minutes
+    if (msUntil <= 0 || msUntil > 45 * 60 * 1000) return;
+    // avoid duplicate sends per task per session
+    if (nudgeSentRef.current === id) return;
+    nudgeSentRef.current = id;
+    const title = "Next up";
+    const body = `${nextUp.task.title} at ${when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    // fire-and-forget; server has per-user rate limits
+    fetch('/api/push/send-to-user', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, body, url: '/dashboard' })
+    }).catch(() => {});
+  }, [pushEnabled, nextUp]);
+
   return (
     <div className="space-y-7">
       {/* Top Section: Greeting + Quick Actions */}
@@ -328,6 +464,11 @@ export default function DashboardPage() {
           <Link
             href={{ pathname: "/food" }}
             className="rounded-full px-3 py-1.5 text-xs font-medium bg-white/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 backdrop-blur-sm hover:bg-white dark:hover:bg-slate-900 transition"
+            onClick={() => {
+              try {
+                track("quick_action_use", { label: "Quick log" });
+              } catch {}
+            }}
           >
             Quick log
           </Link>
@@ -360,6 +501,31 @@ export default function DashboardPage() {
         </div>
       </section>
 
+      {/* Next Up banner (mobile-first) */}
+      {nextUp && (
+        <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/20 p-3 flex items-center justify-between shadow-sm">
+          <div className="min-w-0">
+            <div className="text-xs uppercase tracking-wide text-slate-500">Next up</div>
+            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{nextUp.task.title}</div>
+            {nextUp.when && (
+              <div className="text-[11px] text-slate-600 dark:text-slate-400">{nextUp.when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+            )}
+          </div>
+          <button
+            className="px-3 py-1.5 rounded-full text-xs font-medium bg-blue-600 text-white"
+            onClick={() => {
+              try {
+                track("next_up_click", { taskId: nextUp.task.id });
+              } catch {}
+              const el = document.getElementById('later-today');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+          >
+            View
+          </button>
+        </div>
+      )}
+
       {/* Today's Tasks */}
       <section className="space-y-3" aria-labelledby="today-tasks-heading">
         <h2
@@ -368,49 +534,125 @@ export default function DashboardPage() {
         >
           Today's Tasks
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {tasks
-            .filter((t) => isDueToday(t.id))
-            .map((t) => (
-              <div
-                key={t.id}
-                className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-950/60 backdrop-blur-sm p-4 flex items-start justify-between gap-3"
-              >
+        {tasksLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3" aria-hidden>
+            <div className="skeleton-card h-20 rounded-2xl" />
+            <div className="skeleton-card h-20 rounded-2xl" />
+            <div className="skeleton-card h-20 rounded-2xl hidden md:block" />
+          </div>
+        ) : (() => {
+          const dueToday = tasks.filter((t) => isDueToday(t.id) && !t.completedToday);
+          const withMeta = dueToday.map((t) => ({ t, meta: classifyToday(t) }));
+          const dueNow = withMeta.filter((x) => x.meta.dueNow);
+          const later = withMeta.filter((x) => x.meta.later);
+          // Sort: dueNow without time first, then by time; later strictly by time
+          const sortByWhen = (a: any, b: any) => {
+            const wa = a.meta.when?.getTime?.() ?? 0;
+            const wb = b.meta.when?.getTime?.() ?? 0;
+            return wa - wb;
+          };
+          dueNow.sort(sortByWhen);
+          later.sort(sortByWhen);
+
+          if (dueNow.length + later.length === 0) {
+            return (
+              <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-950/60 backdrop-blur-sm p-5 text-center">
+                <div className="text-sm text-slate-600 dark:text-slate-400">No tasks due today. Enjoy a rest or log a quick win.</div>
+                <div className="mt-3">
+                  <Link
+                    href="/food"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-600 text-white"
+                    onClick={() => {
+                      try {
+                        track("quick_action_use", { label: "Empty state quick log" });
+                      } catch {}
+                    }}
+                  >
+                    Log a quick win
+                  </Link>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="space-y-4">
+              {dueNow.length > 0 && (
                 <div>
-                  <div className="font-semibold flex items-center gap-2">
-                    {t.title}
-                    {t.goal?.title && (
-                      <span className="text-[10px] uppercase tracking-wide bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">
-                        Goal: {t.goal.title}
-                      </span>
-                    )}
-                  </div>
-                  {t.description && (
-                    <div className="text-xs text-slate-600 mt-1">
-                      {t.description}
-                    </div>
-                  )}
-                  <div className="text-[11px] text-slate-500 mt-1">
-                    +{t.ep_value} EP
+                  <div className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 mb-2">Due now</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {dueNow.map(({ t, meta }) => (
+                      <div
+                        key={t.id}
+                        className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-950/60 backdrop-blur-sm p-4 flex items-start justify-between gap-3"
+                      >
+                        <div>
+                          <div className="font-semibold flex items-center gap-2">
+                            {t.title}
+                            {t.goal?.title && (
+                              <span className="text-[10px] uppercase tracking-wide bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">
+                                Goal: {t.goal.title}
+                              </span>
+                            )}
+                          </div>
+                          {t.description && (
+                            <div className="text-xs text-slate-600 mt-1">{t.description}</div>
+                          )}
+                          <div className="text-[11px] text-slate-500 mt-1">+{t.ep_value} EP</div>
+                        </div>
+                        <button
+                          disabled={!!busy || t.completedToday}
+                          onClick={() => completeTask(t.id, t.ep_value)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium disabled:opacity-60 ${t.completedToday ? "bg-slate-300 text-slate-600" : "bg-blue-600 text-white"}`}
+                        >
+                          {t.completedToday ? "Completed" : busy === t.id ? "Completing…" : "Complete"}
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <button
-                  disabled={!!busy || t.completedToday}
-                  onClick={() => completeTask(t.id, t.ep_value)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium disabled:opacity-60 ${t.completedToday ? "bg-slate-300 text-slate-600" : "bg-blue-600 text-white"}`}
-                >
-                  {t.completedToday
-                    ? "Completed"
-                    : busy === t.id
-                      ? "Completing…"
-                      : "Complete"}
-                </button>
-              </div>
-            ))}
-          {tasks.filter((t) => isDueToday(t.id)).length === 0 && (
-            <div className="text-sm text-slate-500">No tasks due today.</div>
-          )}
-        </div>
+              )}
+
+              {later.length > 0 && (
+                <div>
+                  <div id="later-today" className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 mb-2">Later today</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {later.map(({ t, meta }) => (
+                      <div
+                        key={t.id}
+                        className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-950/60 backdrop-blur-sm p-3 flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold truncate">{t.title}</div>
+                          <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
+                            <span>+{t.ep_value} EP</span>
+                            {meta.when && (
+                              <span className="inline-flex items-center gap-1 text-slate-500">
+                                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                  <circle cx="12" cy="12" r="10" />
+                                  <path d="M12 6v6l4 2" />
+                                </svg>
+                                {meta.when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          disabled={!!busy || t.completedToday}
+                          onClick={() => completeTask(t.id, t.ep_value)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium disabled:opacity-60 ${t.completedToday ? "bg-slate-300 text-slate-600" : "bg-blue-600 text-white"}`}
+                          aria-label={`Complete ${t.title}`}
+                        >
+                          {t.completedToday ? "Done" : busy === t.id ? "…" : "Complete"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </section>
 
       {/* Life Streak + Progress & Diamonds */}
@@ -504,6 +746,11 @@ export default function DashboardPage() {
             <Link
               href="/rewards"
               className="inline-block px-3 py-1.5 rounded-full text-xs font-medium bg-white/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-900"
+              onClick={() => {
+                try {
+                  track("open_wallet");
+                } catch {}
+              }}
             >
               View rewards
             </Link>
@@ -684,6 +931,11 @@ function QuickAction({
       href={{ pathname: href }}
       aria-label={label}
       className={`group block rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-600 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 active:scale-[.995] transition-transform ${className || ""}`}
+      onClick={() => {
+        try {
+          track("quick_action_use", { label });
+        } catch {}
+      }}
     >
       <div
         className={`w-full h-12 sm:h-[56px] rounded-full border ${c.border} shadow-sm hover:shadow-md active:shadow-sm flex items-center gap-2 pl-2 pr-1.5 sm:pr-2 transition-all duration-200 ease-out ${c.tint} backdrop-blur-md overflow-hidden`}

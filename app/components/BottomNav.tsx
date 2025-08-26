@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/utils/cn";
 
 const items = [
-  { href: "/dashboard", label: "Home", icon: HomeIcon },
+  { href: "/dashboard", label: "Today", icon: HomeIcon },
   { href: "/tasks", label: "Tasks", icon: TasksIcon },
   { href: "/food", label: "Log", icon: PlusIcon },
   { href: "/goals", label: "Goals", icon: TargetIcon },

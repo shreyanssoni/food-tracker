@@ -35,6 +35,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Authenticated users landing on home should go to Today (/dashboard)
+  if (pathname === '/') {
+    try {
+      const token = await getToken({ 
+        req: request,
+        secret: process.env.NEXTAUTH_SECRET,
+        secureCookie: process.env.NODE_ENV === 'production',
+      });
+      if (token) {
+        const url = new URL('/dashboard', request.url);
+        return NextResponse.redirect(url);
+      }
+    } catch {}
+  }
+
   // Edge rate limiting for API routes (even if public), if Upstash configured
   if (redis && pathname.startsWith('/api/')) {
     const ip = getClientIp(request);
