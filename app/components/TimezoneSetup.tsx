@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
+import { getReliableTimeZone } from "@/utils/timezone";
 
 // Minimal timezone selector shown only if user_preferences.timezone is missing
 export default function TimezoneSetup() {
@@ -11,13 +12,7 @@ export default function TimezoneSetup() {
   const [saving, setSaving] = useState(false);
   const [currentTz, setCurrentTz] = useState<string>("");
 
-  const guessed = useMemo(() => {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    } catch {
-      return "UTC";
-    }
-  }, []);
+  const guessed = useMemo(() => getReliableTimeZone(), []);
 
   useEffect(() => {
     let cancelled = false;

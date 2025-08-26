@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useNotifications } from '@/utils/notifications';
 import { useSession } from 'next-auth/react';
+import { getReliableTimeZone } from '@/utils/timezone';
 
 type Units = 'metric' | 'us';
 type Theme = 'system' | 'light' | 'dark';
@@ -43,9 +44,9 @@ export default function SettingsPage() {
         const j = await res.json();
         if (cancelled) return;
         const tz = j?.profile?.timezone as string | undefined;
-        setTimezone(tz || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+        setTimezone(tz || getReliableTimeZone());
       } catch {
-        setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+        setTimezone(getReliableTimeZone());
       } finally {
         if (!cancelled) setTzLoading(false);
       }
@@ -95,10 +96,11 @@ export default function SettingsPage() {
     if (!timezone) return;
     setTzSaving(true);
     try {
+      const isIana = /\//.test(timezone) || timezone === 'UTC';
       const res = await fetch('/api/user/preferences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ timezone }),
+        body: JSON.stringify({ timezone: isIana ? timezone : 'UTC' }),
       });
       if (!res.ok) throw new Error('Failed to save timezone');
     } catch {
@@ -128,7 +130,7 @@ export default function SettingsPage() {
                   >
                     {/* Lightweight curated list + detected */}
                     {(() => {
-                      const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                      const detected = getReliableTimeZone();
                       const list = [
                         detected,
                         'Asia/Kolkata',

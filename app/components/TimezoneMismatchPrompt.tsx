@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
+import { getReliableTimeZone } from "@/utils/timezone";
 
 export default function TimezoneMismatchPrompt() {
   const supabase = createBrowserClient();
@@ -19,12 +20,7 @@ export default function TimezoneMismatchPrompt() {
 
   useEffect(() => {
     // Determine device timezone
-    try {
-      const g = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-      setGuessed(g);
-    } catch {
-      setGuessed("UTC");
-    }
+    try { setGuessed(getReliableTimeZone()); } catch { setGuessed("UTC"); }
   }, []);
 
   useEffect(() => {
@@ -71,10 +67,12 @@ export default function TimezoneMismatchPrompt() {
     if (!guessed) return;
     setSaving(true);
     try {
+      // Only save IANA-style zones or 'UTC'. If fallback like 'UTC+05:30', coerce to 'UTC' to avoid breaking server logic.
+      const isIana = /\//.test(guessed) || guessed === 'UTC';
       const res = await fetch("/api/preferences", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ timezone: guessed }),
+        body: JSON.stringify({ timezone: isIana ? guessed : 'UTC' }),
       });
       if (!res.ok) throw new Error("Failed to update timezone");
       if (dismissKey) {
