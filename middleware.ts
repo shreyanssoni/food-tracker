@@ -54,8 +54,11 @@ export async function middleware(request: NextRequest) {
   if (redis && pathname.startsWith('/api/')) {
     const ip = getClientIp(request);
     const isVercelCron = request.headers.get('x-vercel-cron');
-    // Allow Vercel Cron through (still low volume)
-    if (!isVercelCron) {
+    const providedSecret = request.headers.get('x-cron-secret') || request.nextUrl.searchParams.get('secret') || '';
+    const cronSecret = process.env.CRON_SECRET || '';
+    const isAuthorizedCron = !!cronSecret && providedSecret === cronSecret;
+    // Allow Vercel Cron or authorized x-cron-secret through (still low volume)
+    if (!isVercelCron && !isAuthorizedCron) {
       let result: { success: boolean } | null = null;
       if (pathname.startsWith('/api/ai/')) {
         result = await limiterAI!.limit(`ai:${ip}`);
@@ -84,6 +87,11 @@ export async function middleware(request: NextRequest) {
     '/api/push/send-to-user',
     '/api/push/send-test',
     '/api/push/send-test-admin',
+    // Cron/maintenance endpoints that self-authorize via x-cron-secret or x-vercel-cron
+    '/api/tasks/reminders/run',
+    '/api/streaks/pre-eod-reminder',
+    '/api/life-streak/run-eod',
+    '/api/tasks/maintenance/once',
     '/api/ai',
     '/api/trpc',
     '/_next',
