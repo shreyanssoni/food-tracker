@@ -48,6 +48,10 @@ export default function GoalsPage() {
   const [collectibleIcon, setCollectibleIcon] = useState("🏆");
   const [collectiblePrice, setCollectiblePrice] = useState<number | "">("");
 
+  // Edit modal state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editGoal, setEditGoal] = useState<Goal | null>(null);
+
   const canSubmit = useMemo(() => {
     // deadline must be strictly in the future (not today)
     const dOk = (() => {
@@ -118,6 +122,38 @@ export default function GoalsPage() {
       toast.error(e.message || 'Failed to refresh streaks');
     } finally {
       setStreaksLoading(prev => ({ ...prev, [goalId]: false }));
+    }
+  }
+
+  async function onDeleteGoal(id: string) {
+    if (!confirm('Delete this goal? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/goals?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || 'Delete failed');
+      toast.success('Goal deleted');
+      await refresh();
+    } catch (e: any) {
+      toast.error(e.message || 'Delete failed');
+    }
+  }
+
+  async function onSaveEdit(patch: { title?: string; description?: string | null; deadline?: string }) {
+    if (!editGoal) return;
+    try {
+      const res = await fetch(`/api/goals?id=${encodeURIComponent(editGoal.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || 'Update failed');
+      toast.success('Goal updated');
+      setEditOpen(false);
+      setEditGoal(null);
+      await refresh();
+    } catch (e: any) {
+      toast.error(e.message || 'Update failed');
     }
   }
 
@@ -372,11 +408,54 @@ export default function GoalsPage() {
                 streaksData={streaksCache[g.id]}
                 streaksLoading={!!streaksLoading[g.id]}
                 onRefetchStreaks={() => refetchStreaks(g.id)}
+                onEdit={() => { setEditGoal(g); setEditOpen(true); }}
+                onDelete={() => onDeleteGoal(g.id)}
               />
             ))}
           </div>
         )}
       </div>
+      {/* Edit Goal Modal */}
+      {editOpen && editGoal ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => { setEditOpen(false); setEditGoal(null); }} />
+          <div className="relative w-[92%] max-w-md rounded-2xl border border-gray-200/70 dark:border-gray-800/70 bg-white dark:bg-gray-900 p-4">
+            <div className="text-sm font-semibold mb-3">Edit Goal</div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium">Title</label>
+                <input defaultValue={editGoal.title} id="edit-title" className="mt-1 w-full rounded-xl border px-3 py-2 bg-transparent" />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Description</label>
+                <textarea defaultValue={editGoal.description || ''} id="edit-desc" className="mt-1 w-full rounded-xl border px-3 py-2 bg-transparent" rows={2} />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Deadline</label>
+                <input type="date" defaultValue={editGoal.deadline.slice(0,10)} id="edit-deadline" className="mt-1 w-full rounded-xl border px-3 py-2 bg-transparent" />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => { setEditOpen(false); setEditGoal(null); }} className="px-3 py-1.5 text-sm rounded-full border">Cancel</button>
+              <button
+                onClick={() => {
+                  const title = (document.getElementById('edit-title') as HTMLInputElement)?.value?.trim();
+                  const description = (document.getElementById('edit-desc') as HTMLTextAreaElement)?.value ?? null;
+                  const deadline = (document.getElementById('edit-deadline') as HTMLInputElement)?.value;
+                  const patch: any = {};
+                  if (title) patch.title = title;
+                  patch.description = description;
+                  if (deadline) patch.deadline = deadline;
+                  onSaveEdit(patch);
+                }}
+                className="px-3 py-1.5 text-sm rounded-full bg-blue-600 text-white"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -389,6 +468,8 @@ function GoalCard({
   streaksData,
   streaksLoading,
   onRefetchStreaks,
+  onEdit,
+  onDelete,
 }: {
   goal: Goal;
   summary?: { totalWeeks: number; successWeeks: number };
@@ -397,6 +478,8 @@ function GoalCard({
   streaksData?: any;
   streaksLoading?: boolean;
   onRefetchStreaks?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }) {
   const now = new Date();
   const start = new Date(goal.start_date);
@@ -434,9 +517,13 @@ function GoalCard({
             <div className="text-xs text-gray-500 mt-1">Deadline: {deadline.toLocaleDateString()} • Days left: {daysLeft}</div>
           </div>
         </button>
-        <span className={`px-2 py-1 rounded-full text-xs ${pastDeadline ? "bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300" : "bg-emerald-100 text-emerald-700"}`}>
-          {pastDeadline ? "Ended" : "In progress"}
-        </span>
+        <div className="flex items-center gap-2">
+          <button onClick={onEdit} className="text-xs px-2 py-1 rounded-full border hover:bg-gray-100/70 dark:hover:bg-white/5">Edit</button>
+          <button onClick={onDelete} className="text-xs px-2 py-1 rounded-full border border-red-300/70 text-red-600 hover:bg-red-50/70">Delete</button>
+          <span className={`px-2 py-1 rounded-full text-xs ${pastDeadline ? "bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300" : "bg-emerald-100 text-emerald-700"}`}>
+            {pastDeadline ? "Ended" : "In progress"}
+          </span>
+        </div>
       </div>
 
       {/* Compact progress row */}

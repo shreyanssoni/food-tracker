@@ -240,3 +240,83 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
   }
 }
+
+// PATCH: update a goal's basic fields (title, description, deadline)
+// Usage: PATCH /api/goals?id=GOAL_ID with JSON { title?, description?, deadline? }
+export async function PATCH(req: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const url = new URL(req.url);
+    const id = url.searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'Missing goal id' }, { status: 400 });
+    const supabase = createClient();
+
+    // Ensure ownership
+    const { data: goal, error: gErr } = await supabase
+      .from('goals')
+      .select('id, user_id')
+      .eq('id', id)
+      .single();
+    if (gErr) throw gErr;
+    if (!goal || goal.user_id !== user.id) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    const body = await req.json().catch(() => ({}));
+    const patch: any = {};
+    if (typeof body.title === 'string') patch.title = body.title;
+    if (typeof body.description === 'string' || body.description === null) patch.description = body.description;
+    if (typeof body.deadline === 'string') {
+      const d = new Date(body.deadline);
+      if (!(d instanceof Date) || isNaN(d.getTime())) return NextResponse.json({ error: 'Invalid deadline' }, { status: 400 });
+      const today = new Date();
+      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      if (d <= startOfToday) return NextResponse.json({ error: 'Deadline must be a future date' }, { status: 400 });
+      patch.deadline = body.deadline;
+    }
+    if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+
+    const { data: updated, error: uErr } = await supabase
+      .from('goals')
+      .update(patch)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select('*')
+      .single();
+    if (uErr) throw uErr;
+    return NextResponse.json({ goal: updated });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
+  }
+}
+
+// DELETE: delete a goal (relies on FK cascades if configured)
+// Usage: DELETE /api/goals?id=GOAL_ID
+export async function DELETE(req: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const url = new URL(req.url);
+    const id = url.searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'Missing goal id' }, { status: 400 });
+    const supabase = createClient();
+
+    // Ensure ownership
+    const { data: goal, error: gErr } = await supabase
+      .from('goals')
+      .select('id, user_id')
+      .eq('id', id)
+      .single();
+    if (gErr) throw gErr;
+    if (!goal || goal.user_id !== user.id) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    const { error: dErr } = await supabase
+      .from('goals')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+    if (dErr) throw dErr;
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
+  }
+}

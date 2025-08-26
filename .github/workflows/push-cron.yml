@@ -2,7 +2,7 @@ name: Push Scheduler
 
 on:
   schedule:
-    - cron: "0 * * * *"  # hourly
+    - cron: "*/5 * * * *"  # every 5 minutes
   workflow_dispatch:
 
 jobs:
@@ -24,5 +24,9 @@ jobs:
             -H "Accept: application/json" || true
           echo "Calling ${BASE_URL%/}/api/life-streak/run-eod"
           curl -sS -f "${BASE_URL%/}/api/life-streak/run-eod?secret=${CRON_SECRET}" \
+            -H "User-Agent: github-actions/cron" \
+            -H "Accept: application/json" || true
+          echo "Calling ${BASE_URL%/}/api/streaks/pre-eod-reminder"
+          curl -sS -f "${BASE_URL%/}/api/streaks/pre-eod-reminder?secret=${CRON_SECRET}" \
             -H "User-Agent: github-actions/cron" \
             -H "Accept: application/json" || true

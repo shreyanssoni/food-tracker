@@ -2,11 +2,18 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { getCurrentUser } from '@/utils/auth';
 
+function dateKeyLocal(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function startOfWeek(d: Date) {
+  // Sunday as the first day of the week to match UI labels (S M T W T F S)
   const date = new Date(d);
-  const dow = date.getDay();
-  const diffToMonday = (dow + 6) % 7;
-  date.setDate(date.getDate() - diffToMonday);
+  const dow = date.getDay(); // 0 = Sunday
+  date.setDate(date.getDate() - dow);
   date.setHours(0, 0, 0, 0);
   return date;
 }
@@ -84,8 +91,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         .select('task_id, completed_on')
         .eq('user_id', user.id)
         .in('task_id', taskIds as any)
-        .gte('completed_on', start.toISOString().slice(0, 10))
-        .lte('completed_on', end.toISOString().slice(0, 10));
+        .gte('completed_on', dateKeyLocal(start))
+        .lte('completed_on', dateKeyLocal(end));
       if (cErr) throw cErr;
       completions = (comps || []) as any;
     }
@@ -103,23 +110,24 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       .select('revive_date')
       .eq('goal_id', goal.id)
       .eq('user_id', user.id)
-      .gte('revive_date', start.toISOString().slice(0, 10))
-      .lte('revive_date', end.toISOString().slice(0, 10));
+      .gte('revive_date', dateKeyLocal(start))
+      .lte('revive_date', dateKeyLocal(end));
     if (rErr) throw rErr;
     const revivedSet = new Set<string>((reviveRows || []).map((r: any) => String(r.revive_date)));
 
     // Build days for current week
     const curStart = startOfWeek(today);
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const days: Array<{ date: string; completed: boolean; revived: boolean; missed: boolean; count: number }> = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(curStart);
       d.setDate(curStart.getDate() + i);
-      const key = d.toISOString().slice(0, 10);
+      const key = dateKeyLocal(d);
       const cnt = dayCounts.get(key) || 0;
       const revived = revivedSet.has(key);
       const completed = cnt > 0 || revived;
-      // Only mark missed if the day is on/after the goal start and not in the future
-      const missed = !completed && d >= new Date(String(goal.start_date)) && d <= new Date();
+      // Mark missed only for days strictly before today (local). Do not mark current day yet.
+      const missed = !completed && d >= new Date(String(goal.start_date)) && d < startOfToday;
       days.push({ date: key, completed, revived, missed, count: cnt });
     }
 
@@ -167,21 +175,27 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
     // Build week successes for last 12 weeks
     const weeks: Array<{ weekStart: string; success: boolean; count: number }> = [];
-    const wStart = new Date(start);
-    for (let w = 0; w < 12; w++) {
+    const wStart = startOfWeek(start);
+    const wEnd = endOfWeek(end);
+    const totalWeeks = Math.max(1, Math.round((wEnd.getTime() - wStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
+    for (let w = 0; w < totalWeeks; w++) {
       const ws = new Date(wStart);
       ws.setDate(wStart.getDate() + w * 7);
       const we = new Date(ws);
       we.setDate(ws.getDate() + 6);
-      const keyStart = ws.toISOString().slice(0, 10);
+      // Adjust start for first week to not consider days before goal start
+      const wsAdj = goalStart > ws ? goalStart : ws;
+      const keyStart = dateKeyLocal(ws);
       let cnt = 0;
       for (let i = 0; i < 7; i++) {
         const d = new Date(ws);
         d.setDate(ws.getDate() + i);
-        const dk = d.toISOString().slice(0, 10);
+        if (d < wsAdj) continue; // skip days before goal start in the first week
+        const dk = dateKeyLocal(d);
         cnt += dayCounts.get(dk) || 0;
       }
-      const effQuota = effectiveQuotaForWeek(ws, we);
+      // Compute quota only for active portion of the week (from wsAdj -> we)
+      const effQuota = effectiveQuotaForWeek(wsAdj, we);
       weeks.push({ weekStart: keyStart, success: effQuota > 0 ? cnt >= effQuota : false, count: cnt });
     }
 
@@ -212,7 +226,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       const d = new Date(day0);
       d.setDate(day0.getDate() - i);
       if (d < goalStart) break;
-      const key = d.toISOString().slice(0, 10);
+      const key = dateKeyLocal(d);
       const c = (dayCounts.get(key) || 0) > 0 || revivedSet.has(key);
       if (c) dailyStreakCurrent += 1; else break;
     }
@@ -225,7 +239,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       d.setHours(0,0,0,0);
       if (d > end) break;
       if (d < goalStart) continue;
-      const key = d.toISOString().slice(0, 10);
+      const key = dateKeyLocal(d);
       const c = (dayCounts.get(key) || 0) > 0 || revivedSet.has(key);
       if (c) { curRun++; longestDaily = Math.max(longestDaily, curRun); }
       else { curRun = 0; }
@@ -235,7 +249,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
     yesterday.setHours(0,0,0,0);
-    const yKey = yesterday.toISOString().slice(0, 10);
+    const yKey = dateKeyLocal(yesterday);
     const yCompleted = (dayCounts.get(yKey) || 0) > 0;
     const yRevived = revivedSet.has(yKey);
     const within24h = (day0.getTime() - yesterday.getTime()) <= 24*60*60*1000 && day0 > yesterday;

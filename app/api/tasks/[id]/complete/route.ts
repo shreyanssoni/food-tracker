@@ -115,7 +115,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     const newTotal = totalEP + ep_awarded;
 
-    // Update progress
+    // Update progress (fires DB trigger to auto-grant rewards based on level/total_ep)
     const { error: upErr } = await supabase
       .from('user_progress')
       .update({ level: curLevel, ep_in_level: curEp, total_ep: newTotal, updated_at: new Date().toISOString() })
@@ -167,54 +167,17 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       }
     }
 
-    // Auto-claim newly eligible rewards (level or total_ep based), idempotent with user_reward_claims
-    let rewardDiamonds = 0;
-    const collectiblesGranted: string[] = [];
-    {
-      // Fetch unclaimed rewards
-      const { data: claimed } = await supabase
-        .from('user_reward_claims')
-        .select('reward_id')
-        .eq('user_id', user.id);
-      const claimedSet = new Set((claimed || []).map((r: any) => r.reward_id));
+    // Reload progress to capture diamonds granted by the DB trigger for reward groups
+    const { data: postProg, error: postErr } = await supabase
+      .from('user_progress')
+      .select('diamonds')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (postErr) throw postErr;
+    const diamondsAfter = postProg?.diamonds ?? diamonds;
 
-      const { data: rewards, error: rErr } = await supabase
-        .from('rewards')
-        .select('id, kind, amount, collectible_id, unlock_rule, unlock_level, unlock_ep');
-      if (rErr) throw rErr;
-
-      for (const r of rewards || []) {
-        if (claimedSet.has(r.id)) continue;
-        const rule = (r as any).unlock_rule || 'level';
-        const eligible = rule === 'total_ep'
-          ? (typeof (r as any).unlock_ep === 'number' ? newTotal >= (r as any).unlock_ep : false)
-          : (curLevel >= (r as any).unlock_level);
-        if (!eligible) continue;
-
-        if (r.kind === 'diamond' && typeof r.amount === 'number') {
-          // Auto-claim diamonds only
-          const { error: clErr } = await supabase
-            .from('user_reward_claims')
-            .insert({ user_id: user.id, reward_id: (r as any).id });
-          if (clErr && (clErr as any).code !== '23505') throw clErr;
-          rewardDiamonds += r.amount;
-        }
-        // Collectible rewards are unlocked but must be purchased with diamonds by the user
-      }
-
-      if (rewardDiamonds > 0) {
-        const { error: dLErr } = await supabase
-          .from('diamond_ledger')
-          .insert({ user_id: user.id, delta: rewardDiamonds, reason: 'reward' });
-        if (dLErr) throw dLErr;
-        const { error: dUpdErr } = await supabase
-          .from('user_progress')
-          .update({ diamonds: diamonds + rewardDiamonds })
-          .eq('user_id', user.id);
-        if (dUpdErr) throw dUpdErr;
-        diamonds += rewardDiamonds;
-      }
-    }
+    // Diamonds granted by rewards (beyond level-up diamonds)
+    const rewardDiamonds = Math.max(0, diamondsAfter - (diamonds));
 
     // Build notifications
     const origin = (() => {
@@ -240,19 +203,19 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       await notify('Level up!', `You reached level ${curLevel}. +${levelUpDiamonds} diamonds`, '/rewards');
     }
 
-    // Reward diamonds notification
+    // Reward diamonds notification (from grouped rewards)
     if (rewardDiamonds > 0) {
       await notify('Reward earned', `You received +${rewardDiamonds} diamonds`, '/rewards');
     }
 
     return NextResponse.json({
       completion,
-      progress: { level: curLevel, ep_in_level: curEp, total_ep: newTotal, diamonds },
+      progress: { level: curLevel, ep_in_level: curEp, total_ep: newTotal, diamonds: diamondsAfter },
       rewards: {
         level_up_diamonds: levelUpDiamonds,
         reward_diamonds: rewardDiamonds,
         total_diamonds_awarded: levelUpDiamonds + rewardDiamonds,
-        collectibles: collectiblesGranted,
+        collectibles: [],
       },
     });
   } catch (err: any) {
