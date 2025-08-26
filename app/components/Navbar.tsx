@@ -300,6 +300,26 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [mobileOpen]);
 
+  // When mobile menu is open, lock background scroll
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const body = document.body;
+    if (mobileOpen) {
+      // Prevent background scroll/touch
+      const prevOverflow = body.style.overflow;
+      const prevTouch = (body.style as any).touchAction || '';
+      body.style.overflow = 'hidden';
+      ;(body.style as any).touchAction = 'none';
+      return () => {
+        body.style.overflow = prevOverflow;
+        ;(body.style as any).touchAction = prevTouch;
+      };
+    }
+    // restore if closed
+    body.style.overflow = '';
+    ;(body.style as any).touchAction = '';
+  }, [mobileOpen]);
+
   // Fetch admin flag and auto-logout if the app user record is missing
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -769,7 +789,7 @@ export default function Navbar() {
       {/* Mobile menu (animated) */}
       {/* Backdrop overlay */}
       <div
-        className={`fixed inset-0 z-40 bg-black/30 sm:hidden transition-opacity duration-300 ease-out ${
+        className={`fixed inset-0 z-[70] bg-black/30 sm:hidden transition-opacity duration-300 ease-out ${
           mobileOpen
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"
@@ -778,7 +798,7 @@ export default function Navbar() {
         aria-hidden
       />
       <div
-        className={`sm:hidden fixed z-50 top-16 inset-x-0 transform transition-all duration-300 ease-out ${
+        className={`sm:hidden fixed z-[80] top-16 inset-x-0 transform transition-all duration-300 ease-out ${
           mobileOpen
             ? "opacity-100 translate-y-0 pointer-events-auto"
             : "opacity-0 -translate-y-2 pointer-events-none"

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createClient as createBrowserClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
 import { CheckCircle2, Plus, Pencil, Trash2, Clock, CalendarDays, Search, ChevronDown, ChevronRight, Sun, Moon, Zap, Gem, Flame, MoreHorizontal } from 'lucide-react';
@@ -35,8 +35,6 @@ export default function TasksPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
-  // Two-tap confirmation tracker for destructive actions
-  const pendingDeleteRef = useRef<Record<string, number>>({});
   const [newTask, setNewTask] = useState<{ title: string; description?: string; ep_value: number; min_level: number; schedule?: Partial<Schedule> & { timezone?: string; start_date?: string | null; end_date?: string | null } }>(
     { title: '', description: '', ep_value: 10, min_level: 1, schedule: { frequency: 'daily' } as any }
   );
@@ -223,13 +221,6 @@ export default function TasksPage() {
   }
 
   async function deleteTask(id: string) {
-    const t0 = pendingDeleteRef.current[id] || 0;
-    const now = Date.now();
-    if (!t0 || now - t0 > 4000) {
-      pendingDeleteRef.current[id] = now;
-      toast.warning('Tap delete again to confirm');
-      return;
-    }
     try {
       setBusy(id);
       const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
@@ -246,7 +237,6 @@ export default function TasksPage() {
       toast.error(e?.message || 'Delete failed');
     } finally {
       setBusy(null);
-      delete pendingDeleteRef.current[id];
     }
   }
 
@@ -526,7 +516,7 @@ export default function TasksPage() {
         ) : (
           <>
           {/* Today */}
-          <section className="rounded-2xl border border-blue-200 dark:border-blue-900/40 bg-white dark:bg-gray-950 overflow-hidden">
+          <section className="rounded-2xl border border-blue-200 dark:border-blue-900/40 bg-white dark:bg-gray-950 overflow-visible">
             <button onClick={()=>setSectionsOpen(s=>({...s,today:!s.today}))} className="w-full flex items-center justify-between px-4 py-3 bg-blue-50 dark:bg-blue-950/30">
               <div className="flex items-center gap-2 font-semibold text-blue-700 dark:text-blue-300">
                 {sectionsOpen.today ? <ChevronDown className="w-4 h-4"/> : <ChevronRight className="w-4 h-4"/>}
@@ -598,7 +588,7 @@ export default function TasksPage() {
                                 <MoreHorizontal className="w-4 h-4" />
                               </button>
                               {menuOpen===t.id && (
-                                <div className="absolute right-0 mt-1 w-40 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow-soft z-10">
+                                <div className="absolute right-0 bottom-full mb-1 w-40 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow-soft z-30">
                                   <button className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-900 ${!t.completedToday && due ? 'text-blue-700 dark:text-blue-300 font-medium' : ''}`} onClick={()=>{ setMenuOpen(null); if(!t.completedToday) completeTask(t); }} disabled={!!busy || t.completedToday}>{t.completedToday? 'Completed' : 'Complete'}</button>
                                   <button className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={()=>{ setMenuOpen(null); startEdit(t.id); }}>Edit</button>
                                   <button className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={()=>{ setMenuOpen(null); deleteTask(t.id); }} disabled={!!busy}>Delete</button>
@@ -695,7 +685,7 @@ export default function TasksPage() {
           {/* Upcoming section removed */}
 
           {/* Inactive */}
-          <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-hidden">
+          <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-visible">
           <button onClick={()=>setSectionsOpen(s=>({...s,inactive:!s.inactive}))} className="w-full flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-2 font-semibold">
               {sectionsOpen.inactive ? <ChevronDown className="w-4 h-4"/> : <ChevronRight className="w-4 h-4"/>}
