@@ -35,6 +35,7 @@ html, body { height: 100%; }
 .skeleton { @apply animate-pulse bg-gray-200 dark:bg-gray-800 rounded-md; }
 .skeleton-line { @apply skeleton h-3; }
 .skeleton-circle { @apply skeleton rounded-full; }
+.skeleton-card { @apply skeleton; }
 
 /* Hide scrollbars utility */
 .no-scrollbar {
