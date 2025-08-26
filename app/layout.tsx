@@ -16,7 +16,7 @@ import AutoEnableNotifications from './components/AutoEnableNotifications';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'Nourish — AI Food & Mood Tracker',
+  title: 'Nourish — AI Life Tracker',
   description: 'Log meals by text or photo. Get empathetic coaching. PWA-ready.',
   manifest: '/manifest.json',
   icons: [{ rel: 'icon', url: '/icons/icon-192.svg' }],

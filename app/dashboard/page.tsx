@@ -455,19 +455,45 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-7">
-      {/* Top Section: Greeting + Quick Actions */}
-      <section className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gradient-to-br from-sky-600/10 via-blue-500/10 to-cyan-400/10 dark:from-sky-900/20 dark:via-blue-900/10 dark:to-cyan-900/10 p-5 sm:p-6">
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-            Today
-          </h1>
+      {/* Player Card + Quick Actions */}
+      <section className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gradient-to-br from-sky-600/15 via-indigo-600/10 to-emerald-500/10 dark:from-sky-900/25 dark:via-indigo-900/20 dark:to-emerald-900/20 p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+              Today
+            </h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              {/* Level */}
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 px-2 py-1">
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-indigo-600" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l3 7 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z"/></svg>
+                <span className="font-semibold">Level</span>
+                <span className="tabular-nums">{progress?.level ?? '—'}</span>
+              </span>
+              {/* EP */}
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 px-2 py-1">
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3l9 9-9 9-9-9 9-9z"/></svg>
+                <span className="font-semibold">EP</span>
+                <span className="tabular-nums">{progress ? `${progress.ep_in_level}/${progress.ep_required}` : '—'}</span>
+              </span>
+              {/* Diamonds */}
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 px-2 py-1">
+                <span aria-hidden className="text-blue-600">💎</span>
+                <span className="font-semibold">Diamonds</span>
+                <span className="tabular-nums">{progress?.diamonds ?? 0}</span>
+              </span>
+              {/* Life Streak */}
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/70 dark:bg-slate-900/60 border border-orange-200/70 dark:border-orange-900/50 px-2 py-1">
+                <span aria-hidden>🔥</span>
+                <span className="font-semibold">Streak</span>
+                <span className="tabular-nums">{lifeStreak?.current ?? '—'}</span>
+              </span>
+            </div>
+          </div>
           <Link
             href={{ pathname: "/food" }}
-            className="rounded-full px-3 py-1.5 text-xs font-medium bg-white/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 backdrop-blur-sm hover:bg-white dark:hover:bg-slate-900 transition"
+            className="rounded-full px-3 py-1.5 text-xs font-medium bg-white/80 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-700 backdrop-blur-sm hover:bg-white dark:hover:bg-slate-900 transition"
             onClick={() => {
-              try {
-                track("quick_action_use", { label: "Quick log" });
-              } catch {}
+              try { track("quick_action_use", { label: "Quick log" }); } catch {}
             }}
           >
             Quick log
@@ -480,24 +506,9 @@ export default function DashboardPage() {
           <QuickAction href="/food" emoji="🍽️" label="Log" kind="emerald" />
           <QuickAction href="/tasks" emoji="✅" label="Tasks" kind="blue" />
           <QuickAction href="/goals" emoji="🎯" label="Goals" kind="violet" />
-          <QuickAction
-            href="/suggestions"
-            emoji="✨"
-            label="Ideas"
-            kind="amber"
-          />
-          <QuickAction
-            href="/collectibles/shop"
-            emoji="🛒"
-            label="Collectibles"
-            kind="slate"
-          />
-          <QuickAction
-            href="/settings"
-            emoji="⚙️"
-            label="Settings"
-            kind="blue"  
-          />
+          <QuickAction href="/suggestions" emoji="✨" label="Ideas" kind="amber" />
+          <QuickAction href="/collectibles/shop" emoji="🛒" label="Collectibles" kind="slate" />
+          <QuickAction href="/rewards" emoji="🎁" label="Rewards" kind="violet" />
         </div>
       </section>
 
@@ -581,10 +592,12 @@ export default function DashboardPage() {
                 <div>
                   <div className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 mb-2">Due now</div>
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {dueNow.map(({ t, meta }) => (
+                    {dueNow.map(({ t, meta }) => {
+                      const rc = rarityClasses(t.ep_value);
+                      return (
                       <div
                         key={t.id}
-                        className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-950/60 backdrop-blur-sm p-4 flex items-start justify-between gap-3"
+                        className={`rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-950/60 backdrop-blur-sm p-4 flex items-start justify-between gap-3 ${rc.card}`}
                       >
                         <div>
                           <div className="font-semibold flex items-center gap-2">
@@ -594,11 +607,14 @@ export default function DashboardPage() {
                                 Goal: {t.goal.title}
                               </span>
                             )}
+                            <span className={`ml-1 inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${rc.badge}`}>
+                              <span className="font-semibold">+{t.ep_value} EP</span>
+                              <span className="opacity-80">{rc.label}</span>
+                            </span>
                           </div>
                           {t.description && (
                             <div className="text-xs text-slate-600 mt-1">{t.description}</div>
                           )}
-                          <div className="text-[11px] text-slate-500 mt-1">+{t.ep_value} EP</div>
                         </div>
                         <button
                           disabled={!!busy || t.completedToday}
@@ -608,7 +624,7 @@ export default function DashboardPage() {
                           {t.completedToday ? "Completed" : busy === t.id ? "Completing…" : "Complete"}
                         </button>
                       </div>
-                    ))}
+                    );})}
                   </div>
                 </div>
               )}
@@ -617,15 +633,22 @@ export default function DashboardPage() {
                 <div>
                   <div id="later-today" className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 mb-2">Later today</div>
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {later.map(({ t, meta }) => (
+                    {later.map(({ t, meta }) => {
+                      const rc = rarityClasses(t.ep_value);
+                      return (
                       <div
                         key={t.id}
-                        className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-950/60 backdrop-blur-sm p-3 flex items-center justify-between gap-3"
+                        className={`rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-950/60 backdrop-blur-sm p-3 flex items-center justify-between gap-3 ${rc.card}`}
                       >
                         <div className="min-w-0">
-                          <div className="text-sm font-semibold truncate">{t.title}</div>
+                          <div className="text-sm font-semibold truncate flex items-center gap-2">
+                            {t.title}
+                            <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${rc.badge}`}>
+                              <span className="font-semibold">+{t.ep_value} EP</span>
+                              <span className="opacity-80">{rc.label}</span>
+                            </span>
+                          </div>
                           <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
-                            <span>+{t.ep_value} EP</span>
                             {meta.when && (
                               <span className="inline-flex items-center gap-1 text-slate-500">
                                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -646,7 +669,7 @@ export default function DashboardPage() {
                           {t.completedToday ? "Done" : busy === t.id ? "…" : "Complete"}
                         </button>
                       </div>
-                    ))}
+                    );})}
                   </div>
                 </div>
               )}
@@ -728,6 +751,25 @@ export default function DashboardPage() {
                 <div className="text-[11px] text-slate-500 mt-1">
                   {progress.ep_in_level}/{progress.ep_required} EP • Remaining{" "}
                   {Math.max(0, progress.ep_required - progress.ep_in_level)}
+                </div>
+                {/* Weekly consistency mini-meter */}
+                <div className="mt-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-xs font-medium text-slate-700 dark:text-slate-300">Weekly consistency</div>
+                    <div className="text-[11px] text-slate-500">Longest {streakMax?.longest ?? 0}</div>
+                  </div>
+                  <div className="flex gap-1.5">
+                    {Array.from({ length: 7 }).map((_, i) => {
+                      const filled = (streakMax?.current ?? 0) % 7 > i || (streakMax?.current ?? 0) >= 7 && i < 7;
+                      return (
+                        <span
+                          key={i}
+                          className={`h-2.5 w-8 rounded-full ${filled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                          aria-hidden
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
               {/* Removed old daily streak chips in favor of Life Streak card */}
@@ -870,6 +912,32 @@ function colorClasses(kind: QuickKind) {
         border: "border-blue-300/70 dark:border-blue-800/50",
       } as const;
   }
+}
+
+// EP rarity styling based on EP value
+function rarityClasses(ep: number) {
+  // Simple tiers: 1-9 Common, 10-19 Uncommon, 20-34 Rare, 35-49 Epic, 50+ Legendary
+  let label = 'Common';
+  let card = '';
+  let badge = 'border-slate-300 dark:border-slate-700 bg-white/70 dark:bg-slate-900/50 text-slate-700 dark:text-slate-200';
+  if (ep >= 50) {
+    label = 'Legendary';
+    card = 'ring-1 ring-offset-1 ring-yellow-400/50 dark:ring-yellow-500/50 ring-offset-white dark:ring-offset-slate-950';
+    badge = 'border-yellow-300 dark:border-yellow-600 bg-yellow-50/80 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200';
+  } else if (ep >= 35) {
+    label = 'Epic';
+    card = 'ring-1 ring-offset-1 ring-purple-400/50 dark:ring-purple-500/50 ring-offset-white dark:ring-offset-slate-950';
+    badge = 'border-purple-300 dark:border-purple-600 bg-purple-50/80 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200';
+  } else if (ep >= 20) {
+    label = 'Rare';
+    card = 'ring-1 ring-offset-1 ring-blue-400/40 dark:ring-blue-500/40 ring-offset-white dark:ring-offset-slate-950';
+    badge = 'border-blue-300 dark:border-blue-600 bg-blue-50/80 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200';
+  } else if (ep >= 10) {
+    label = 'Uncommon';
+    card = 'ring-1 ring-offset-1 ring-emerald-400/40 dark:ring-emerald-500/40 ring-offset-white dark:ring-offset-slate-950';
+    badge = 'border-emerald-300 dark:border-emerald-600 bg-emerald-50/80 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200';
+  }
+  return { label, card, badge };
 }
 
 function QuickAction({

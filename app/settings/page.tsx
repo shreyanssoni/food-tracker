@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useNotifications } from '@/utils/notifications';
 import { useSession } from 'next-auth/react';
-import { getReliableTimeZone } from '@/utils/timezone';
+import { getReliableTimeZone, mapOffsetToIana } from '@/utils/timezone';
 
 type Units = 'metric' | 'us';
 type Theme = 'system' | 'light' | 'dark';
@@ -34,7 +34,7 @@ export default function SettingsPage() {
     } catch {}
   }, []);
 
-  // Load timezone from server preferences
+  // Load timezone from server preferences; if missing, default to device tz and persist
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -44,7 +44,28 @@ export default function SettingsPage() {
         const j = await res.json();
         if (cancelled) return;
         const tz = j?.profile?.timezone as string | undefined;
-        setTimezone(tz || getReliableTimeZone());
+        if (tz) {
+          setTimezone(tz);
+        } else {
+          const guessed = getReliableTimeZone();
+          setTimezone(guessed);
+          // Persist device timezone to server so it's not UTC by default in PWAs
+          try {
+            const isIana = /\//.test(guessed) || guessed === 'UTC';
+            let toSave = guessed;
+            if (!isIana) {
+              const offsetMin = new Date().getTimezoneOffset();
+              const totalEast = -offsetMin;
+              const mapped = mapOffsetToIana(totalEast);
+              toSave = mapped || 'UTC';
+            }
+            await fetch('/api/preferences', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ timezone: toSave }),
+            });
+          } catch {}
+        }
       } catch {
         setTimezone(getReliableTimeZone());
       } finally {
@@ -97,7 +118,7 @@ export default function SettingsPage() {
     setTzSaving(true);
     try {
       const isIana = /\//.test(timezone) || timezone === 'UTC';
-      const res = await fetch('/api/user/preferences', {
+      const res = await fetch('/api/preferences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ timezone: isIana ? timezone : 'UTC' }),

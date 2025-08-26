@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { cn } from "@/utils/cn";
 
 const items = [
@@ -15,6 +16,8 @@ const items = [
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const { status } = useSession();
+  if (status !== "authenticated") return null;
   return (
     <nav
       role="navigation"

@@ -106,18 +106,54 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold">Your Profile</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Manage your body metrics used to compute targets.</p>
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          {/* Avatar and user meta */}
+          <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden flex items-center justify-center text-gray-500 shrink-0">
+            {session?.user?.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={session.user.image} alt="avatar" className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-sm font-medium">
+                {(session?.user?.name || session?.user?.email || 'U')
+                  .toString()
+                  .trim()
+                  .charAt(0)
+                  .toUpperCase()}
+              </span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-lg font-semibold truncate">Your Profile</h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+              {session?.user?.name || session?.user?.email}
+            </p>
+          </div>
         </div>
+        {/* Desktop actions */}
         {!editing ? (
-          <button className="px-3 py-1.5 rounded-md bg-gray-900 text-white" onClick={() => setEditing(true)}>Edit</button>
+          <button
+            className="hidden sm:inline-flex px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-800 active:scale-[0.99] transition"
+            onClick={() => setEditing(true)}
+          >
+            Edit
+          </button>
         ) : (
-          <div className="flex gap-2">
-            <button className="px-3 py-1.5 rounded-md border" onClick={() => setEditing(false)}>Cancel</button>
-            <button className="px-3 py-1.5 rounded-md bg-emerald-600 text-white" onClick={onSave} disabled={loading}>{loading ? 'Saving…' : 'Save'}</button>
+          <div className="hidden sm:flex gap-2">
+            <button
+              className="px-3 py-2 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900"
+              onClick={() => setEditing(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="px-3 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
+              onClick={onSave}
+              disabled={loading}
+            >
+              {loading ? 'Saving…' : 'Save'}
+            </button>
           </div>
         )}
       </div>
@@ -131,7 +167,14 @@ export default function ProfilePage() {
           {!editing ? (
             <div className="mt-1 text-base font-medium dark:text-gray-100">{profile.height_cm ?? '—'} cm</div>
           ) : (
-            <input type="number" className="mt-1 input w-full" value={profile.height_cm ?? ''} onChange={(e)=>setProfile({...profile, height_cm: e.target.value ? Number(e.target.value) : null})} placeholder="cm" />
+            <input
+              type="number"
+              className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={profile.height_cm ?? ''}
+              onChange={(e)=>setProfile({...profile, height_cm: e.target.value ? Number(e.target.value) : null})}
+              placeholder="cm"
+              inputMode="decimal"
+            />
           )}
         </div>
 
@@ -141,7 +184,14 @@ export default function ProfilePage() {
           {!editing ? (
             <div className="mt-1 text-base font-medium dark:text-gray-100">{profile.weight_kg ?? '—'} kg</div>
           ) : (
-            <input type="number" className="mt-1 input w-full" value={profile.weight_kg ?? ''} onChange={(e)=>setProfile({...profile, weight_kg: e.target.value ? Number(e.target.value) : null})} placeholder="kg" />
+            <input
+              type="number"
+              className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={profile.weight_kg ?? ''}
+              onChange={(e)=>setProfile({...profile, weight_kg: e.target.value ? Number(e.target.value) : null})}
+              placeholder="kg"
+              inputMode="decimal"
+            />
           )}
         </div>
 
@@ -151,7 +201,14 @@ export default function ProfilePage() {
           {!editing ? (
             <div className="mt-1 text-base font-medium dark:text-gray-100">{profile.age ?? '—'}</div>
           ) : (
-            <input type="number" className="mt-1 input w-full" value={profile.age ?? ''} onChange={(e)=>setProfile({...profile, age: e.target.value ? Number(e.target.value) : null})} placeholder="years" />
+            <input
+              type="number"
+              className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={profile.age ?? ''}
+              onChange={(e)=>setProfile({...profile, age: e.target.value ? Number(e.target.value) : null})}
+              placeholder="years"
+              inputMode="numeric"
+            />
           )}
         </div>
 
@@ -161,7 +218,11 @@ export default function ProfilePage() {
           {!editing ? (
             <div className="mt-1 text-base font-medium dark:text-gray-100">{profile.gender ?? '—'}</div>
           ) : (
-            <select className="mt-1 input w-full" value={profile.gender ?? 'male'} onChange={(e)=>setProfile({...profile, gender: e.target.value as any})}>
+            <select
+              className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={profile.gender ?? 'male'}
+              onChange={(e)=>setProfile({...profile, gender: e.target.value as any})}
+            >
               <option value="male">Male</option>
               <option value="female">Female</option>
               <option value="other">Other</option>
@@ -175,7 +236,11 @@ export default function ProfilePage() {
           {!editing ? (
             <div className="mt-1 text-base font-medium dark:text-gray-100">{profile.activity_level}</div>
           ) : (
-            <select className="mt-1 input w-full" value={profile.activity_level ?? 'sedentary'} onChange={(e)=>setProfile({...profile, activity_level: e.target.value as Activity})}>
+            <select
+              className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={profile.activity_level ?? 'sedentary'}
+              onChange={(e)=>setProfile({...profile, activity_level: e.target.value as Activity})}
+            >
               <option value="sedentary">Sedentary</option>
               <option value="light">Light</option>
               <option value="moderate">Moderate</option>
@@ -191,7 +256,11 @@ export default function ProfilePage() {
           {!editing ? (
             <div className="mt-1 text-base font-medium dark:text-gray-100">{profile.goal}</div>
           ) : (
-            <select className="mt-1 input w-full" value={profile.goal ?? 'maintain'} onChange={(e)=>setProfile({...profile, goal: e.target.value as Goal})}>
+            <select
+              className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={profile.goal ?? 'maintain'}
+              onChange={(e)=>setProfile({...profile, goal: e.target.value as Goal})}
+            >
               <option value="maintain">Maintain</option>
               <option value="lose">Lose</option>
               <option value="gain">Gain</option>
@@ -206,7 +275,7 @@ export default function ProfilePage() {
             <div className="mt-1 text-base font-medium dark:text-gray-100">{profile.workout_level ?? '—'}</div>
           ) : (
             <select
-              className="mt-1 input w-full"
+              className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={profile.workout_level ?? 'beginner'}
               onChange={(e)=>setProfile({...profile, workout_level: e.target.value as any})}
             >
@@ -218,6 +287,27 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
+
+      {/* Mobile sticky action bar when editing */}
+      {editing && (
+        <div className="sm:hidden fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 supports-[backdrop-filter]:dark:bg-gray-950/70">
+          <div className="mx-auto max-w-3xl px-4 py-3 flex items-center justify-end gap-2">
+            <button
+              className="px-4 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950"
+              onClick={() => setEditing(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
+              onClick={onSave}
+              disabled={loading}
+            >
+              {loading ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

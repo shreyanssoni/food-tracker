@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import { getReliableTimeZone } from "@/utils/timezone";
+import { getReliableTimeZone, mapOffsetToIana } from "@/utils/timezone";
 
 // Minimal timezone selector shown only if user_preferences.timezone is missing
 export default function TimezoneSetup() {
@@ -29,10 +29,35 @@ export default function TimezoneSetup() {
         const j = await res.json().catch(() => ({}));
         const tz = j?.profile?.timezone as string | undefined;
         if (cancelled) return;
-        // Open only if preferences exist but timezone missing OR preferences row missing entirely
+        // If timezone is missing, auto-save detected device timezone to avoid defaulting to UTC in PWAs.
         if (!tz) {
-          setCurrentTz(guessed);
-          setOpen(true);
+          const detected = guessed;
+          setCurrentTz(detected);
+          try {
+            const isIana = /\//.test(detected) || detected === "UTC";
+            let toSave = detected;
+            if (!isIana) {
+              const offsetMin = new Date().getTimezoneOffset();
+              const totalEast = -offsetMin; // positive east of UTC
+              const mapped = mapOffsetToIana(totalEast);
+              toSave = mapped || "UTC";
+            }
+            const resp = await fetch("/api/preferences", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ timezone: toSave }),
+            });
+            if (!resp.ok) {
+              // Fallback: show modal to let user confirm manually
+              setOpen(true);
+            }
+          } catch {
+            // If auto-save fails for any reason, fall back to showing the modal
+            setOpen(true);
+          } finally {
+            setLoading(false);
+          }
+          return;
         }
       } catch {
         // no-op
