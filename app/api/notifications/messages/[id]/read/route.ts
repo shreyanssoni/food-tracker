@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { getCurrentUser } from '@/utils/auth';
 
 // POST /api/notifications/messages/[id]/read
@@ -10,7 +10,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     const id = params.id;
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { error } = await supabase
       .from('user_messages')
       .update({ read_at: new Date().toISOString() })
