@@ -256,7 +256,7 @@ export default function CollectiblesShopPage() {
       </div>
 
       {loading ? (
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="mt-4 px-1 sm:px-0 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
@@ -265,7 +265,7 @@ export default function CollectiblesShopPage() {
           ))}
         </div>
       ) : (
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="mt-4 px-1 sm:px-0 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
           {items.length === 0 && (
             <div className="col-span-full text-center text-sm text-gray-600 dark:text-gray-400">
               No items available yet. Progress your level or unlock requirements
@@ -377,17 +377,17 @@ export default function CollectiblesShopPage() {
             return (
               <div
                 key={i.id}
-                className={`group relative h-full rounded-2xl p-[1px] bg-gradient-to-r ${rarityClass} transition-all md:hover:scale-[1.01] md:hover:-translate-y-0.5 cursor-pointer`}
+                className={`group relative h-full rounded-2xl p-[1px] mx-1 sm:mx-0 bg-gradient-to-r ${rarityClass} transition-all md:hover:scale-[1.01] md:hover:-translate-y-0.5 cursor-pointer`}
                 onClick={() => onCardClick(i)}
               >
                 {/* Hover glow halo */}
                 <div className={`pointer-events-none absolute -inset-0.5 rounded-2xl opacity-0 md:group-hover:opacity-60 blur-xl transition-opacity bg-gradient-to-r ${rarityClass}`}></div>
                 {/* Card body */}
-                <div className="relative flex flex-col h-full rounded-2xl p-4 border border-white/60 dark:border-gray-800/70 bg-white/80 dark:bg-gray-950/60 shadow-sm md:group-hover:shadow-lg">
+                <div className="relative flex flex-col h-full rounded-2xl p-2.5 sm:p-3 md:p-4 border border-white/60 dark:border-gray-800/70 bg-white/80 dark:bg-gray-950/60 shadow-sm md:group-hover:shadow-lg">
                 {/* Header */}
                 <div className="min-w-0">
                   <div
-                    className="text-[15px] sm:text-base font-semibold leading-tight text-gray-900 dark:text-gray-100 whitespace-normal break-words max-h-[2.6rem] overflow-hidden"
+                    className="text-[13px] sm:text-[15px] md:text-base font-semibold leading-tight text-gray-900 dark:text-gray-100 whitespace-normal break-words max-h-[2.2rem] sm:max-h-[2.6rem] overflow-hidden"
                     title={c.name || "Collectible"}
                   >
                     {c.name || "Collectible"}
@@ -400,13 +400,13 @@ export default function CollectiblesShopPage() {
                   >
                     {c.rarity || "Common"}
                   </span>
-                  <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-gray-200/70 dark:border-gray-800/70 bg-white/80 dark:bg-gray-900/80 text-gray-800 dark:text-gray-200">
+                  <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full border border-gray-200/70 dark:border-gray-800/70 bg-white/80 dark:bg-gray-900/80 text-gray-800 dark:text-gray-200">
                     <Gem className="h-3.5 w-3.5" /> {i.price}
                   </span>
                 </div>
 
                 {/* Badge gate banner slot (fixed height for alignment) */}
-                <div className="mt-2 min-h-[38px]">
+                <div className="mt-2 min-h-[24px] sm:min-h-[38px]">
                   {!i.owned &&
                     !i.can_purchase &&
                     i.unavailable_reason === "badge_required" && (
@@ -419,7 +419,7 @@ export default function CollectiblesShopPage() {
                 </div>
 
                 {/* Image with rarity inner frame */}
-                <div className={`mt-1 h-32 sm:h-36 rounded-xl p-[1px] bg-gradient-to-r ${rarityClass} overflow-hidden`}>
+                <div className={`mt-1 h-24 sm:h-28 md:h-36 rounded-xl p-[1px] bg-gradient-to-r ${rarityClass} overflow-hidden`}>
                   <div className="h-full w-full rounded-[10px] border border-gray-200/60 dark:border-gray-800/60 grid place-items-center bg-gray-50 dark:bg-gray-900 overflow-hidden">
                   {/* Always render an image and fallback to default placeholder if missing or load fails */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -439,7 +439,7 @@ export default function CollectiblesShopPage() {
                   </div>
                 </div>
                 <div
-                  className="mt-3 flex items-center justify-between gap-2"
+                  className="mt-2 sm:mt-3 flex items-center justify-between gap-2"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {i.owned ? (
@@ -457,7 +457,7 @@ export default function CollectiblesShopPage() {
                     )
                   ) : (
                     <button
-                      className="text-[12px] px-3 py-1.5 rounded-full border border-transparent bg-gradient-to-r from-blue-600 to-emerald-500 text-white w-full sm:w-auto disabled:opacity-60 disabled:grayscale"
+                      className="text-[12px] sm:text-[12px] px-2.5 sm:px-3 py-1.5 sm:py-1.5 rounded-full border border-transparent bg-gradient-to-r from-blue-600 to-emerald-500 text-white w-full sm:w-auto disabled:opacity-60 disabled:grayscale"
                       onClick={() => purchase(i.id)}
                       disabled={busy === i.id || !i.can_purchase}
                     >
@@ -470,7 +470,7 @@ export default function CollectiblesShopPage() {
                   )}
                 </div>
                 {/* Description slot with fixed height for alignment */}
-                <div className="mt-2 min-h-[28px] text-xs text-gray-600 dark:text-gray-400">
+                <div className="mt-2 min-h-[20px] sm:min-h-[28px] text-xs text-gray-600 dark:text-gray-400">
                   {!i.owned && !i.can_purchase ? (
                     <>
                       {i.unavailable_reason === "badge_required" &&

@@ -10,6 +10,8 @@ import { track } from "@/utils/analytics";
 export default function DashboardPage() {
   const supabase = createBrowserClient();
   const { enabled: pushEnabled } = useNotifications();
+  // Minute tick to re-evaluate date-sensitive UI (e.g., after midnight)
+  const [clockTick, setClockTick] = useState(0);
   const [targets, setTargets] = useState<{
     calories: number;
     protein_g: number;
@@ -46,6 +48,7 @@ export default function DashboardPage() {
     longest: number;
     canRevive: boolean;
     reviveCost: number;
+    week?: Array<{ day: string; status: 'counted' | 'revived' | 'missed' | 'none' }>;
   } | null>(null);
   // Goals overview
   const [goals, setGoals] = useState<any[]>([]);
@@ -54,6 +57,8 @@ export default function DashboardPage() {
   const [tasksLoading, setTasksLoading] = useState(true);
   const [nextUp, setNextUp] = useState<null | { task: any; when: Date | null }>(null);
   const nudgeSentRef = useRef<string | null>(null);
+  // Server-calculated set of tasks due today
+  const [todayTaskIds, setTodayTaskIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetch("/api/preferences")
@@ -128,6 +133,33 @@ export default function DashboardPage() {
     };
     loadGamification();
   }, []);
+
+  useEffect(() => {
+    // update every 60s to naturally roll UI to a new day/time without manual refresh
+    const id = setInterval(() => setClockTick((t) => t + 1), 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    // also force a re-render at immediate mount to sync with current minute boundary
+    setClockTick((t) => t);
+  }, []);
+
+  // Fetch today's tasks from the server based on current instant
+  useEffect(() => {
+    (async () => {
+      try {
+        const nowIso = new Date().toISOString();
+        const res = await fetch(`/api/tasks/today?now=${encodeURIComponent(nowIso)}`, { cache: 'no-store' });
+        const j = await res.json().catch(() => ({}));
+        if (res.ok && Array.isArray(j.tasks)) {
+          setTodayTaskIds(new Set((j.tasks as any[]).map((x) => x.id)));
+        }
+      } catch {}
+    })();
+  }, [clockTick]);
+
+  // ---------- existing effects below ----------
 
   useEffect(() => {
     const load = async () => {
@@ -387,23 +419,51 @@ export default function DashboardPage() {
       const done = Number(t.week_count || 0);
       if (done >= t.week_quota) return false;
     }
-    const now = new Date();
-    const dow = now.getDay();
+    const nowTz = nowInTZ(s.timezone);
+    const todayStr = dateStrInTZ(s.timezone);
+    // If a date window exists (start_date[/end_date]), only show within that window
+    if (s.start_date) {
+      const start = String(s.start_date || "").slice(0, 10);
+      const end = String(s.end_date || s.start_date || "").slice(0, 10);
+      if (!(todayStr >= start && todayStr <= end)) return false;
+    }
+    // one-time tasks: only on the scheduled date (respect timezone); support optional end_date window
+    if (s.frequency === "once") {
+      // The window check above already filtered; enforce presence of start_date
+      return Boolean(s.start_date);
+    }
     if (s.frequency === "daily") return true;
     if (s.frequency === "weekly") {
+      const dow = nowTz.getDay();
       return Array.isArray(s.byweekday) ? s.byweekday.includes(dow) : false;
     }
-    // custom: include for now
-    return true;
+    // custom/other: default to not due unless explicitly windowed above
+    return false;
   };
 
   // Helpers to evaluate time-of-day based due-ness with timezone awareness
+  const normalizeTz = (tz?: string) => {
+    // Many older schedules may have 'UTC' persisted; for client-side "today" checks we prefer local time over UTC.
+    return tz && tz !== 'UTC' ? tz : undefined;
+  };
   const nowInTZ = (tz?: string) => {
     try {
-      return tz ? new Date(new Date().toLocaleString("en-US", { timeZone: tz })) : new Date();
+      const t = normalizeTz(tz);
+      return t ? new Date(new Date().toLocaleString("en-US", { timeZone: t })) : new Date();
     } catch {
       return new Date();
     }
+  };
+
+  // Format YYYY-MM-DD for a given timezone without converting to UTC
+  const dateStrInTZ = (tz?: string, d?: Date) => {
+    const fmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone: normalizeTz(tz),
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    return fmt.format(d || new Date()); // en-CA yields YYYY-MM-DD
   };
 
   const todayAtInTZ = (tz: string | undefined, atTime: string | null | undefined) => {
@@ -418,25 +478,28 @@ export default function DashboardPage() {
   const classifyToday = (task: any) => {
     const s = schedules[task.id];
     if (!s) return { dueNow: false, later: false, when: null as Date | null };
-    if (!isDueToday(task.id)) return { dueNow: false, later: false, when: null };
+    if (!todayTaskIds.has(task.id)) return { dueNow: false, later: false, when: null };
     const when = todayAtInTZ(s.timezone, s.at_time);
     if (!when) {
       // No specific time, treat as due now
       return { dueNow: true, later: false, when: null };
     }
     const n = nowInTZ(s.timezone);
-    return { dueNow: n >= when, later: n < when, when };
+    // If time has already passed, mark as expired for today (not due now or later)
+    if (n.getTime() > when.getTime()) return { dueNow: false, later: false, when };
+    return { dueNow: false, later: true, when };
   };
 
   // Compute Next Up whenever tasks/schedules change
   useEffect(() => {
-    const dueToday = tasks.filter((t) => isDueToday(t.id) && !t.completedToday);
-    const withMeta = dueToday.map((t) => ({ t, meta: classifyToday(t) }));
+    const dueToday = tasks.filter((t) => todayTaskIds.has(t.id) && !t.completedToday);
+    const withMeta = dueToday.map((t) => ({ t, meta: classifyToday(t) }))
+      .filter((x) => x.meta.dueNow || x.meta.later);
     const later = withMeta.filter((x) => x.meta.later);
     later.sort((a: any, b: any) => (a.meta.when?.getTime?.() ?? 0) - (b.meta.when?.getTime?.() ?? 0));
     if (later.length > 0) setNextUp({ task: later[0].t, when: later[0].meta.when || null });
     else setNextUp(null);
-  }, [tasks, schedules]);
+  }, [tasks, schedules, clockTick, todayTaskIds]);
 
   // Notifications timing hook: send a gentle nudge if user opted in and next task is upcoming
   useEffect(() => {
@@ -559,8 +622,9 @@ export default function DashboardPage() {
             <div className="skeleton-card h-20 rounded-2xl hidden md:block" />
           </div>
         ) : (() => {
-          const dueToday = tasks.filter((t) => isDueToday(t.id) && !t.completedToday);
-          const withMeta = dueToday.map((t) => ({ t, meta: classifyToday(t) }));
+          const dueToday = tasks.filter((t) => todayTaskIds.has(t.id) && !t.completedToday);
+          const withMeta = dueToday.map((t) => ({ t, meta: classifyToday(t) }))
+            .filter((x) => x.meta.dueNow || x.meta.later);
           const dueNow = withMeta.filter((x) => x.meta.dueNow);
           const later = withMeta.filter((x) => x.meta.later);
           // Sort: dueNow without time first, then by time; later strictly by time
@@ -807,16 +871,29 @@ export default function DashboardPage() {
                     <div className="text-[11px] text-slate-500">Longest {streakMax?.longest ?? 0}</div>
                   </div>
                   <div className="flex gap-1.5">
-                    {Array.from({ length: 7 }).map((_, i) => {
-                      const filled = (streakMax?.current ?? 0) % 7 > i || (streakMax?.current ?? 0) >= 7 && i < 7;
-                      return (
-                        <span
-                          key={i}
-                          className={`h-2.5 w-8 rounded-full ${filled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
-                          aria-hidden
-                        />
-                      );
-                    })}
+                    {Array.isArray(lifeStreak?.week) && (lifeStreak!.week as any[]).length === 7 ? (
+                      (lifeStreak!.week as Array<{ day: string; status: 'counted'|'revived'|'missed'|'none' }>).map((d, i) => {
+                        const cls = d.status === 'counted'
+                          ? 'bg-amber-400'
+                          : d.status === 'revived'
+                            ? 'bg-blue-500'
+                            : d.status === 'missed'
+                              ? 'bg-red-500'
+                              : 'bg-slate-300 dark:bg-slate-700';
+                        return <span key={i} className={`h-2.5 w-8 rounded-full ${cls}`} aria-hidden />;
+                      })
+                    ) : (
+                      Array.from({ length: 7 }).map((_, i) => {
+                        const filled = (streakMax?.current ?? 0) % 7 > i || (streakMax?.current ?? 0) >= 7 && i < 7;
+                        return (
+                          <span
+                            key={i}
+                            className={`h-2.5 w-8 rounded-full ${filled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                            aria-hidden
+                          />
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               </div>

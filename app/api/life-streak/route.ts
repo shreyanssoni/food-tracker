@@ -138,6 +138,63 @@ export async function GET() {
     // Compute current/longest streaks
     const { current, longest } = computeCurrentAndLongest(days as any, todayKey);
 
+    // Build current week statuses (Sun..Sat) with colors controlled by client
+    const startOfWeek = (d: Date) => {
+      const x = new Date(d);
+      const day = x.getUTCDay(); // 0..6 Sun..Sat
+      x.setUTCDate(x.getUTCDate() - day);
+      x.setUTCHours(0,0,0,0);
+      return x;
+    };
+    const sow = startOfWeek(now);
+    // Fetch user creation date to avoid penalizing pre-account days
+    const { data: userRow } = await supabase
+      .from('app_users')
+      .select('created_at')
+      .eq('id', user.id)
+      .maybeSingle();
+    const createdAtUtc = userRow?.created_at ? new Date(userRow.created_at) : new Date('1970-01-01T00:00:00Z');
+    const createdKey = isoDay(createdAtUtc);
+    const week: Array<{ day: string; status: 'counted'|'revived'|'missed'|'none' }> = [];
+    const daysByKey: Record<string, { counted: boolean; revived: boolean }> = {};
+    for (const d of days as any[]) {
+      daysByKey[d.day] = { counted: !!d.counted, revived: !!d.revived };
+    }
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(sow);
+      d.setUTCDate(sow.getUTCDate() + i);
+      const key = isoDay(d);
+      const row = daysByKey[key];
+      // Do not mark future days as missed; also ignore days before account creation
+      const todayOnly = isoDay(now);
+      if (key > todayOnly || key < createdKey) {
+        week.push({ day: key, status: 'none' });
+        continue;
+      }
+      if (row?.revived) {
+        week.push({ day: key, status: 'revived' });
+        continue;
+      }
+      if (row?.counted) {
+        week.push({ day: key, status: 'counted' });
+        continue;
+      }
+      // Determine eligibility to label as missed or none
+      // Note: we use server time in UTC for eligibility windows, consistent with other checks in this route
+      let status: 'missed'|'none' = 'none';
+      try {
+        const { eligible, allDone } = await allTasksCompletedForDate(supabase, user.id, d);
+        // Only past days (<= yesterday) can be missed
+        const isPast = key < todayOnly;
+        if (isPast && eligible && !allDone) status = 'missed';
+        // If eligible && allDone but not counted, conservatively call it 'missed' (shouldn't happen normally)
+        if (isPast && eligible && allDone && !row) status = 'missed';
+      } catch {
+        status = 'none';
+      }
+      week.push({ day: key, status });
+    }
+
     // Revive eligibility: yesterday missed (eligible day) and not counted nor revived
     const yKey = isoDay(yesterday);
     const yRow = (days as any).find((d: any) => d.day === yKey);
@@ -147,7 +204,7 @@ export async function GET() {
       if (eligible && !allDone) canRevive = true;
     }
 
-    return NextResponse.json({ lifeStreak: { current, longest, canRevive, reviveCost: 10 } });
+    return NextResponse.json({ lifeStreak: { current, longest, canRevive, reviveCost: 10, week } });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
   }

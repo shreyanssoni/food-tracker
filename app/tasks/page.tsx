@@ -27,12 +27,17 @@ interface Schedule {
   at_time?: string | null;
   start_date?: string | null;
   end_date?: string | null;
+  timezone?: string | null;
 }
 
 export default function TasksPage() {
   const supabase = createBrowserClient();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [schedules, setSchedules] = useState<Record<string, Schedule>>({});
+  // Minute tick to naturally re-evaluate date-sensitive UI like "Today" after midnight
+  const [clockTick, setClockTick] = useState(0);
+  // Today's tasks from server API (ids only)
+  const [todayTaskIds, setTodayTaskIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -92,6 +97,49 @@ export default function TasksPage() {
       mounted = false;
     };
   }, []);
+
+  // Keep UI fresh across midnight boundaries
+  useEffect(() => {
+    const id = setInterval(() => setClockTick((t) => t + 1), 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Fetch today's tasks from server using provided current instant
+  useEffect(() => {
+    (async () => {
+      try {
+        const nowIso = new Date().toISOString();
+        const res = await fetch(`/api/tasks/today?now=${encodeURIComponent(nowIso)}`, { cache: 'no-store' });
+        const j = await res.json().catch(() => ({}));
+        if (res.ok && Array.isArray(j.tasks)) {
+          setTodayTaskIds(new Set((j.tasks as any[]).map((x) => x.id)));
+        }
+      } catch {}
+    })();
+  }, [clockTick]);
+
+  // -------- Timezone helpers (mirror dashboard) --------
+  const normalizeTz = (tz?: string | null) => {
+    // If tz is 'UTC' or missing, prefer local time for client-side daily checks
+    return tz && tz !== 'UTC' ? tz : undefined;
+  };
+  const nowInTZ = (tz?: string | null) => {
+    try {
+      const t = normalizeTz(tz || undefined);
+      return t ? new Date(new Date().toLocaleString('en-US', { timeZone: t })) : new Date();
+    } catch {
+      return new Date();
+    }
+  };
+  const dateStrInTZ = (tz?: string | null, d?: Date) => {
+    const fmt = new Intl.DateTimeFormat('en-CA', {
+      timeZone: normalizeTz(tz || undefined),
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    return fmt.format(d || new Date()); // YYYY-MM-DD
+  };
 
   // Load goals for streaks selector and default selection
   useEffect(() => {
@@ -202,7 +250,7 @@ export default function TasksPage() {
     const t = tasks.find((x) => x.id === id)!;
     setEdits((m) => ({ ...m, [id]: { title: t.title, description: t.description || '', ep_value: t.ep_value, min_level: t.min_level, active: t.active } }));
     const s = schedules[id];
-    if (s) setSchedEdits((m) => ({ ...m, [id]: { ...s } }));
+    if (s) setSchedEdits((m) => ({ ...m, [id]: { ...s, timezone: (s.timezone ?? undefined) as any } }));
   }
 
   function cancelEdit(id: string) {
@@ -320,7 +368,6 @@ export default function TasksPage() {
     });
   }, [tasks, schedules, q, statusFilter, freqFilter]);
 
-  const today = new Date().getDay();
   const isDueToday = (t: Task) => {
     const s = schedules[t.id];
     if (!s) return false;
@@ -329,14 +376,38 @@ export default function TasksPage() {
       const done = Number(t.week_count || 0);
       if (done >= t.week_quota) return false;
     }
+    const todayStr = dateStrInTZ(s.timezone);
+    // If a date window exists, only show within that window (prevents lingering past end date)
+    if (s.start_date) {
+      const start = String(s.start_date || '').slice(0, 10);
+      const end = String(s.end_date || s.start_date || '').slice(0, 10);
+      if (!(todayStr >= start && todayStr <= end)) return false;
+    }
+    if (s.frequency === 'once') {
+      // window check above suffices; ensure presence of start_date
+      return Boolean(s.start_date);
+    }
     if (s.frequency === 'daily') return true;
-    if (s.frequency === 'weekly') return Array.isArray(s.byweekday) && s.byweekday.includes(today);
-    if (s.frequency === 'once') return Boolean(s.start_date) && s.start_date === new Date().toISOString().slice(0,10);
-    return false; // custom (not displayed as due today by default)
+    if (s.frequency === 'weekly') {
+      const dow = nowInTZ(s.timezone).getDay();
+      return Array.isArray(s.byweekday) && s.byweekday.includes(dow);
+    }
+    return false; // custom default not due unless windowed
   };
 
   const grouped = useMemo(() => {
-    const todayList = filtered.filter((t) => t.active && isDueToday(t));
+    const isExpiredForToday = (t: Task) => {
+      const s = schedules[t.id];
+      if (!s || !s.at_time) return false;
+      try {
+        const n = nowInTZ(s.timezone);
+        const [hh, mm = '0', ss = '0'] = String(s.at_time).split(':');
+        const due = new Date(n.getFullYear(), n.getMonth(), n.getDate(), Number(hh)||0, Number(mm)||0, Number(ss)||0, 0);
+        return n.getTime() > due.getTime();
+      } catch { return false; }
+    };
+
+    const todayList = filtered.filter((t) => t.active && todayTaskIds.has(t.id) && !isExpiredForToday(t));
     // Consider tasks overdue (>1 day since last completion) as inactive for display, but only for daily schedules
     const isOverdue = (t: Task) => {
       if (!t.active) return false; // already inactive handled below
@@ -348,10 +419,10 @@ export default function TasksPage() {
       const diffDays = Math.floor((today.getTime() - last.getTime()) / (1000*60*60*24));
       return diffDays > 1;
     };
-    const inactiveList = filtered.filter((t) => !t.active || isOverdue(t));
-    const activeList = filtered.filter((t) => t.active && !isDueToday(t) && !isOverdue(t));
+    const inactiveList = filtered.filter((t) => !t.active || isOverdue(t) || isExpiredForToday(t));
+    const activeList = filtered.filter((t) => t.active && !todayTaskIds.has(t.id) && !isOverdue(t) && !isExpiredForToday(t));
     return { todayList, activeList, inactiveList };
-  }, [filtered]);
+  }, [filtered, schedules, clockTick, todayTaskIds]);
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -773,30 +844,56 @@ export default function TasksPage() {
                           <CheckCircle2 className={`w-5 h-5 ${t.completedToday ? 'text-green-500' : 'text-gray-300 dark:text-gray-700'}`} />
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium text-[15px] sm:text-base flex items-center gap-2">
-                            {t.title}
-                            {t.goal?.title && (
-                              <span className="text-[10px] uppercase tracking-wide bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">Goal: {t.goal.title}</span>
-                            )}
+                          {/* Title row with EP pill on the right */}
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-[15px] sm:text-base flex items-center gap-2">
+                                <span className="truncate">{t.title}</span>
+                                {t.goal?.title && (
+                                  <span className="text-[10px] uppercase tracking-wide bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800 whitespace-nowrap">Goal: {t.goal.title}</span>
+                                )}
+                                {!t.active && <span className="text-[10px] uppercase tracking-wide bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded whitespace-nowrap">inactive</span>}
+                              </div>
+                              {t.description && (
+                                <div className="text-[13px] sm:text-sm text-gray-600 dark:text-gray-400 mt-0.5 overflow-hidden" style={{display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
+                                  {t.description}
+                                </div>
+                              )}
+                            </div>
+                            <span className="ml-2 inline-flex items-center gap-1 text-blue-700 dark:text-blue-300 text-[11px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 shrink-0">+{t.ep_value} EP</span>
                           </div>
-                          {t.description && <div className="text-[13px] sm:text-sm text-gray-600 dark:text-gray-400 mt-0.5">{t.description}</div>}
-                          <div className="text-[12px] sm:text-xs text-gray-500 dark:text-gray-500 mt-1 flex items-center gap-3">
+                          <div className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-500 mt-2 flex items-center gap-1.5 sm:gap-2 flex-wrap">
                             {s ? (
-                              <span className="inline-flex items-center gap-1">
+                              <span className="inline-flex items-center gap-1 flex-wrap">
                                 {s.frequency === 'daily' && <Sun className="w-3.5 h-3.5"/>}
                                 {s.frequency === 'weekly' && <CalendarDays className="w-3.5 h-3.5"/>}
                                 {s.frequency === 'custom' && <Clock className="w-3.5 h-3.5"/>}
-                                <span>
+                                {s.frequency === 'once' && <CalendarDays className="w-3.5 h-3.5"/>}
+                                <span className="px-1.5 py-0.5 sm:px-2 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">
                                   {s.frequency === 'daily' && 'Daily'}
                                   {s.frequency === 'weekly' && 'Weekly'}
                                   {s.frequency === 'custom' && 'Custom'}
-                                  {s.at_time ? ` • ${s.at_time}` : ''}
+                                  {s.frequency === 'once' && 'One time'}
                                 </span>
+                                {s.frequency === 'weekly' && Array.isArray(s.byweekday) && s.byweekday.length ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {s.byweekday?.map((d) => (
+                                      <span key={d} className="px-1.5 py-0.5 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-[10px] sm:text-[11px]">
+                                        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d] ?? d}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : null}
+                                {s.at_time ? (
+                                  <span className="px-1.5 py-0.5 sm:px-2 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">{String(s.at_time).slice(0,5)}</span>
+                                ) : null}
+                                {s.frequency === 'once' && s.start_date ? (
+                                  <span className="px-1.5 py-0.5 sm:px-2 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">{s.start_date}</span>
+                                ) : null}
                               </span>
                             ) : (
                               <span>No schedule</span>
                             )}
-                            <span className="ml-auto inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 font-semibold">+{t.ep_value} EP</span>
                           </div>
                         </div>
                         <div className="shrink-0 flex flex-col sm:items-end gap-2 mt-2 sm:mt-0">
