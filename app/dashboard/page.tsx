@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useNotifications } from "@/utils/notifications";
 import { track } from "@/utils/analytics";
 import AvatarPanel from "../../components/AvatarPanel";
+import { useSession } from "next-auth/react";
 
 export default function DashboardPage() {
   const supabase = createBrowserClient();
@@ -68,6 +69,8 @@ export default function DashboardPage() {
   const nudgeSentRef = useRef<string | null>(null);
   // Server-calculated set of tasks due today
   const [todayTaskIds, setTodayTaskIds] = useState<Set<string>>(new Set());
+  const { data: session } = useSession();
+
 
   useEffect(() => {
     // Ensure user has an avatar; if unauthorized, redirect to sign-in
@@ -200,11 +203,19 @@ export default function DashboardPage() {
       start.setHours(0, 0, 0, 0);
       const end = new Date();
       end.setHours(23, 59, 59, 999);
+      // const { data: userRes, error: userErr } = await supabase.auth.getUser();
+      // const userId = userRes?.user?.id;
+      // if (userErr || !userId) {
+      //   // Not signed in; redirect to sign-in
+      //   window.location.href = "/auth/signin";
+      //   return;
+      // }
       const { data } = await supabase
         .from("food_logs")
         .select("calories,protein_g,carbs_g,fat_g")
         .gte("eaten_at", start.toISOString())
-        .lte("eaten_at", end.toISOString());
+        .lte("eaten_at", end.toISOString())
+        .eq("user_id", session?.user?.id);
       if (data) {
         const totals = data.reduce(
           (acc: any, l: any) => {
