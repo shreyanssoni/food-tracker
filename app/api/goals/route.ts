@@ -329,6 +329,23 @@ export async function DELETE(req: Request) {
       // Optional: you could check if some tasks failed to delete; we won't hard-fail here
     }
 
+    const {data: collectibles, error: cErr} = await supabase
+      .from('goal_collectibles')
+      .select('collectible_id')
+      .eq('goal_id', id);
+    if (cErr) throw cErr;
+    const collectibleIds = (collectibles || []).map((r: any) => r.collectible_id).filter(Boolean);
+    if (collectibleIds.length > 0) {
+      const { data: deletedCollectibles, error: delCollectiblesErr } = await supabase
+        .from('collectibles')
+        .delete()
+        .in('id', collectibleIds)
+        .eq('user_id', user.id)
+        .select('id');
+      if (delCollectiblesErr) throw delCollectiblesErr;
+      // Optional: you could check if some collectibles failed to delete; we won't hard-fail here
+    }
+
     // 2) Delete the goal (will cascade goal_task_templates, goal_collectibles, etc.)
     const { data: deletedGoals, error: dErr } = await supabase
       .from('goals')
