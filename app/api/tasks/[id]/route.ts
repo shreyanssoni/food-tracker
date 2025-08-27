@@ -13,7 +13,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const updates: any = { updated_at: new Date().toISOString() };
     if (typeof title === 'string') updates.title = title;
     if (typeof description === 'string') updates.description = description;
-    if (typeof ep_value === 'number') updates.ep_value = ep_value;
+    if (typeof ep_value === 'number') {
+      if (!Number.isFinite(ep_value) || ep_value < 0) {
+        return NextResponse.json({ error: 'EP value must be a non-negative number' }, { status: 400 });
+      }
+      if (ep_value > 100) {
+        return NextResponse.json({ error: 'EP value cannot exceed 100' }, { status: 400 });
+      }
+      updates.ep_value = ep_value;
+    }
     if (typeof active === 'boolean') updates.active = active;
 
     // Only allow updating user's own tasks

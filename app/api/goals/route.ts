@@ -137,9 +137,9 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
-      if (t.ep_value > 200) {
+      if (t.ep_value > 100) {
         return NextResponse.json(
-          { error: "EP value cannot exceed 200" },
+          { error: "EP value cannot exceed 100" },
           { status: 400 }
         );
       }
@@ -162,7 +162,7 @@ export async function POST(req: Request) {
     for (const t of templates) {
       if ((t.frequency || "weekly") === "weekly") {
         weeklyEpFromTemplates +=
-          Math.min(200, t.ep_value ?? 10) *
+          Math.min(100, t.ep_value ?? 10) *
           Math.min(MAX_TIMES_PER_PERIOD, t.times_per_period ?? 1);
       }
     }
@@ -218,7 +218,7 @@ export async function POST(req: Request) {
       goal_id: goal.id,
       title: t.title,
       description: t.description || null,
-      ep_value: Math.min(200, t.ep_value ?? 10),
+      ep_value: Math.min(100, t.ep_value ?? 10),
       frequency: t.frequency || "weekly",
       times_per_period: Math.min(MAX_TIMES_PER_PERIOD, t.times_per_period ?? 1),
       byweekday: t.byweekday || null,

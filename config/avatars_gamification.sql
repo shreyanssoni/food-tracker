@@ -70,14 +70,7 @@ create or replace function public.stage_for(level int)
 returns text
 language sql
 as $$
-  select case
-    when level >= 30 then 'stage6'
-    when level >= 20 then 'stage5'
-    when level >= 15 then 'stage4'
-    when level >= 10 then 'stage3'
-    when level >= 5 then 'stage2'
-    else 'stage1'
-  end;
+  select 'stage' || level::text;
 $$;
 
 create or replace function public.sync_avatar_stage_from_progress()

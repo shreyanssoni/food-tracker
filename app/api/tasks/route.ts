@@ -147,6 +147,13 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { title, description, ep_value = 10, schedule } = body || {};
     if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 });
+    // EP validation
+    if (typeof ep_value !== 'number' || !Number.isFinite(ep_value) || ep_value < 0) {
+      return NextResponse.json({ error: 'EP value must be a non-negative number' }, { status: 400 });
+    }
+    if (ep_value > 100) {
+      return NextResponse.json({ error: 'EP value cannot exceed 100' }, { status: 400 });
+    }
 
     const supabase = createClient();
     const { data: inserted, error } = await supabase

@@ -5,14 +5,6 @@ import { requireUser } from '@/utils/auth';
 function requiredEpFor(level: number) {
   return Math.round(100 * Math.pow(1.5, Math.max(0, level - 1)));
 }
-function stageFor(level: number) {
-  if (level >= 30) return 'stage6';
-  if (level >= 20) return 'stage5';
-  if (level >= 15) return 'stage4';
-  if (level >= 10) return 'stage3';
-  if (level >= 5) return 'stage2';
-  return 'stage1';
-}
 
 const rarityWeights = { common: 70, rare: 22, epic: 7, legendary: 1 } as const;
 function pickByWeight<T extends { rarity?: keyof typeof rarityWeights }>(items: T[]): T | null {
@@ -135,8 +127,8 @@ export async function POST(req: Request) {
       .eq('user_id', user.id);
     if (upProgErr) throw upProgErr;
 
-    // Sync avatar stage based on level
-    const appearance_stage = stageFor(level);
+    // Sync avatar stage based on exact level
+    const appearance_stage = `stage${level}`;
     await supabase.from('avatars').update({ appearance_stage }).eq('user_id', user.id);
 
     return NextResponse.json({ progress: { level, ep_in_level, total_ep }, awarded });

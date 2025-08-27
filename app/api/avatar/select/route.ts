@@ -14,14 +14,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'appearance_stage required' }, { status: 400 });
     }
     // Option B: appearance_stage is actually the storage path like 'stage1/knight_01.png'
-    // Extract appearance_key = 'knight_01'
+    // Extract appearance_key = 'knight_01' and ext; stage will be derived from user level.
     let appearance_key = '';
-    let appearance_stage = 'stage1';
     let appearance_ext = 'png';
     try {
       const parts = appearance_stage_input.split('/');
-      // stage folder is first segment (e.g., 'stage1')
-      if (parts[0]) appearance_stage = parts[0];
       const filename = parts[parts.length - 1] || '';
       if (filename.includes('.')) {
         appearance_key = filename.slice(0, filename.lastIndexOf('.'));
@@ -33,6 +30,18 @@ export async function POST(req: Request) {
     if (!appearance_key) {
       return NextResponse.json({ error: 'Invalid avatar asset path' }, { status: 400 });
     }
+    // Fetch current user level from user_progress (fallback to level 1)
+    const { data: progressRow, error: progressErr } = await supabase
+      .from('user_progress')
+      .select('level')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (progressErr) throw progressErr;
+
+    const userLevel = progressRow?.level ?? 1;
+
+    // Derive appearance_stage exactly from level (e.g., level 12 -> stage12)
+    const appearance_stage = `stage${userLevel}`;
     // Ensure row exists and set initial fields if missing
     const { data: existing, error: getErr } = await supabase
       .from('avatars')
@@ -51,7 +60,7 @@ export async function POST(req: Request) {
     } else {
       const { error: updErr } = await supabase
         .from('avatars')
-        .update({ appearance_stage, appearance_key, appearance_ext })
+        .update({ appearance_stage, appearance_key, appearance_ext, updated_at: new Date().toISOString() })
         .eq('user_id', user.id);
       if (updErr) throw updErr;
     }

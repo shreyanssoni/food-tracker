@@ -124,16 +124,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       .eq('user_id', user.id);
     if (upErr) throw upErr;
 
-    // Sync avatar stage based on level (single source of truth)
-    const stageFor = (level: number) => {
-      if (level >= 30) return 'stage6';
-      if (level >= 20) return 'stage5';
-      if (level >= 15) return 'stage4';
-      if (level >= 10) return 'stage3';
-      if (level >= 5) return 'stage2';
-      return 'stage1';
-    };
-    const appearance_stage = stageFor(curLevel);
+    // Sync avatar stage based on exact level (single source of truth)
+    const appearance_stage = `stage${curLevel}`;
     await admin.from('avatars').update({ appearance_stage }).eq('user_id', user.id);
 
     // Ensure historical levels are marked as claimed (no diamonds granted)

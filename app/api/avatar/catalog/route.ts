@@ -6,13 +6,20 @@ import { requireUser } from "@/utils/auth";
 // Option B layout: avatars/stage1/{appearance_key}.ext only for onboarding.
 export async function GET() {
   try {
-    await requireUser(); // keep gating by auth, but use admin client to bypass RLS for listing
+    const user = await requireUser(); // gate by auth
     const supabase = createAdminClient();
 
     const exts = ["png", "jpg", "jpeg", "webp", "gif", "svg"];
 
-    // Only list files under the stage1/ folder (Option B)
-    const path = "stage1";
+    // Determine user's exact stage folder from their current level
+    const { data: progressRow, error: progressErr } = await supabase
+      .from('user_progress')
+      .select('level')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (progressErr) throw progressErr;
+    const lvl = progressRow?.level ?? 1;
+    const path = `stage${lvl}`;
     let offset = 0;
     const pageSize = 100;
     const files: any[] = [];
