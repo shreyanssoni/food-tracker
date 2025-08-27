@@ -1,21 +1,25 @@
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GEMINI_URL =
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 // Simple in-memory circuit breaker for Gemini 429s
 let geminiFailCount = 0;
 let geminiSkipUntil = 0; // epoch ms
 
 function shouldSkipGemini(): boolean {
-  if (process.env.AI_PROVIDER?.toLowerCase() === 'openrouter') return true;
-  if (process.env.AI_PROVIDER?.toLowerCase() === 'gemini') return false;
+  if (process.env.AI_PROVIDER?.toLowerCase() === "openrouter") return true;
+  if (process.env.AI_PROVIDER?.toLowerCase() === "gemini") return false;
   return Date.now() < geminiSkipUntil;
 }
 
 function noteGemini429() {
   geminiFailCount = Math.min(geminiFailCount + 1, 5);
   const baseMinutes = 15;
-  const backoffMinutes = Math.min(baseMinutes * Math.pow(2, geminiFailCount - 1), 60);
+  const backoffMinutes = Math.min(
+    baseMinutes * Math.pow(2, geminiFailCount - 1),
+    60
+  );
   geminiSkipUntil = Date.now() + backoffMinutes * 60_000;
 }
 
@@ -30,7 +34,7 @@ const orModelStates: Record<string, ModelState> = {};
 
 function parseResetFromHeaders(headers: Headers): number | null {
   // Try OpenRouter's X-RateLimit-Reset which may be a unix ms or seconds
-  const reset = headers.get('X-RateLimit-Reset');
+  const reset = headers.get("X-RateLimit-Reset");
   if (!reset) return null;
   const n = Number(reset);
   if (!Number.isFinite(n)) return null;
@@ -45,56 +49,69 @@ function shouldSkipModel(model: string): boolean {
 
 function noteModel429(model: string, headers: Headers) {
   const resetMs = parseResetFromHeaders(headers);
-  const backoffMs = resetMs && resetMs > Date.now() ? resetMs - Date.now() : 15 * 60_000; // 15m fallback
+  const backoffMs =
+    resetMs && resetMs > Date.now() ? resetMs - Date.now() : 15 * 60_000; // 15m fallback
   orModelStates[model] = { skipUntil: Date.now() + backoffMs };
 }
 
 export async function geminiText(prompt: string) {
-  const providerPref = (process.env.AI_PROVIDER || 'auto').toLowerCase();
+  const providerPref = (process.env.AI_PROVIDER || "auto").toLowerCase();
   // Debug mode: avoid external calls; return empty to trigger local fallbacks in callers
-  if (String(process.env.AI_DEBUG || '').toLowerCase() === 'true') {
-    return '';
+  if (String(process.env.AI_DEBUG || "").toLowerCase() === "true") {
+    return "";
   }
 
   // If provider is openrouter (explicit), try OpenRouter first
   // Default 'auto' also prefers OpenRouter first per product choice
-  if ((providerPref === 'openrouter' || providerPref === 'auto') && process.env.OPENROUTER_API_KEY) {
+  if (
+    (providerPref === "openrouter" || providerPref === "auto") &&
+    process.env.OPENROUTER_API_KEY
+  ) {
     // Build model list: env list > single model > sensible defaults
-    const envList = (process.env.OPENROUTER_MODELS || '')
-      .split(',')
+    const envList = (process.env.OPENROUTER_MODELS || "")
+      .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
     const single = process.env.OPENROUTER_MODEL?.trim();
     // Keep defaults conservative; recommend free models via .env.example comments
     const defaultModels = [
-      'meta-llama/llama-3.1-8b-instruct:free',
-      'mistralai/mistral-7b-instruct:free',
+      "meta-llama/llama-3.1-8b-instruct:free",
+      "mistralai/mistral-7b-instruct:free",
     ];
-    const models = envList.length ? envList : (single ? [single] : defaultModels);
+    const models = envList.length ? envList : single ? [single] : defaultModels;
 
     for (const model of models) {
       if (shouldSkipModel(model)) continue;
       try {
         const res = await fetch(OPENROUTER_URL, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-            'HTTP-Referer': process.env.OPENROUTER_REFERRER || 'http://localhost',
-            'X-Title': process.env.OPENROUTER_APP_NAME || 'food-tracker',
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            "HTTP-Referer":
+              process.env.OPENROUTER_REFERRER || "http://localhost",
+            "X-Title": process.env.OPENROUTER_APP_NAME || "food-tracker",
           },
           body: JSON.stringify({
             model,
             messages: [
-              { role: 'system', content: 'You are an empathetic, concise nutrition coach.' },
-              { role: 'user', content: prompt },
+              {
+                role: "system",
+                content: "You are an empathetic, concise nutrition coach.",
+              },
+              { role: "user", content: prompt },
             ],
             temperature: 0.7,
           }),
         });
         if (!res.ok) {
-          const body = await res.text().catch(() => '');
-          console.error('OpenRouter error', model, res.status, body?.slice(0, 500));
+          const body = await res.text().catch(() => "");
+          console.error(
+            "OpenRouter error",
+            model,
+            res.status,
+            body?.slice(0, 500)
+          );
           if (res.status === 429) {
             noteModel429(model, res.headers);
             // try next model
@@ -104,11 +121,11 @@ export async function geminiText(prompt: string) {
           continue;
         }
         const json = await res.json();
-        const text = json.choices?.[0]?.message?.content || '';
+        const text = json.choices?.[0]?.message?.content || "";
         if (text) return text as string;
         // empty text -> try next
       } catch (e) {
-        console.error('OpenRouter call failed', model, e);
+        console.error("OpenRouter call failed", model, e);
         // try next model
       }
     }
@@ -116,16 +133,23 @@ export async function geminiText(prompt: string) {
   }
 
   // If provider is gemini (explicit), try Gemini now; or as secondary fallback after OpenRouter
-  if ((providerPref === 'gemini' || providerPref === 'auto') && process.env.GEMINI_API_KEY && !shouldSkipGemini()) {
+  if (
+    (providerPref === "gemini" || providerPref === "auto") &&
+    process.env.GEMINI_API_KEY &&
+    !shouldSkipGemini()
+  ) {
     try {
-      const res = await fetch(`${GEMINI_URL}?key=${process.env.GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-      });
+      const res = await fetch(
+        `${GEMINI_URL}?key=${process.env.GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        }
+      );
       if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        console.error('Gemini error', res.status, body?.slice(0, 500));
+        const body = await res.text().catch(() => "");
+        console.error("Gemini error", res.status, body?.slice(0, 500));
         if (res.status === 429) {
           noteGemini429();
         } else {
@@ -133,7 +157,7 @@ export async function geminiText(prompt: string) {
         }
       } else {
         const json = await res.json();
-        const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const text = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
         if (text) {
           noteGeminiSuccess();
           return text as string;
@@ -145,73 +169,169 @@ export async function geminiText(prompt: string) {
   }
 
   // Groq as tertiary fallback or explicit provider
-  if ((providerPref === 'groq' || providerPref === 'auto') && process.env.GROQ_API_KEY) {
-    const groq = await groqText(prompt).catch(() => '');
+  if (
+    (providerPref === "groq" || providerPref === "auto") &&
+    process.env.GROQ_API_KEY
+  ) {
+    const groq = await groqText(prompt).catch(() => "");
     if (groq) return groq;
   }
 
   // Final graceful fallback to avoid breaking routes that rely on AI
-  return 'We are rate-limited right now.';
+  return "We are rate-limited right now.";
 }
 
 // Groq provider (OpenAI-compatible)
 async function groqText(prompt: string) {
-  const model = process.env.GROQ_MODEL?.trim() || 'llama-3.1-8b-instant';
+  const model = process.env.GROQ_MODEL?.trim() || "llama-3.1-8b-instant";
   const res = await fetch(GROQ_URL, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
     },
     body: JSON.stringify({
       model,
       messages: [
-        { role: 'system', content: 'You are an empathetic, concise nutrition coach.' },
-        { role: 'user', content: prompt },
+        {
+          role: "system",
+          content: "You are an empathetic, concise nutrition coach.",
+        },
+        { role: "user", content: prompt },
       ],
       temperature: 0.7,
     }),
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    console.error('Groq error', model, res.status, body?.slice(0, 500));
+    const body = await res.text().catch(() => "");
+    console.error("Groq error", model, res.status, body?.slice(0, 500));
     throw new Error(`Groq error ${res.status}`);
   }
   const json = await res.json();
-  const text = json.choices?.[0]?.message?.content || '';
+  const text = json.choices?.[0]?.message?.content || "";
   return text as string;
 }
 
-export async function geminiImagePrompt(prompt: string, imageBase64: string, mime = 'image/jpeg') {
-  if (String(process.env.AI_DEBUG || '').toLowerCase() === 'true') {
-    throw new Error('AI_DEBUG is enabled: image prompt disabled');
+export async function geminiImagePrompt(
+  prompt: string,
+  imageBase64: string,
+  mime = "image/jpeg"
+) {
+  if (String(process.env.AI_DEBUG || "").toLowerCase() === "true") {
+    throw new Error("AI_DEBUG is enabled: image prompt disabled");
   }
-  // Currently, only Gemini is implemented for image understanding. If the key
-  // is missing, return a graceful text fallback instead of throwing, so routes
-  // remain resilient.
-  if (!process.env.GEMINI_API_KEY) {
-    return 'Image analysis is temporarily unavailable. Provide a concise nutrition summary based on user text only, and suggest a balanced, protein-forward meal.';
+  // Provider preference: try OpenRouter image-capable models first when available.
+  const providerPref = (process.env.AI_PROVIDER || "auto").toLowerCase();
+  if (
+    (providerPref === "openrouter" || providerPref === "auto") &&
+    process.env.OPENROUTER_API_KEY
+  ) {
+    // Allow overriding via env. Fallback to common free image-capable models.
+    const envList = (
+      process.env.OPENROUTER_IMAGE_MODELS ||
+      process.env.OPENROUTER_MODELS ||
+      ""
+    )
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const single =
+      process.env.OPENROUTER_IMAGE_MODEL?.trim() ||
+      process.env.OPENROUTER_MODEL?.trim();
+    const defaultModels = ["google/gemini-2.5-flash-image-preview:free"];
+    const models = envList.length ? envList : single ? [single] : defaultModels;
+
+    const dataUrl = `data:${mime};base64,${imageBase64}`;
+    for (const model of models) {
+      // if (shouldSkipModel(model)) continue;
+      try {
+        const res = await fetch(OPENROUTER_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            "HTTP-Referer":
+              process.env.OPENROUTER_REFERRER || "http://localhost",
+            "X-Title": process.env.OPENROUTER_APP_NAME || "food-tracker",
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: prompt },
+                  { type: "image_url", image_url: { url: dataUrl } },
+                ],
+              },
+            ],
+            temperature: 0.1,
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.text().catch(() => "");
+          console.error(
+            "OpenRouter image error",
+            model,
+            res.status,
+            body?.slice(0, 500)
+          );
+          if (res.status === 429) {
+            noteModel429(model, res.headers);
+            continue;
+          }
+          // non-429: try next model
+          continue;
+        }
+        const json = await res.json();
+        const text = json.choices?.[0]?.message?.content || "";
+        if (text) return text as string;
+      } catch (e) {
+        console.error("OpenRouter image call failed", model, e);
+        // try next model
+      }
+    }
+    // fall through to native Gemini
   }
-  const res = await fetch(`${GEMINI_URL}?key=${process.env.GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            { text: prompt },
-            { inlineData: { data: imageBase64, mimeType: mime } }
-          ],
-        },
-      ],
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    console.error('Gemini image error', res.status, body?.slice(0, 500));
-    throw new Error(`Gemini error ${res.status}`);
+
+  // Native Gemini as fallback or explicit provider
+  if (
+    (providerPref === "gemini" || providerPref === "auto") &&
+    process.env.GEMINI_API_KEY &&
+    !shouldSkipGemini()
+  ) {
+    const res = await fetch(`${GEMINI_URL}?key=${process.env.GEMINI_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              { inlineData: { data: imageBase64, mimeType: mime } },
+            ],
+          },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error("Gemini image error", res.status, body?.slice(0, 500));
+      if (res.status === 429) {
+        noteGemini429();
+      } else {
+        throw new Error(`Gemini error ${res.status}`);
+      }
+    } else {
+      const json = await res.json();
+      const text = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      if (text) {
+        noteGeminiSuccess();
+        return text as string;
+      }
+    }
   }
-  const json = await res.json();
-  const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  return text as string;
+
+  // Graceful final fallback if neither provider is available
+  return "Image analysis is temporarily unavailable. Provide a concise nutrition summary based on user text only, and suggest a balanced, protein-forward meal.";
 }

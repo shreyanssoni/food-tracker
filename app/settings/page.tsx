@@ -213,11 +213,11 @@ export default function SettingsPage() {
               </div>
 
               {/* Dietary preferences */}
-              <div className="md:col-span-2">
+              {/* <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Dietary preferences</label>
                 <input className="mt-1 input w-full" placeholder="e.g., vegetarian, low-carb" value={dietary} onChange={(e)=>onChangeDietary(e.target.value)} />
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Used to tailor suggestions.</p>
-              </div>
+              </div> */}
 
               {/* Notifications */}
               <div className="md:col-span-2">

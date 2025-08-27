@@ -1,19 +1,21 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 
-type Activity = 'sedentary' | 'light' | 'moderate' | 'very' | 'super';
-type Goal = 'maintain' | 'lose' | 'gain';
+type Activity = "sedentary" | "light" | "moderate" | "very" | "super";
+type Goal = "maintain" | "lose" | "gain";
 
 interface Profile {
   height_cm: number | null;
   weight_kg: number | null;
   age: number | null;
-  gender: 'male' | 'female' | 'other' | null;
+  gender: "male" | "female" | "other" | null;
   activity_level: Activity | null;
   goal: Goal | null;
-  workout_level: 'beginner' | 'intermediate' | 'advanced' | 'pro' | null;
+  workout_level: "beginner" | "intermediate" | "advanced" | "pro" | null;
+  // UI uses a comma-separated string; API stores array at dietary_restrictions
+  dietary: string | null;
 }
 
 export default function ProfilePage() {
@@ -26,17 +28,18 @@ export default function ProfilePage() {
     weight_kg: null,
     age: null,
     gender: null,
-    activity_level: 'sedentary',
-    goal: 'maintain',
+    activity_level: "sedentary",
+    goal: "maintain",
     workout_level: null,
+    dietary: null,
   });
 
   useEffect(() => {
     const load = async () => {
-      if (status === 'authenticated') {
+      if (status === "authenticated") {
         try {
-          const r = await fetch('/api/preferences');
-          if (!r.ok) throw new Error('Failed to load profile');
+          const r = await fetch("/api/preferences");
+          if (!r.ok) throw new Error("Failed to load profile");
           const d = await r.json();
           const p = d?.profile || {};
           setProfile({
@@ -44,16 +47,19 @@ export default function ProfilePage() {
             weight_kg: p.weight_kg ?? null,
             age: p.age ?? null,
             gender: p.gender ?? null,
-            activity_level: p.activity_level ?? 'sedentary',
-            goal: p.goal ?? 'maintain',
+            activity_level: p.activity_level ?? "sedentary",
+            goal: p.goal ?? "maintain",
             workout_level: p.workout_level ?? null,
+            dietary: Array.isArray(p?.dietary_restrictions)
+              ? (p.dietary_restrictions as string[]).join(", ")
+              : p?.dietary_restrictions ?? null,
           });
         } catch (e: any) {
-          setError(e?.message || 'Error');
+          setError(e?.message || "Error");
         } finally {
           setLoading(false);
         }
-      } else if (status === 'unauthenticated') {
+      } else if (status === "unauthenticated") {
         setLoading(false);
       }
     };
@@ -64,9 +70,9 @@ export default function ProfilePage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/preferences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/preferences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           height_cm: profile.height_cm,
           weight_kg: profile.weight_kg,
@@ -75,18 +81,22 @@ export default function ProfilePage() {
           activity_level: profile.activity_level,
           goal: profile.goal,
           workout_level: profile.workout_level,
+          dietary_restrictions:
+            profile.dietary && profile.dietary.trim().length > 0
+              ? profile.dietary.split(",").map((s) => s.trim()).filter(Boolean)
+              : null,
         }),
       });
-      if (!res.ok) throw new Error('Failed to save');
+      if (!res.ok) throw new Error("Failed to save");
       setEditing(false);
     } catch (e: any) {
-      setError(e?.message || 'Failed to save');
+      setError(e?.message || "Failed to save");
     } finally {
       setLoading(false);
     }
   };
 
-  if (status === 'loading' || loading) {
+  if (status === "loading" || loading) {
     return (
       <div className="min-h-[50vh] grid place-items-center">
         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
@@ -94,12 +104,19 @@ export default function ProfilePage() {
     );
   }
 
-  if (status === 'unauthenticated') {
+  if (status === "unauthenticated") {
     return (
       <div className="min-h-[50vh] grid place-items-center text-center">
         <div>
-          <h2 className="text-xl font-semibold mb-2">Please sign in to view your profile</h2>
-          <a href="/auth/signin" className="px-4 py-2 rounded-md bg-blue-600 text-white">Sign in</a>
+          <h2 className="text-xl font-semibold mb-2">
+            Please sign in to view your profile
+          </h2>
+          <a
+            href="/auth/signin"
+            className="px-4 py-2 rounded-md bg-blue-600 text-white"
+          >
+            Sign in
+          </a>
         </div>
       </div>
     );
@@ -113,10 +130,14 @@ export default function ProfilePage() {
           <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden flex items-center justify-center text-gray-500 shrink-0">
             {session?.user?.image ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={session.user.image} alt="avatar" className="h-full w-full object-cover" />
+              <img
+                src={session.user.image}
+                alt="avatar"
+                className="h-full w-full object-cover"
+              />
             ) : (
               <span className="text-sm font-medium">
-                {(session?.user?.name || session?.user?.email || 'U')
+                {(session?.user?.name || session?.user?.email || "U")
                   .toString()
                   .trim()
                   .charAt(0)
@@ -131,10 +152,10 @@ export default function ProfilePage() {
             </p>
           </div>
         </div>
-        {/* Desktop actions */}
+        {/* Actions */}
         {!editing ? (
           <button
-            className="hidden sm:inline-flex px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-800 active:scale-[0.99] transition"
+            className="inline-flex px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-800 active:scale-[0.99] transition"
             onClick={() => setEditing(true)}
           >
             Edit
@@ -152,7 +173,7 @@ export default function ProfilePage() {
               onClick={onSave}
               disabled={loading}
             >
-              {loading ? 'Saving…' : 'Save'}
+              {loading ? "Saving…" : "Save"}
             </button>
           </div>
         )}
@@ -163,15 +184,24 @@ export default function ProfilePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Height */}
         <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-4 border border-gray-100 dark:border-gray-800">
-          <label className="text-xs uppercase tracking-wide text-gray-500">Height</label>
+          <label className="text-xs uppercase tracking-wide text-gray-500">
+            Height
+          </label>
           {!editing ? (
-            <div className="mt-1 text-base font-medium dark:text-gray-100">{profile.height_cm ?? '—'} cm</div>
+            <div className="mt-1 text-base font-medium dark:text-gray-100">
+              {profile.height_cm ?? "—"} cm
+            </div>
           ) : (
             <input
               type="number"
               className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={profile.height_cm ?? ''}
-              onChange={(e)=>setProfile({...profile, height_cm: e.target.value ? Number(e.target.value) : null})}
+              value={profile.height_cm ?? ""}
+              onChange={(e) =>
+                setProfile({
+                  ...profile,
+                  height_cm: e.target.value ? Number(e.target.value) : null,
+                })
+              }
               placeholder="cm"
               inputMode="decimal"
             />
@@ -180,15 +210,24 @@ export default function ProfilePage() {
 
         {/* Weight */}
         <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-4 border border-gray-100 dark:border-gray-800">
-          <label className="text-xs uppercase tracking-wide text-gray-500">Weight</label>
+          <label className="text-xs uppercase tracking-wide text-gray-500">
+            Weight
+          </label>
           {!editing ? (
-            <div className="mt-1 text-base font-medium dark:text-gray-100">{profile.weight_kg ?? '—'} kg</div>
+            <div className="mt-1 text-base font-medium dark:text-gray-100">
+              {profile.weight_kg ?? "—"} kg
+            </div>
           ) : (
             <input
               type="number"
               className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={profile.weight_kg ?? ''}
-              onChange={(e)=>setProfile({...profile, weight_kg: e.target.value ? Number(e.target.value) : null})}
+              value={profile.weight_kg ?? ""}
+              onChange={(e) =>
+                setProfile({
+                  ...profile,
+                  weight_kg: e.target.value ? Number(e.target.value) : null,
+                })
+              }
               placeholder="kg"
               inputMode="decimal"
             />
@@ -197,15 +236,24 @@ export default function ProfilePage() {
 
         {/* Age */}
         <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-4 border border-gray-100 dark:border-gray-800">
-          <label className="text-xs uppercase tracking-wide text-gray-500">Age</label>
+          <label className="text-xs uppercase tracking-wide text-gray-500">
+            Age
+          </label>
           {!editing ? (
-            <div className="mt-1 text-base font-medium dark:text-gray-100">{profile.age ?? '—'}</div>
+            <div className="mt-1 text-base font-medium dark:text-gray-100">
+              {profile.age ?? "—"}
+            </div>
           ) : (
             <input
               type="number"
               className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={profile.age ?? ''}
-              onChange={(e)=>setProfile({...profile, age: e.target.value ? Number(e.target.value) : null})}
+              value={profile.age ?? ""}
+              onChange={(e) =>
+                setProfile({
+                  ...profile,
+                  age: e.target.value ? Number(e.target.value) : null,
+                })
+              }
               placeholder="years"
               inputMode="numeric"
             />
@@ -214,14 +262,20 @@ export default function ProfilePage() {
 
         {/* Gender */}
         <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-4 border border-gray-100 dark:border-gray-800">
-          <label className="text-xs uppercase tracking-wide text-gray-500">Gender</label>
+          <label className="text-xs uppercase tracking-wide text-gray-500">
+            Gender
+          </label>
           {!editing ? (
-            <div className="mt-1 text-base font-medium dark:text-gray-100">{profile.gender ?? '—'}</div>
+            <div className="mt-1 text-base font-medium dark:text-gray-100">
+              {profile.gender ?? "—"}
+            </div>
           ) : (
             <select
               className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={profile.gender ?? 'male'}
-              onChange={(e)=>setProfile({...profile, gender: e.target.value as any})}
+              value={profile.gender ?? "male"}
+              onChange={(e) =>
+                setProfile({ ...profile, gender: e.target.value as any })
+              }
             >
               <option value="male">Male</option>
               <option value="female">Female</option>
@@ -232,14 +286,23 @@ export default function ProfilePage() {
 
         {/* Activity */}
         <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-4 border border-gray-100 dark:border-gray-800">
-          <label className="text-xs uppercase tracking-wide text-gray-500">Activity level</label>
+          <label className="text-xs uppercase tracking-wide text-gray-500">
+            Activity level
+          </label>
           {!editing ? (
-            <div className="mt-1 text-base font-medium dark:text-gray-100">{profile.activity_level}</div>
+            <div className="mt-1 text-base font-medium dark:text-gray-100">
+              {profile.activity_level}
+            </div>
           ) : (
             <select
               className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={profile.activity_level ?? 'sedentary'}
-              onChange={(e)=>setProfile({...profile, activity_level: e.target.value as Activity})}
+              value={profile.activity_level ?? "sedentary"}
+              onChange={(e) =>
+                setProfile({
+                  ...profile,
+                  activity_level: e.target.value as Activity,
+                })
+              }
             >
               <option value="sedentary">Sedentary</option>
               <option value="light">Light</option>
@@ -252,14 +315,20 @@ export default function ProfilePage() {
 
         {/* Goal */}
         <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-4 border border-gray-100 dark:border-gray-800">
-          <label className="text-xs uppercase tracking-wide text-gray-500">Goal</label>
+          <label className="text-xs uppercase tracking-wide text-gray-500">
+            Goal
+          </label>
           {!editing ? (
-            <div className="mt-1 text-base font-medium dark:text-gray-100">{profile.goal}</div>
+            <div className="mt-1 text-base font-medium dark:text-gray-100">
+              {profile.goal}
+            </div>
           ) : (
             <select
               className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={profile.goal ?? 'maintain'}
-              onChange={(e)=>setProfile({...profile, goal: e.target.value as Goal})}
+              value={profile.goal ?? "maintain"}
+              onChange={(e) =>
+                setProfile({ ...profile, goal: e.target.value as Goal })
+              }
             >
               <option value="maintain">Maintain</option>
               <option value="lose">Lose</option>
@@ -270,14 +339,20 @@ export default function ProfilePage() {
 
         {/* Workout intensity */}
         <div className="bg-white dark:bg-gray-950 rounded-xl shadow-soft p-4 border border-gray-100 dark:border-gray-800">
-          <label className="text-xs uppercase tracking-wide text-gray-500">Workout intensity</label>
+          <label className="text-xs uppercase tracking-wide text-gray-500">
+            Workout intensity
+          </label>
           {!editing ? (
-            <div className="mt-1 text-base font-medium dark:text-gray-100">{profile.workout_level ?? '—'}</div>
+            <div className="mt-1 text-base font-medium dark:text-gray-100">
+              {profile.workout_level ?? "—"}
+            </div>
           ) : (
             <select
               className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={profile.workout_level ?? 'beginner'}
-              onChange={(e)=>setProfile({...profile, workout_level: e.target.value as any})}
+              value={profile.workout_level ?? "beginner"}
+              onChange={(e) =>
+                setProfile({ ...profile, workout_level: e.target.value as any })
+              }
             >
               <option value="beginner">Beginner</option>
               <option value="intermediate">Intermediate</option>
@@ -285,6 +360,32 @@ export default function ProfilePage() {
               <option value="pro">Pro</option>
             </select>
           )}
+        </div>
+
+        {/* Dietary preferences */}
+        <div className="md:col-span-2 bg-white dark:bg-gray-950 rounded-xl shadow-soft p-4 border border-gray-100 dark:border-gray-800">
+          <label className="text-xs uppercase tracking-wide text-gray-500">
+            Dietary preferences
+          </label>
+          {!editing ? (
+            <div className="mt-1 text-base font-medium dark:text-gray-100">
+              {profile.dietary && profile.dietary.trim().length > 0
+                ? profile.dietary
+                : "—"}
+            </div>
+          ) : (
+            <input
+              className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., vegetarian, low-carb"
+              value={profile.dietary ?? ""}
+              onChange={(e) =>
+                setProfile({ ...profile, dietary: e.target.value })
+              }
+            />
+          )}
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Used to tailor suggestions.
+          </p>
         </div>
       </div>
 
@@ -303,7 +404,7 @@ export default function ProfilePage() {
               onClick={onSave}
               disabled={loading}
             >
-              {loading ? 'Saving…' : 'Save'}
+              {loading ? "Saving…" : "Save"}
             </button>
           </div>
         </div>

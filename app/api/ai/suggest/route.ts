@@ -19,6 +19,7 @@ export async function POST(request: Request) {
       .select('*')
       .eq('user_id', session.user.id)
       .single();
+      
     const incoming = (preferences as any)?.profile || preferences || {};
     const profile = { ...(dbPrefs || {}), ...incoming } as any;
     const restrictions: string[] = Array.isArray(profile?.dietary_restrictions)
