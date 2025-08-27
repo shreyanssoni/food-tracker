@@ -2,8 +2,8 @@
 import { useState } from "react";
 import { z } from "zod";
 import { useSession } from "next-auth/react";
-import { PlusCircle, Loader2, Sparkles, Soup } from "lucide-react";
-
+import { PlusCircle, Loader2, Soup } from "lucide-react";
+import type { FoodLog } from "@/types";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
 
 const schema = z.object({
