@@ -23,6 +23,30 @@ export default function AvatarCanvas({ appearanceStage, imageUrl, equipment, equ
     return `/images/collectibles/${icon}.svg`;
   };
 
+  // Clamp stage to a maximum of 50 for rendering assets
+  const clampStageName = (stage: string) => {
+    const m = stage?.match(/stage(\d+)/i);
+    if (!m) return stage;
+    const n = parseInt(m[1], 10);
+    if (Number.isFinite(n) && n > 50) return "stage50";
+    return `stage${n}`;
+  };
+
+  // If an external storage URL encodes stage number, rewrite to 50 when >50
+  const resolveAvatarSrc = (src: string | undefined | null, stage: string) => {
+    const capped = clampStageName(stage);
+    if (src) {
+      try {
+        // Replace occurrences like avatar_stage12.svg or /stage12/ to stage50
+        if (/stage\d+/i.test(src) && capped === "stage50") {
+          return src.replace(/stage\d+/ig, "stage50");
+        }
+      } catch {}
+      return src;
+    }
+    return `/images/collectibles/avatar_${capped}.svg`;
+  };
+
   const weapon = equipment?.weapon ? equippedMeta?.[equipment.weapon] : undefined;
   const armor = equipment?.armor ? equippedMeta?.[equipment.armor] : undefined;
   const cosmetic = equipment?.cosmetic ? equippedMeta?.[equipment.cosmetic] : undefined;
@@ -53,7 +77,7 @@ export default function AvatarCanvas({ appearanceStage, imageUrl, equipment, equ
       <div className="absolute inset-0 grid place-items-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={imageUrl || `/images/collectibles/avatar_${appearanceStage}.svg`}
+          src={resolveAvatarSrc(imageUrl, appearanceStage)}
           onError={(e) => {
             const fallback = "/images/collectibles/default.svg";
             // @ts-ignore
