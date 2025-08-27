@@ -107,7 +107,7 @@ export async function POST(req: Request) {
     const MAX_ACTIVE_GOALS = 3;
     const MAX_TEMPLATES_PER_GOAL = 5;
     const MAX_TIMES_PER_PERIOD = 7; // per week or period
-    const WEEKLY_EP_CAP = 300; // total weekly EP across all templates in a goal
+    const WEEKLY_EP_CAP = 500; // total weekly EP across all templates in a goal
 
     // Limit active goals per user
     const { data: activeGoals, error: agErr } = await supabase

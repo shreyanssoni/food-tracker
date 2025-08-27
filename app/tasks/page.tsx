@@ -671,13 +671,13 @@ export default function TasksPage() {
                           <CheckCircle2 className={`w-5 h-5 ${t.completedToday ? 'text-green-500' : 'text-gray-300 dark:text-gray-700'}`} />
                         </div>
                         <div className="flex-1">
-                          {/* Title row with EP pill on the right */}
+                              {/* Title row with EP pill on the right */}
                           <div className="flex items-start gap-2">
                             <div className="flex-1 min-w-0">
-                              <div className="font-medium text-[15px] sm:text-base flex items-center gap-2">
-                                <span className="truncate">{t.title}</span>
+                              <div className="font-medium text-[15px] sm:text-base flex items-center gap-2 flex-wrap">
+                                <span className="flex-auto min-w-0 truncate">{t.title}</span>
                                 {t.goal?.title && (
-                                  <span className="text-[10px] uppercase tracking-wide bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800 whitespace-nowrap">Goal: {t.goal.title}</span>
+                                  <span className="shrink-0 text-[10px] uppercase tracking-wide bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800 whitespace-nowrap">Goal: {t.goal.title}</span>
                                 )}
                                 {!t.active && <span className="text-[10px] uppercase tracking-wide bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded whitespace-nowrap">inactive</span>}
                               </div>
