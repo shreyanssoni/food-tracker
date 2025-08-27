@@ -18,6 +18,52 @@ export function PhotoUpload({
   const [hint, setHint] = useState<string | null>(null);
   const { data: session } = useSession();
 
+  // Normalize any image (including Android HEIC/WEBP) to a compressed JPEG base64.
+  // Also downsizes to a reasonable max dimension to keep payloads small.
+  const fileToJpegBase64 = async (
+    file: File,
+    maxDim = 1600,
+    quality = 0.9
+  ): Promise<{ base64: string; mime: string }> => {
+    // Read as a data URL first
+    const dataUrl: string = await new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onerror = () => reject(fr.error);
+      fr.onload = () => resolve(String(fr.result));
+      fr.readAsDataURL(file);
+    });
+
+    // Draw into canvas to force JPEG re-encode and size reduction
+    const img: HTMLImageElement = await new Promise((resolve, reject) => {
+      const i = new Image();
+      // Safer for cross-origin blobs; most local data URLs are fine
+      i.crossOrigin = "anonymous";
+      i.onload = () => resolve(i);
+      i.onerror = (e) => reject(e);
+      i.src = dataUrl;
+    });
+
+    let { width, height } = img;
+    if (width > maxDim || height > maxDim) {
+      const scale = Math.min(maxDim / width, maxDim / height);
+      width = Math.max(1, Math.round(width * scale));
+      height = Math.max(1, Math.round(height * scale));
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas not supported");
+    ctx.drawImage(img, 0, 0, width, height);
+
+    const outMime = "image/jpeg";
+    const outUrl = canvas.toDataURL(outMime, quality);
+    // Strip prefix "data:image/jpeg;base64,"
+    const base64 = outUrl.split(",")[1] || "";
+    return { base64, mime: outMime };
+  };
+
   const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -29,14 +75,14 @@ export function PhotoUpload({
     const url = URL.createObjectURL(file);
     setPreview(url);
     try {
-      const buf = await file.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+      // Convert any incoming image (HEIC/WEBP/PNG/JPEG) into a JPEG base64 for broad AI compatibility
+      const { base64, mime } = await fileToJpegBase64(file);
       const res = await fetch("/api/ai/photo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageBase64: base64,
-          mimeType: file.type || "image/jpeg",
+          mimeType: mime,
         }),
       });
       const data = await res.json();
