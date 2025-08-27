@@ -97,11 +97,15 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       completions = (comps || []) as any;
     }
 
-    // Aggregate by day
+    // Aggregate completions by day and by unique task for accurate per-day completion checks
     const dayCounts = new Map<string, number>();
+    const completedByDay = new Map<string, Set<string>>();
     for (const c of completions) {
       const d = String((c as any).completed_on);
       dayCounts.set(d, (dayCounts.get(d) || 0) + 1);
+      const set = completedByDay.get(d) || new Set<string>();
+      set.add(String((c as any).task_id));
+      completedByDay.set(d, set);
     }
 
     // Fetch revived days for this goal/user in the window
@@ -115,6 +119,43 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     if (rErr) throw rErr;
     const revivedSet = new Set<string>((reviveRows || []).map((r: any) => String(r.revive_date)));
 
+    // Fetch schedules for linked tasks to compute how many tasks are due on each day
+    let schedules: Array<{ task_id: string; frequency: string; byweekday: number[] | null; start_date?: string | null; end_date?: string | null }>=[];
+    if (taskIds.length) {
+      const { data: schedRows, error: sErr } = await supabase
+        .from('task_schedules')
+        .select('task_id, frequency, byweekday, start_date, end_date')
+        .in('task_id', taskIds as any);
+      if (sErr) throw sErr;
+      schedules = (schedRows || []) as any;
+    }
+
+    function isDueOnDay(s: any, date: Date) {
+      const freq = String(s.frequency || 'weekly');
+      // date window check if present
+      const d0 = new Date(date); d0.setHours(0,0,0,0);
+      if (s.start_date) {
+        const sd = new Date(String(s.start_date)); sd.setHours(0,0,0,0);
+        if (d0 < sd) return false;
+      }
+      if (s.end_date) {
+        const ed = new Date(String(s.end_date)); ed.setHours(23,59,59,999);
+        if (d0 > ed) return false;
+      }
+      if (freq === 'daily') return true;
+      const by: number[] = Array.isArray(s.byweekday) ? s.byweekday : [];
+      if (freq === 'weekly' || freq === 'custom') {
+        return by.includes(d0.getDay());
+      }
+      // 'once' and others: compare start_date
+      if (freq === 'once') {
+        if (!s.start_date) return false;
+        const sd = new Date(String(s.start_date)); sd.setHours(0,0,0,0);
+        return d0.getTime() === sd.getTime();
+      }
+      return false;
+    }
+
     // Build days for current week
     const curStart = startOfWeek(today);
     const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -125,7 +166,10 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       const key = dateKeyLocal(d);
       const cnt = dayCounts.get(key) || 0;
       const revived = revivedSet.has(key);
-      const completed = cnt > 0 || revived;
+      // How many tasks are due on this day for this goal?
+      const due = schedules.reduce((acc, s) => acc + (isDueOnDay(s, d) ? 1 : 0), 0);
+      const completedUnique = (completedByDay.get(key)?.size) || 0;
+      const completed = revived || (due === 0) || (completedUnique >= due);
       // Mark missed only for days strictly before today (local). Do not mark current day yet.
       const missed = !completed && d >= new Date(String(goal.start_date)) && d < startOfToday;
       days.push({ date: key, completed, revived, missed, count: cnt });
@@ -216,7 +260,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     // Compute current week's effective quota for display (this prevents Sunday-before-start from blocking)
     const curWs = startOfWeek(today);
     const curWe = endOfWeek(today);
-    const week_quota_current = effectiveQuotaForWeek(curWs, curWe) || week_quota;
+    // For display, weekly quota is number of days in the week (7)
+    const week_quota_current = 7;
 
     // Daily streaks (overall since goal start): count consecutive days up to today where completed or revived
     const day0 = new Date(today);
@@ -250,7 +295,14 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     yesterday.setDate(today.getDate() - 1);
     yesterday.setHours(0,0,0,0);
     const yKey = dateKeyLocal(yesterday);
-    const yCompleted = (dayCounts.get(yKey) || 0) > 0;
+    const yCompleted = (() => {
+      const ySet = completedByDay.get(yKey);
+      // compute whether yesterday was considered completed per day rule
+      const yDate = new Date(yKey + 'T00:00:00');
+      const dueY = schedules.reduce((acc, s) => acc + (isDueOnDay(s, yDate) ? 1 : 0), 0);
+      const uniqueCompleted = ySet?.size || 0;
+      return (dueY === 0) || (uniqueCompleted >= dueY);
+    })();
     const yRevived = revivedSet.has(yKey);
     const within24h = (day0.getTime() - yesterday.getTime()) <= 24*60*60*1000 && day0 > yesterday;
     const canRevive = within24h && !yCompleted && !yRevived && (yesterday >= goalStart);
