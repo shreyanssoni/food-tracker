@@ -169,9 +169,9 @@ export function FoodForm({ onLogged }: { onLogged: (log: FoodLog) => void }) {
             )}
           </button>
           {/* character counter */}
-          <div className="absolute -bottom-5 right-1 text-[11px] text-zinc-400">
+          {/* <div className="absolute -bottom-5 right-1 text-[11px] text-zinc-400">
             {text.length}/140
-          </div>
+          </div> */}
         </div>
 
         {/* helper hint */}
