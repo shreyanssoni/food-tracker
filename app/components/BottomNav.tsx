@@ -61,7 +61,7 @@ export default function BottomNav() {
                         "bg-gradient-to-tr from-blue-600 to-emerald-500",
                         active ? "scale-105" : "group-active:scale-95"
                       )}
-                      style={fabBounce ? ({ animation: "bounce 300ms" } as any) : undefined}
+                      style={fabBounce ? ({ animation: "bounce 500ms" } as any) : undefined}
                     >
                       <Icon aria-hidden className="h-6 w-6" strokeWidth={2.2} />
                     </span>

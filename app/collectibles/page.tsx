@@ -3,10 +3,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Gift } from 'lucide-react';
 import { toast } from 'sonner';
 import { createPortal } from 'react-dom';
+import { allowedSlotsForCollectible } from '@/utils/collectibleSlots';
 
 export default function MyCollectiblesPage() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [equipment, setEquipment] = useState<{ weapon?: string | null; armor?: string | null; cosmetic?: string | null; pet?: string | null } | null>(null);
+  const [eqBusy, setEqBusy] = useState<string | null>(null); // key: slot|collectibleId
   // Share modal state
   const [shareOpen, setShareOpen] = useState(false);
   const [shareVisible, setShareVisible] = useState(false);
@@ -18,10 +21,14 @@ export default function MyCollectiblesPage() {
     let alive = true;
     (async () => {
       try {
-        const res = await fetch('/api/collectibles/mine');
-        const j = await res.json();
+        const [res, aRes] = await Promise.all([
+          fetch('/api/collectibles/mine'),
+          fetch('/api/avatar'),
+        ]);
+        const [j, aj] = await Promise.all([res.json(), aRes.json()]);
         if (!alive) return;
         if (res.ok) setItems(j.items || []);
+        if (aRes.ok) setEquipment(aj?.equipment || null);
       } finally {
         if (alive) setLoading(false);
       }
@@ -32,6 +39,52 @@ export default function MyCollectiblesPage() {
   const rarityToClass = (r?: string) => {
     const rar = (r || 'common').toLowerCase();
     return rar === 'epic' ? 'from-fuchsia-500 to-amber-400' : rar === 'rare' ? 'from-blue-500 to-emerald-400' : 'from-gray-400 to-gray-300';
+  };
+
+  const refreshEquipment = async () => {
+    try {
+      const res = await fetch('/api/avatar');
+      const j = await res.json();
+      if (res.ok) setEquipment(j?.equipment || null);
+    } catch {}
+  };
+
+  const equip = async (slot: 'weapon'|'armor'|'cosmetic'|'pet', collectible_id: string) => {
+    try {
+      setEqBusy(`${slot}|${collectible_id}`);
+      const res = await fetch('/api/avatar/equip-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slot, collectible_id }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || 'Equip failed');
+      toast.success('Equipped');
+      await refreshEquipment();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setEqBusy(null);
+    }
+  };
+
+  const unequip = async (slot: 'weapon'|'armor'|'cosmetic'|'pet') => {
+    try {
+      setEqBusy(`${slot}|none`);
+      const res = await fetch('/api/avatar/unequip-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slot }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || 'Unequip failed');
+      toast.success('Unequipped');
+      await refreshEquipment();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setEqBusy(null);
+    }
   };
 
   const openShare = (slug: string, name: string, rarity?: string) => {
@@ -126,6 +179,12 @@ export default function MyCollectiblesPage() {
               rarity === 'epic' ? 'from-fuchsia-500 to-amber-400' :
               rarity === 'rare' ? 'from-blue-500 to-emerald-400' :
               'from-gray-400 to-gray-300';
+            const eq = equipment || {} as any;
+            const equippedSlots: Array<'weapon'|'armor'|'cosmetic'|'pet'> = [];
+            if (eq.weapon === c.id) equippedSlots.push('weapon');
+            if (eq.armor === c.id) equippedSlots.push('armor');
+            if (eq.cosmetic === c.id) equippedSlots.push('cosmetic');
+            if (eq.pet === c.id) equippedSlots.push('pet');
             return (
               <div key={c.id} className="relative rounded-2xl p-4 border border-gray-200/70 dark:border-gray-800/70 bg-white/70 dark:bg-gray-950/60 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
@@ -150,13 +209,39 @@ export default function MyCollectiblesPage() {
                     }}
                   />
                 </a>
-                <div className="mt-3 flex items-center justify-end gap-2">
+                {/* Equip controls */}
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1">
+                    {allowedSlotsForCollectible(c).map((slot) => {
+                      const currentInSlot = (equipment as any)?.[slot] as string | null | undefined;
+                      const isEquippedHere = currentInSlot === c.id;
+                      const isBusy = eqBusy === `${slot}|${isEquippedHere ? 'none' : c.id}`;
+                      const disabled = !!eqBusy;
+                      const title = isEquippedHere ? `Unequip from ${slot}` : `Equip to ${slot}`;
+                      const label = isEquippedHere ? `Unequip ${slot}` : `Equip ${slot}`;
+                      return (
+                        <button
+                          key={slot}
+                          className={`text-[10px] px-2 py-1 rounded-full border ${isEquippedHere
+                            ? 'border-emerald-300 text-emerald-700 dark:text-emerald-300 dark:border-emerald-700 bg-emerald-500/10'
+                            : 'border-gray-200 dark:border-gray-700 hover:bg-white/70 dark:hover:bg-gray-900/60'}`}
+                          onClick={() => (isEquippedHere ? unequip(slot) : equip(slot, c.id))}
+                          disabled={disabled}
+                          title={title}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-2">
                   {c.public_slug && (
                     <button onClick={() => openShare(c.public_slug, c.name, c.rarity)} className="text-xs px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-700 hover:bg-white/70 dark:hover:bg-gray-900/60">Share</button>
                   )}
                   {c.public_slug && (
                     <a className="text-xs px-3 py-1.5 rounded-full border border-blue-200 text-blue-700 dark:text-blue-300 dark:border-blue-800 hover:bg-blue-50/50 dark:hover:bg-blue-950/30" href={`/collectibles/${encodeURIComponent(c.public_slug)}`}>View</a>
                   )}
+                  </div>
                 </div>
                 {c.is_badge && (
                   <div className="absolute -top-2 -right-2 text-[10px] px-2 py-0.5 rounded-full border border-amber-400/50 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-900/30 dark:text-amber-200 shadow-sm">Badge</div>

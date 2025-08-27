@@ -71,3 +71,19 @@ export interface NutritionSummary {
   fat_g: number;
   meal_count: number;
 }
+
+// Gamification: Collectibles
+export type CollectibleSlot = 'weapon' | 'armor' | 'cosmetic' | 'pet';
+
+export interface Collectible {
+  id: string;
+  public_slug?: string | null;
+  name: string;
+  rarity?: 'common' | 'rare' | 'epic' | (string & {});
+  icon?: string | null;
+  lore?: string | null;
+  description?: string | null;
+  is_badge?: boolean | null;
+  // Optional typed slot for UI restriction; if undefined, frontend may allow all or use a mapping.
+  type?: CollectibleSlot | null;
+}

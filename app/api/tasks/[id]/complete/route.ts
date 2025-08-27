@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { getCurrentUser } from '@/utils/auth';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
@@ -8,6 +9,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const body = await req.json().catch(() => ({}));
     const supabase = createClient();
+    const admin = createAdminClient();
 
     // Fetch task
     const { data: task, error: tErr } = await supabase
@@ -121,6 +123,18 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       .update({ level: curLevel, ep_in_level: curEp, total_ep: newTotal, updated_at: new Date().toISOString() })
       .eq('user_id', user.id);
     if (upErr) throw upErr;
+
+    // Sync avatar stage based on level (single source of truth)
+    const stageFor = (level: number) => {
+      if (level >= 30) return 'stage6';
+      if (level >= 20) return 'stage5';
+      if (level >= 15) return 'stage4';
+      if (level >= 10) return 'stage3';
+      if (level >= 5) return 'stage2';
+      return 'stage1';
+    };
+    const appearance_stage = stageFor(curLevel);
+    await admin.from('avatars').update({ appearance_stage }).eq('user_id', user.id);
 
     // Ensure historical levels are marked as claimed (no diamonds granted)
     if (oldLevel > 0) {
