@@ -56,54 +56,19 @@ export async function geminiText(prompt: string) {
     return '';
   }
 
-  // If provider is groq, try Groq first (explicit override)
-  if (providerPref === 'groq' && process.env.GROQ_API_KEY) {
-    const groq = await groqText(prompt).catch(() => '');
-    if (groq) return groq;
-  }
-
-  // Try Gemini first unless provider is forced to openrouter/groq or breaker is active
-  if (process.env.GEMINI_API_KEY && providerPref !== 'openrouter' && providerPref !== 'groq' && !shouldSkipGemini()) {
-    try {
-      const res = await fetch(`${GEMINI_URL}?key=${process.env.GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-      });
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        console.error('Gemini error', res.status, body?.slice(0, 500));
-        // If rate-limited or missing quota, fall through to OpenRouter if available
-        if (res.status === 429) {
-          noteGemini429();
-        } else {
-          throw new Error(`Gemini error ${res.status}`);
-        }
-      } else {
-        const json = await res.json();
-        const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        if (text) {
-          noteGeminiSuccess();
-          return text as string;
-        }
-      }
-    } catch (e) {
-      // proceed to fallback
-    }
-  }
-
-  // Fallback to OpenRouter with rotating models if configured (now before Groq)
-  if (process.env.OPENROUTER_API_KEY) {
+  // If provider is openrouter (explicit), try OpenRouter first
+  // Default 'auto' also prefers OpenRouter first per product choice
+  if ((providerPref === 'openrouter' || providerPref === 'auto') && process.env.OPENROUTER_API_KEY) {
     // Build model list: env list > single model > sensible defaults
     const envList = (process.env.OPENROUTER_MODELS || '')
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
     const single = process.env.OPENROUTER_MODEL?.trim();
+    // Keep defaults conservative; recommend free models via .env.example comments
     const defaultModels = [
-      'google/gemma-2-9b-it:free',
       'meta-llama/llama-3.1-8b-instruct:free',
-      'openchat/openchat-7b:free',
+      'mistralai/mistral-7b-instruct:free',
     ];
     const models = envList.length ? envList : (single ? [single] : defaultModels);
 
@@ -147,11 +112,40 @@ export async function geminiText(prompt: string) {
         // try next model
       }
     }
-    // If OpenRouter exhausted, try Groq next (last fallback)
+    // If OpenRouter exhausted, fall through to Gemini next
   }
 
-  // Fallback to Groq last if available (and not already tried above)
-  if (process.env.GROQ_API_KEY) {
+  // If provider is gemini (explicit), try Gemini now; or as secondary fallback after OpenRouter
+  if ((providerPref === 'gemini' || providerPref === 'auto') && process.env.GEMINI_API_KEY && !shouldSkipGemini()) {
+    try {
+      const res = await fetch(`${GEMINI_URL}?key=${process.env.GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        console.error('Gemini error', res.status, body?.slice(0, 500));
+        if (res.status === 429) {
+          noteGemini429();
+        } else {
+          throw new Error(`Gemini error ${res.status}`);
+        }
+      } else {
+        const json = await res.json();
+        const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (text) {
+          noteGeminiSuccess();
+          return text as string;
+        }
+      }
+    } catch (e) {
+      // proceed to next fallback
+    }
+  }
+
+  // Groq as tertiary fallback or explicit provider
+  if ((providerPref === 'groq' || providerPref === 'auto') && process.env.GROQ_API_KEY) {
     const groq = await groqText(prompt).catch(() => '');
     if (groq) return groq;
   }

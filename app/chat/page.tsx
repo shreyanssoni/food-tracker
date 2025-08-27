@@ -16,9 +16,23 @@ export default function ChatPage() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // who am I? needed for admin DELETE requiring user_id
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((d) => {
+        setCurrentUserId(d?.user?.id || null);
+        setIsAdmin(Boolean(d?.user?.is_sys_admin));
+      })
+      .catch(() => {
+        setCurrentUserId(null);
+        setIsAdmin(false);
+      });
+
     fetch("/api/ai/coach")
       .then((r) => r.json())
       .then((data) => setMessages((data?.messages || []).map((m: any) => ({
@@ -69,9 +83,16 @@ export default function ChatPage() {
   async function clearHistory() {
     setError(null);
     try {
-      const res = await fetch("/api/ai/coach", { method: "DELETE" });
+      if (!currentUserId) {
+        throw new Error("Cannot clear: missing user context");
+      }
+      const url = `/api/ai/coach?user_id=${encodeURIComponent(currentUserId)}`;
+      const res = await fetch(url, { method: "DELETE" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || data?.hint || "Failed to clear");
+      if (!res.ok) {
+        const msg = data?.error || data?.hint || (res.status === 403 ? "Forbidden: admin required" : "Failed to clear");
+        throw new Error(msg);
+      }
       setMessages([]);
     } catch (e: any) {
       const msg = e?.message || "Failed to clear";
@@ -97,6 +118,7 @@ export default function ChatPage() {
             <p className="text-xs text-gray-500 dark:text-gray-400">Quick, practical guidance for meals, macros, and habits.</p>
           </div>
           <div className="flex items-center gap-2">
+            {isAdmin && (
             <button
               onClick={clearHistory}
               className="inline-flex items-center gap-1.5 rounded-full border border-gray-200/80 dark:border-gray-800/80 px-3 py-1.5 text-xs hover:bg-gray-100/70 dark:hover:bg-white/5"
@@ -106,6 +128,7 @@ export default function ChatPage() {
               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12Zm13-15h-3.5l-1-1h-5l-1 1H5v2h14V4Z"/></svg>
               Clear
             </button>
+            )}
           </div>
         </div>
       </header>

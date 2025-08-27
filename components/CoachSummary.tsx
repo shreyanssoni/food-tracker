@@ -5,19 +5,25 @@ import { useEffect, useState } from "react";
 export default function CoachSummary({ className = "" }: { className?: string }) {
   const [summary, setSummary] = useState<any>(null);
   const [clearing, setClearing] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/ai/summary", { method: "POST" })
       .then((r) => r.json())
       .then(setSummary)
       .catch(() => setSummary(null));
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((d) => setCurrentUserId(d?.user?.id || null))
+      .catch(() => setCurrentUserId(null));
   }, []);
 
   const clearContext = async () => {
     if (clearing) return;
     try {
       setClearing(true);
-      await fetch("/api/ai/coach", { method: "DELETE" });
+      if (!currentUserId) throw new Error("Missing user context");
+      await fetch(`/api/ai/coach?user_id=${encodeURIComponent(currentUserId)}`, { method: "DELETE" });
     } finally {
       setClearing(false);
     }

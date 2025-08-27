@@ -20,6 +20,9 @@ export default function FoodPage() {
   const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0, 10)); // yyyy-mm-dd
   const [targets, setTargets] = useState<{ calories: number; protein_g: number; carbs_g: number; fat_g: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [override, setOverride] = useState<{ calories: number; protein_g: number; carbs_g: number; fat_g: number } | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState<{ calories: string; protein_g: string; carbs_g: string; fat_g: string }>({ calories: '', protein_g: '', carbs_g: '', fat_g: '' });
 
   // No longer rely on Supabase auth user for identity; use NextAuth session
   // session?.user?.id is stored in food_logs.user_id on insert
@@ -57,6 +60,30 @@ export default function FoodPage() {
     fetchLogs();
   }, [supabase, date, session?.user?.id]);
 
+  // Fetch macro override for selected day
+  useEffect(() => {
+    const fetchOverride = async () => {
+      if (!session?.user?.id) { setOverride(null); return; }
+      const { data, error } = await supabase
+        .from('daily_macro_overrides')
+        .select('calories, protein_g, carbs_g, fat_g')
+        .eq('user_id', session.user.id)
+        .eq('date', date)
+        .single();
+      if (!error && data) {
+        setOverride({
+          calories: Number(data.calories) || 0,
+          protein_g: Number(data.protein_g) || 0,
+          carbs_g: Number(data.carbs_g) || 0,
+          fat_g: Number(data.fat_g) || 0,
+        });
+      } else {
+        setOverride(null);
+      }
+    };
+    fetchOverride();
+  }, [supabase, date, session?.user?.id]);
+
   const onLogged = (log: FoodLog) => {
     const logDate = new Date(log.eaten_at).toISOString().slice(0, 10);
     if (logDate === date) setLogs((prev) => [log, ...prev]);
@@ -81,6 +108,12 @@ export default function FoodPage() {
     }
   };
 
+  const onUpdate = (updated: FoodLog) => {
+    setLogs((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+    setToast('Saved');
+    setTimeout(() => setToast(null), 1200);
+  };
+
   const totals = useMemo(() => {
     return logs.reduce(
       (acc, l) => {
@@ -93,6 +126,67 @@ export default function FoodPage() {
       { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 }
     );
   }, [logs]);
+
+  const displayTotals = override ?? totals;
+
+  const isToday = useMemo(() => new Date().toISOString().slice(0,10) === date, [date]);
+
+  const startEdit = () => {
+    setForm({
+      calories: String(override?.calories ?? totals.calories),
+      protein_g: String(override?.protein_g ?? totals.protein_g),
+      carbs_g: String(override?.carbs_g ?? totals.carbs_g),
+      fat_g: String(override?.fat_g ?? totals.fat_g),
+    });
+    setEditing(true);
+  };
+
+  const saveOverride = async () => {
+    if (!session?.user?.id) return;
+    const payload = {
+      user_id: session.user.id,
+      date,
+      calories: Number(form.calories) || 0,
+      protein_g: Number(form.protein_g) || 0,
+      carbs_g: Number(form.carbs_g) || 0,
+      fat_g: Number(form.fat_g) || 0,
+    };
+    const { data, error } = await supabase
+      .from('daily_macro_overrides')
+      .upsert(payload, { onConflict: 'user_id,date' })
+      .select()
+      .single();
+    if (error) {
+      setToast(error.message || 'Failed to save');
+      setTimeout(() => setToast(null), 2000);
+      return;
+    }
+    setOverride({
+      calories: Number(data.calories) || 0,
+      protein_g: Number(data.protein_g) || 0,
+      carbs_g: Number(data.carbs_g) || 0,
+      fat_g: Number(data.fat_g) || 0,
+    });
+    setEditing(false);
+    setToast('Updated macros for today');
+    setTimeout(() => setToast(null), 1200);
+  };
+
+  const clearOverride = async () => {
+    if (!session?.user?.id) return;
+    const { error } = await supabase
+      .from('daily_macro_overrides')
+      .delete()
+      .eq('user_id', session.user.id)
+      .eq('date', date);
+    if (error) {
+      setToast(error.message || 'Failed to reset');
+      setTimeout(() => setToast(null), 2000);
+      return;
+    }
+    setOverride(null);
+    setEditing(false);
+  };
 
   return (
     <div className="space-y-5">
@@ -166,10 +260,10 @@ export default function FoodPage() {
 
       {targets ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <CircularStat label="Calories" value={totals.calories} target={targets.calories} unit="kcal" />
-          <CircularStat label="Protein" value={totals.protein_g} target={targets.protein_g} unit="g" />
-          <CircularStat label="Carbs" value={totals.carbs_g} target={targets.carbs_g} unit="g" />
-          <CircularStat label="Fats" value={totals.fat_g} target={targets.fat_g} unit="g" />
+          <CircularStat label="Calories" value={displayTotals.calories} target={targets.calories} unit="kcal" />
+          <CircularStat label="Protein" value={displayTotals.protein_g} target={targets.protein_g} unit="g" />
+          <CircularStat label="Carbs" value={displayTotals.carbs_g} target={targets.carbs_g} unit="g" />
+          <CircularStat label="Fats" value={displayTotals.fat_g} target={targets.fat_g} unit="g" />
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4" aria-hidden>
@@ -184,6 +278,43 @@ export default function FoodPage() {
       <CoachSummary />
 
       <div className="space-y-3">
+        {/* Edit macros for today */}
+        {isToday && (
+          <div className="rounded-xl border border-gray-200/70 dark:border-gray-800/70 p-3 bg-white/80 dark:bg-gray-950/70">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium">Today's macros {override ? <span className="ml-1 text-xs text-emerald-600">(edited)</span> : null}</div>
+              {!editing ? (
+                <div className="flex items-center gap-2">
+                  {override ? (
+                    <button onClick={clearOverride} className="text-xs px-2 py-1 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-white/5">Reset</button>
+                  ) : null}
+                  <button onClick={startEdit} className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700">Edit</button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setEditing(false)} className="text-xs px-2 py-1 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-white/5">Cancel</button>
+                  <button onClick={saveOverride} className="text-xs px-2 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700">Save</button>
+                </div>
+              )}
+            </div>
+            {editing && (
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {(['calories','protein_g','carbs_g','fat_g'] as const).map((k) => (
+                  <div key={k} className="space-y-1">
+                    <label className="text-[11px] text-gray-500 capitalize">{k.replace('_g','')}</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={(form as any)[k]}
+                      onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
+                      className="w-full rounded-md border border-gray-200/70 dark:border-gray-800/70 bg-white/80 dark:bg-gray-900/70 px-2 py-1 text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {loading ? (
           <div className="space-y-3" aria-hidden>
             <SkeletonLogCard />
@@ -193,7 +324,7 @@ export default function FoodPage() {
         ) : logs.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">No logs yet. Try adding your first meal!</p>
         ) : (
-          logs.map((l) => <LogCard key={l.id} log={l} onDelete={onDelete} />)
+          logs.map((l) => <LogCard key={l.id} log={l} onDelete={onDelete} onUpdate={onUpdate} />)
         )}
       </div>
     </div>

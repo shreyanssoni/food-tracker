@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createClient } from '@/utils/supabase/server';
 import { geminiText } from '@/utils/ai';
+import { getCurrentUser } from '@/utils/auth';
+import { createAdminClient } from '@/utils/supabase/admin';
 
 export async function GET() {
   const session = await auth();
@@ -99,7 +101,7 @@ export async function POST(req: NextRequest) {
       .join('\n');
 
     const prompt = `You are an empathetic nutrition coach. Be supportive, concise, and actionable. Use the context but do not reveal raw data unless useful.
-Important: Prioritize the LATEST user message. If it uses pronouns like "it/that/this" or is an ellipsis follow-up (e.g., "how to make it"), assume it refers to the most recent assistant meal suggestion.
+Important: Prioritize the LATEST user message.
 
 Conversation summary to maintain continuity (use implicitly): ${summaryForPrompt || '(none)'}
 
@@ -281,22 +283,47 @@ Latest exchange: User: ${userMessage} | Coach: ${reply}`;
 
 export const dynamic = 'force-dynamic';
 
-export async function DELETE() {
-  const session = await auth();
-  if (!session?.user?.id) return new NextResponse('Unauthorized', { status: 401 });
+export async function DELETE(req: NextRequest) {
+  // Require authenticated user
+  const me = await getCurrentUser();
+  if (!me) return new NextResponse('Unauthorized', { status: 401 });
 
   try {
+    // Check admin flag (mirrors other admin routes)
     const supabase = createClient();
-    // Delete messages and state for this user with counts
-    const delMsgs = await supabase
+    const { data: meRow } = await supabase
+      .from('app_users')
+      .select('is_sys_admin')
+      .eq('id', me.id)
+      .maybeSingle();
+
+    if (process.env.NODE_ENV !== 'development' && !meRow?.is_sys_admin) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Target user_id to delete for: from query (?user_id=) or JSON body
+    const searchParams = (req as any).nextUrl?.searchParams as URLSearchParams | undefined;
+    const qpUserId = searchParams?.get('user_id') || undefined;
+    const body = qpUserId ? null : await req.json().catch(() => ({} as any));
+    const targetUserId: string | undefined = qpUserId || body?.user_id;
+
+    if (!targetUserId) {
+      return NextResponse.json({ error: 'user_id is required' }, { status: 400 });
+    }
+
+    // Use admin client to bypass RLS when deleting other users' rows
+    const admin = createAdminClient();
+
+    const delMsgs = await admin
       .from('coach_messages')
       .delete()
-      .eq('user_id', session.user.id)
+      .eq('user_id', targetUserId)
       .select('user_id');
-    const delState = await supabase
+
+    const delState = await admin
       .from('coach_state')
       .delete()
-      .eq('user_id', session.user.id)
+      .eq('user_id', targetUserId)
       .select('user_id');
 
     const deletedMessages = Array.isArray(delMsgs.data) ? delMsgs.data.length : 0;
@@ -309,19 +336,7 @@ export async function DELETE() {
       );
     }
 
-    if (deletedMessages === 0 || deletedState === 0) {
-      return NextResponse.json(
-        {
-          ok: false,
-          deletedMessages,
-          deletedState,
-          hint: 'Nothing deleted for one or both tables. Check RLS policies and that rows exist for this user.',
-        },
-        { status: 409 }
-      );
-    }
-
-    return NextResponse.json({ ok: true, deletedMessages, deletedState });
+    return NextResponse.json({ ok: true, deletedMessages, deletedState, user_id: targetUserId });
   } catch (e) {
     console.error('clear coach chat error', e);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

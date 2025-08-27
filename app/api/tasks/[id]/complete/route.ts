@@ -27,7 +27,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     let ep_awarded: number = task.ep_value ?? 10;
 
     // Daily EP cap (server-side): prevents farming too much EP in a single day
-    const DAILY_EP_CAP = 400;
+    const DAILY_EP_CAP = 1000;
     const todayStr = new Date().toISOString().slice(0, 10);
     const { data: todayRows, error: sumErr } = await supabase
       .from('task_completions')

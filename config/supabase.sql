@@ -72,12 +72,37 @@ ALTER TABLE public.food_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_preferences ENABLE ROW LEVEL SECURITY;
 
+-- Per-day macro overrides (user-editable aggregates)
+CREATE TABLE IF NOT EXISTS public.daily_macro_overrides (
+  user_id TEXT NOT NULL,
+  date DATE NOT NULL,
+  calories NUMERIC NOT NULL DEFAULT 0,
+  protein_g NUMERIC NOT NULL DEFAULT 0,
+  carbs_g NUMERIC NOT NULL DEFAULT 0,
+  fat_g NUMERIC NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, date)
+);
+
+CREATE INDEX IF NOT EXISTS dmo_user_date_idx ON public.daily_macro_overrides(user_id, date DESC);
+
+ALTER TABLE public.daily_macro_overrides ENABLE ROW LEVEL SECURITY;
+-- Dev policies (adjust/tighten for prod)
+CREATE POLICY IF NOT EXISTS "Allow select to all on daily_macro_overrides" ON public.daily_macro_overrides FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "Allow insert to all on daily_macro_overrides" ON public.daily_macro_overrides FOR INSERT WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow update to all on daily_macro_overrides" ON public.daily_macro_overrides FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow delete to all on daily_macro_overrides" ON public.daily_macro_overrides FOR DELETE USING (true);
+
 -- Permissive policies (for dev; tighten later for prod)
 CREATE POLICY "Allow read to all" ON public.food_logs
   FOR SELECT USING (true);
 
 CREATE POLICY "Allow insert to all" ON public.food_logs
   FOR INSERT WITH CHECK (true);
+
+CREATE POLICY IF NOT EXISTS "Allow update to all" ON public.food_logs
+  FOR UPDATE USING (true) WITH CHECK (true);
 
 CREATE POLICY "Allow all on app_users" ON public.app_users
   USING (true);

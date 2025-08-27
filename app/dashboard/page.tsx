@@ -768,11 +768,11 @@ export default function DashboardPage() {
                             <div>
                               <div className="font-semibold flex items-center gap-2">
                                 {t.title}
-                                {t.goal?.title && (
+                                {/* {t.goal?.title && (
                                   <span className="text-[8px] uppercase tracking-wide bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800">
                                     {t.goal.title}
                                   </span>
-                                )}
+                                )} */}
                                 <span
                                   className={`ml-1 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${rc.badge}`}
                                 >
