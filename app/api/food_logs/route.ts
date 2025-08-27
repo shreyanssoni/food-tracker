@@ -9,6 +9,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Debug toggle via query param
+    const url = new URL(req.url);
+    const debug = url.searchParams.get("debug") === "1";
+
     const payload = await req.json();
 
     if (!payload || typeof payload !== "object") {
@@ -179,7 +183,7 @@ export async function POST(req: Request) {
       // If caller already sent a compatible items array, gently coerce
       const rawItems = entries["items"];
       if (Array.isArray(rawItems) && rawItems.length > 0) {
-        return rawItems
+        const parsed = rawItems
           .map((it: any) => {
             const itName =
               typeof it?.name === "string"
@@ -193,7 +197,8 @@ export async function POST(req: Request) {
             const q = parseNumWithUnits(qRaw);
             return { name: itName, quantity: q ?? null };
           })
-          .filter(Boolean);
+          .filter(Boolean) as Array<{ name: string; quantity: number | null }>;
+        return parsed.length > 0 ? parsed : [{ name: "-", quantity: null }];
       }
       // If items is a string like "2 eggs, 1 slice bread"
       if (typeof rawItems === "string" && rawItems.trim()) {
@@ -213,16 +218,20 @@ export async function POST(req: Request) {
           });
       }
       const singleName = typeof name === "string" ? name.trim() : "";
-      return singleName ? [{ name: singleName, quantity: null }] : [];
+      return singleName
+        ? [{ name: singleName, quantity: null }]
+        : [{ name: "-", quantity: null }];
     })();
 
     // Final insertion payload: only mapped fields + user id
+    // IMPORTANT: Supabase columns are NOT NULL with default 0 for macros.
+    // If we pass null explicitly, insert will fail. Default missing values to 0.
     const toInsert = {
       items,
-      calories,
-      protein_g,
-      carbs_g,
-      fat_g,
+      calories: calories ?? 0,
+      protein_g: protein_g ?? 0,
+      carbs_g: carbs_g ?? 0,
+      fat_g: fat_g ?? 0,
       eaten_at,
       note,
       user_id: session.user.id,
@@ -237,10 +246,28 @@ export async function POST(req: Request) {
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      console.error("/api/food_logs insert failed", {
+        error,
+        originalPayload: payload,
+        normalized: toInsert,
+        user: session.user.id,
+      });
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: (error as any)?.code,
+          details: (error as any)?.details,
+          hint: (error as any)?.hint,
+          normalized: debug ? toInsert : undefined,
+        },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json({ data }, { status: 200 });
+    return NextResponse.json(
+      { data, normalized: debug ? toInsert : undefined },
+      { status: 200 }
+    );
   } catch (e: any) {
     return NextResponse.json(
       { error: e?.message || "Server error" },

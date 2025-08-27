@@ -13,7 +13,7 @@ export default async function handler(
   if (!imageBase64)
     return res.status(400).json({ error: "imageBase64 is required" });
   const prompt =
-    "Identify foods in this photo, estimate calories and macros. Return JSON with items, calories, protein_g, carbs_g, fat_g, eaten_at (now, ISO) and also a friendly suggestion message.";
+    "Identify foods in this photo, estimate calories and macros. Return JSON with items (name and quantity in json), calories, protein_g, carbs_g, fat_g, eaten_at (now, ISO) and also a friendly suggestion message including the weight approx (grams) and name of food in suggestion message.";
   try {
     const out = await geminiImagePrompt(
       prompt,

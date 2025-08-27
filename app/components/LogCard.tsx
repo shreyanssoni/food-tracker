@@ -17,7 +17,11 @@ export function LogCard({
   const supabase = createBrowserClient();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const mealTitle = Array.isArray(log.items)
+    ? log.items.map((i: { name: string }) => i.name).join(', ')
+    : 'Meal';
   const [form, setForm] = useState({
+    itemsTitle: mealTitle,
     calories: String(Number(log.calories) || 0),
     protein_g: String(Number(log.protein_g) || 0),
     carbs_g: String(Number(log.carbs_g) || 0),
@@ -28,7 +32,14 @@ export function LogCard({
   const save = async () => {
     setSaving(true);
     try {
+      // Convert itemsTitle back into items array. Split by comma or newline.
+      const rawTokens = (form.itemsTitle || '').split(/[\n,]+/).map((t) => t.trim()).filter(Boolean);
+      const items = (rawTokens.length > 0
+        ? rawTokens.map((t) => ({ name: t, quantity: null as number | null }))
+        : [{ name: '-', quantity: null as number | null }]) as { name: string; quantity: number | null }[];
+
       const payload = {
+        items,
         calories: Number(form.calories) || 0,
         protein_g: Number(form.protein_g) || 0,
         carbs_g: Number(form.carbs_g) || 0,
@@ -52,9 +63,6 @@ export function LogCard({
     }
   };
 
-  const mealTitle = Array.isArray(log.items)
-    ? log.items.map((i: { name: string }) => i.name).join(', ')
-    : 'Meal';
   const mealType = getMealType(log.eaten_at);
 
   return (
@@ -99,6 +107,17 @@ export function LogCard({
         </div>
       ) : (
         <div className="mt-3 space-y-3">
+          <div className="space-y-1">
+            <label className="text-[11px] text-gray-500">Food name(s)</label>
+            <input
+              type="text"
+              value={form.itemsTitle}
+              onChange={(e) => setForm((f) => ({ ...f, itemsTitle: e.target.value }))}
+              className="w-full rounded-md border border-gray-200/70 dark:border-gray-800/70 bg-white/80 dark:bg-gray-900/70 px-2 py-1 text-sm"
+              placeholder="e.g., Onion Salad, Grilled Chicken"
+            />
+            <p className="text-[10px] text-gray-500">Separate multiple items with commas</p>
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {(['calories','protein_g','carbs_g','fat_g'] as const).map((k) => (
               <div key={k} className="space-y-1">
@@ -128,6 +147,7 @@ export function LogCard({
               onClick={() => {
                 setEditing(false);
                 setForm({
+                  itemsTitle: mealTitle,
                   calories: String(Number(log.calories) || 0),
                   protein_g: String(Number(log.protein_g) || 0),
                   carbs_g: String(Number(log.carbs_g) || 0),
