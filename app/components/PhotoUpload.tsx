@@ -91,7 +91,6 @@ export function PhotoUpload({
         return;
       }
       if (data?.suggestion) setHint(data.suggestion);
-      console.log("FOOD RESULTS", data);
       if (
         Array.isArray(data?.log) ||
         (typeof data?.log === "object" && data?.log !== null)
@@ -112,11 +111,11 @@ export function PhotoUpload({
           });
           const j = await resp.json();
           if (resp.ok && j?.data) {
-          onLogged(j.data as FoodLog);
-          if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-            (navigator as any).vibrate?.(40);
+            onLogged(j.data as FoodLog);
+            if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+              (navigator as any).vibrate?.(40);
+            }
           }
-        }
         }
         setReward({ xp: 5 });
         setStep("done");
@@ -172,21 +171,31 @@ export function PhotoUpload({
       <div
         onDrop={onDrop}
         onDragOver={onDragOver}
-        className="relative flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-lg border border-white/10 p-4 sm:p-5 bg-black/20 backdrop-blur cursor-pointer hover:border-white/20 transition"
+        className="relative flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-lg border p-4 sm:p-5 transition cursor-pointer border-gray-200 bg-white/80 hover:border-gray-300 dark:border-white/10 dark:bg-black/20 dark:hover:border-white/20 backdrop-blur"
         onClick={openPicker}
         role="button"
         aria-label="Upload a food photo"
       >
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">
           {/* Camera icon */}
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2z"/>
-            <circle cx="12" cy="13" r="4"/>
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className=""
+          >
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2z" />
+            <circle cx="12" cy="13" r="4" />
           </svg>
         </div>
         <div className="flex-1">
           <p className="text-sm sm:text-base font-medium">Add via photo</p>
-          <p className="text-xs sm:text-sm text-white/60">Tap to open camera or drop an image here</p>
+          <p className="text-xs sm:text-sm text-black dark:text-white/60">
+            Tap to open camera or drop an image here
+          </p>
         </div>
         <button
           type="button"
@@ -206,9 +215,24 @@ export function PhotoUpload({
           <div className="absolute inset-0 rounded-lg bg-black/40 backdrop-blur-sm grid place-items-center">
             <div className="flex items-center gap-3 text-white/90">
               {/* Spinner */}
-              <svg className="h-5 w-5 animate-spin text-emerald-400" viewBox="0 0 24 24">
-                <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
+              <svg
+                className="h-5 w-5 animate-spin text-emerald-400"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-20"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  fill="none"
+                />
+                <path
+                  className="opacity-90"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"
+                />
               </svg>
               <span className="text-sm">
                 {step === "analyzing" && "Analyzing your meal…"}
@@ -222,7 +246,11 @@ export function PhotoUpload({
 
       {preview && (
         <div className="mt-3 sm:mt-4 overflow-hidden rounded-lg border border-white/10">
-          <img src={preview} alt="Preview" className="w-full max-h-64 object-cover" />
+          <img
+            src={preview}
+            alt="Preview"
+            className="w-full max-h-64 object-cover"
+          />
         </div>
       )}
 
@@ -235,7 +263,7 @@ export function PhotoUpload({
       {reward && (
         <div className="mt-3 flex items-center gap-2 rounded-lg border border-yellow-500/20 bg-yellow-500/10 px-3 py-2">
           <span className="animate-bounce">✨</span>
-          <p className="text-sm text-yellow-200">
+          <p className="text-sm text-blue-500 dark:text-yellow-200">
             Logged! Keep your Streak going.
           </p>
         </div>

@@ -15,65 +15,162 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
-    // Normalize payload: support string/number values and common aliases (case-insensitive)
+    // Normalize top-level keys (case-insensitive)
     const entries = Object.entries(payload || {}).reduce<Record<string, any>>(
       (acc, [k, v]) => {
-        acc[k.toLowerCase()] = v;
+        acc[String(k).toLowerCase()] = v;
         return acc;
       },
       {}
     );
 
-    const toNum = (v: any): number | null => {
-      if (v === null || v === undefined || v === "") return null;
-      if (typeof v === "number" && Number.isFinite(v)) return v;
-      if (typeof v === "string") {
-        const n = parseFloat(v.replace(/[,\s]+/g, ""));
-        return Number.isFinite(n) ? n : null;
+    // Helper: unit-aware numeric parsing (e.g., "20 g", "200 kcal", "1.2k")
+    const parseNumWithUnits = (raw: any): number | null => {
+      if (raw === null || raw === undefined || raw === "") return null;
+      if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+      if (typeof raw !== "string") return null;
+      const s = raw.trim().toLowerCase();
+      if (!s) return null;
+      // Handle 1.2k style
+      const kMatch = s.match(/^([+-]?[0-9]*\.?[0-9]+)\s*k(?:\b|$)/);
+      if (kMatch) {
+        const n = parseFloat(kMatch[1]);
+        return Number.isFinite(n) ? n * 1000 : null;
       }
-      return null;
+      // Strip common units like g, gram(s), kcal, cal, mg, etc.
+      const cleaned = s
+        .replace(/kcal|calories?|cals?/g, "")
+        .replace(/grams?|g\b/g, "")
+        .replace(/mgs?|mg\b/g, "")
+        .replace(/[,+]/g, " ")
+        .trim();
+      const n = parseFloat(cleaned.replace(/\s+/g, ""));
+      return Number.isFinite(n) ? n : null;
+    };
+
+    // Helper: nested key lookup across common containers (e.g., macros, nutrition)
+    const findFirst = (
+      keys: string[],
+      containers: Record<string, any>
+    ): any => {
+      for (const key of keys) {
+        if (key in containers) return containers[key];
+      }
+      // Search known nested objects
+      const nestedHosts = [
+        containers["macros"],
+        containers["nutrition"],
+        containers["nutrients"],
+        containers["details"],
+      ].filter(Boolean);
+      for (const host of nestedHosts) {
+        if (host && typeof host === "object") {
+          const lowered = Object.entries(host).reduce<Record<string, any>>(
+            (acc, [k, v]) => {
+              acc[String(k).toLowerCase()] = v;
+              return acc;
+            },
+            {}
+          );
+          for (const key of keys) {
+            if (key in lowered) return lowered[key];
+          }
+        }
+      }
+      return undefined;
+    };
+
+    // Helper: clamp numbers to sane ranges
+    const clamp = (n: number | null, min: number, max: number): number | null => {
+      if (n === null || !Number.isFinite(n)) return null;
+      return Math.min(Math.max(n, min), max);
     };
 
     // Name extraction from common keys
-    const name = ["food", "name", "item", "text", "title"]
+    const name = ["food", "name", "item", "text", "title", "label"]
       .map((k) => entries[k])
       .find((v) => typeof v === "string" && v.trim().length > 0) as
       | string
       | undefined;
 
     // Numeric macros with alias handling
-    const calories = toNum(
-      entries["calories"] ?? entries["kcal"] ?? entries["cal"]
+    const caloriesRaw = findFirst(["calories", "kcal", "cal"], entries);
+    const proteinRaw = findFirst(
+      ["protein_g", "protein", "proteingrams", "prot", "proteins"],
+      entries
     );
-    const protein_g = toNum(
-      entries["protein_g"] ?? entries["protein"] ?? entries["proteingrams"]
+    const carbsRaw = findFirst(
+      [
+        "carbs_g",
+        "carbs",
+        "carbohydrates",
+        "carbsg",
+        "carb",
+        "carbohydrate",
+      ],
+      entries
     );
-    const carbs_g = toNum(
-      entries["carbs_g"] ??
-        entries["carbs"] ??
-        entries["carbohydrates"] ??
-        entries["carbsg"]
+    const fatRaw = findFirst(
+      ["fat_g", "fat", "fatgrams", "fats", "lipids"],
+      entries
     );
-    const fat_g = toNum(
-      entries["fat_g"] ??
-        entries["fat"] ??
-        entries["fatgrams"] ??
-        entries["fats"]
-    );
+
+    let calories = clamp(parseNumWithUnits(caloriesRaw), 0, 10000);
+    let protein_g = clamp(parseNumWithUnits(proteinRaw), 0, 1000);
+    let carbs_g = clamp(parseNumWithUnits(carbsRaw), 0, 1000);
+    let fat_g = clamp(parseNumWithUnits(fatRaw), 0, 1000);
+
+    // If calories missing but macros available, infer via 4/4/9 rule
+    if (calories === null) {
+      const p = typeof protein_g === "number" ? protein_g : 0;
+      const c = typeof carbs_g === "number" ? carbs_g : 0;
+      const f = typeof fat_g === "number" ? fat_g : 0;
+      if (p || c || f) {
+        const inferred = 4 * p + 4 * c + 9 * f;
+        calories = clamp(inferred, 0, 10000);
+      }
+    }
 
     const nowIso = new Date().toISOString();
     const eaten_atRaw =
-      entries["eaten_at"] ?? entries["timestamp"] ?? entries["time"];
+      entries["eaten_at"] ??
+      entries["timestamp"] ??
+      entries["time"] ??
+      findFirst(["eaten_at", "timestamp", "time", "date"], entries);
     const eaten_at = (() => {
-      if (typeof eaten_atRaw === "string" && eaten_atRaw.trim()) {
-        const d = new Date(eaten_atRaw);
-        if (!isNaN(d.getTime())) return d.toISOString();
-      }
-      return nowIso;
+      const coerceDate = (val: any): string | null => {
+        if (val === null || val === undefined) return null;
+        if (typeof val === "number" && Number.isFinite(val)) {
+          // Heuristic: seconds vs ms
+          const ms = val > 1e12 ? val : val * 1000;
+          const d = new Date(ms);
+          return isNaN(d.getTime()) ? null : d.toISOString();
+        }
+        if (typeof val === "string" && val.trim()) {
+          // numeric string? try as epoch
+          const num = Number(val);
+          if (Number.isFinite(num)) {
+            const ms = num > 1e12 ? num : num * 1000;
+            const d = new Date(ms);
+            if (!isNaN(d.getTime())) return d.toISOString();
+          }
+          const d = new Date(val);
+          if (!isNaN(d.getTime())) return d.toISOString();
+        }
+        return null;
+      };
+      return coerceDate(eaten_atRaw) ?? nowIso;
     })();
 
     const note = ((): string | null => {
-      const n = entries["note"] ?? entries["notes"] ?? null;
+      const n =
+        entries["note"] ??
+        entries["notes"] ??
+        entries["comment"] ??
+        entries["comments"] ??
+        entries["description"] ??
+        findFirst(["note", "notes", "comment", "comments", "description"], entries) ??
+        null;
       return typeof n === "string" && n.trim().length > 0 ? n.trim() : null;
     })();
 
@@ -91,9 +188,29 @@ export async function POST(req: Request) {
                   ? it.trim()
                   : "";
             if (!itName) return null;
-            return { name: itName, quantity: it?.quantity ?? null };
+            // quantity may be number-like or string with units
+            const qRaw = it?.quantity ?? it?.qty ?? it?.amount ?? null;
+            const q = parseNumWithUnits(qRaw);
+            return { name: itName, quantity: q ?? null };
           })
           .filter(Boolean);
+      }
+      // If items is a string like "2 eggs, 1 slice bread"
+      if (typeof rawItems === "string" && rawItems.trim()) {
+        return rawItems
+          .split(/[,\n]+/)
+          .map((p) => p.trim())
+          .filter(Boolean)
+          .map((token) => {
+            // Extract leading quantity if any
+            const m = token.match(/^([0-9]*\.?[0-9]+)\s*(x|units?|pcs?|pieces?)?\s*(.*)$/i);
+            if (m) {
+              const qty = parseNumWithUnits(m[1]);
+              const nm = (m[3] || token).trim();
+              if (nm) return { name: nm, quantity: qty ?? null };
+            }
+            return { name: token, quantity: null };
+          });
       }
       const singleName = typeof name === "string" ? name.trim() : "";
       return singleName ? [{ name: singleName, quantity: null }] : [];
