@@ -120,13 +120,13 @@ export default function TasksPage() {
 
   // -------- Timezone helpers (mirror dashboard) --------
   const normalizeTz = (tz?: string | null) => {
-    // If tz is 'UTC' or missing, prefer local time for client-side daily checks
-    return tz && tz !== 'UTC' ? tz : undefined;
+    const t = String(tz || '').trim();
+    return t || (process.env.NEXT_PUBLIC_DEFAULT_TIMEZONE || 'Asia/Kolkata');
   };
   const nowInTZ = (tz?: string | null) => {
     try {
       const t = normalizeTz(tz || undefined);
-      return t ? new Date(new Date().toLocaleString('en-US', { timeZone: t })) : new Date();
+      return new Date(new Date().toLocaleString('en-US', { timeZone: t }));
     } catch {
       return new Date();
     }

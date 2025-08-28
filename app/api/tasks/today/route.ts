@@ -3,7 +3,10 @@ import { createClient } from '@/utils/supabase/server';
 import { getCurrentUser } from '@/utils/auth';
 
 // Helpers
-const normalizeTz = (tz?: string | null) => (tz && tz !== 'UTC' ? tz : undefined);
+const normalizeTz = (tz?: string | null) => {
+  const t = String(tz || '').trim();
+  return t || (process.env.DEFAULT_TIMEZONE || 'Asia/Kolkata');
+};
 const dateStrInTZ = (tz?: string | null, at?: Date) => {
   const fmt = new Intl.DateTimeFormat('en-CA', {
     timeZone: normalizeTz(tz),
