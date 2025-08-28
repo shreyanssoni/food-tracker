@@ -158,7 +158,16 @@ export async function GET(req: NextRequest) {
     // isDueToday server-side (uses provided now instant, formats by schedule timezone)
     const isDueToday = (taskId: string) => {
       const s = schedByTask[taskId];
-      if (!s) return false;
+      // If there is NO explicit schedule but the task has a weekly quota via goal template,
+      // treat it as due on any day of the week until the quota is met.
+      if (!s) {
+        if (typeof weeklyQuotaByTask[taskId] === 'number') {
+          const done = Number(weekCountByTask[taskId] || 0);
+          const quota = weeklyQuotaByTask[taskId] as number;
+          return done < quota;
+        }
+        return false;
+      }
       const t = (tasks || []).find((x) => x.id === taskId);
       if (t && typeof weeklyQuotaByTask[taskId] === 'number') {
         const done = Number(weekCountByTask[taskId] || 0);
