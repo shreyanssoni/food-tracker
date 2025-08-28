@@ -537,7 +537,11 @@ export default function DashboardPage() {
   // Determine if a task is due now (time reached) or later today (time in future)
   const classifyToday = (task: any) => {
     const s = schedules[task.id];
-    if (!s) return { dueNow: false, later: false, when: null as Date | null };
+    // If the server marked it due today but there's no schedule (e.g., goal-based weekly quota), show as due now.
+    if (!s) {
+      if (todayTaskIds.has(task.id)) return { dueNow: true, later: false, when: null as Date | null };
+      return { dueNow: false, later: false, when: null as Date | null };
+    }
     if (!todayTaskIds.has(task.id))
       return { dueNow: false, later: false, when: null };
     const when = todayAtInTZ(s.timezone, s.at_time);
