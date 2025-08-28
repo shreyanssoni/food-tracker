@@ -546,9 +546,9 @@ export default function DashboardPage() {
       return { dueNow: true, later: false, when: null };
     }
     const n = nowInTZ(s.timezone);
-    // If time has already passed, mark as expired for today (not due now or later)
-    if (n.getTime() > when.getTime())
-      return { dueNow: false, later: false, when };
+    // If time has already passed, still show as due now (do not hide it)
+    if (n.getTime() >= when.getTime())
+      return { dueNow: true, later: false, when };
     return { dueNow: false, later: true, when };
   };
 

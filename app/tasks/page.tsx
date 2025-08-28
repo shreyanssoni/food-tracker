@@ -396,18 +396,10 @@ export default function TasksPage() {
   };
 
   const grouped = useMemo(() => {
-    const isExpiredForToday = (t: Task) => {
-      const s = schedules[t.id];
-      if (!s || !s.at_time) return false;
-      try {
-        const n = nowInTZ(s.timezone);
-        const [hh, mm = '0', ss = '0'] = String(s.at_time).split(':');
-        const due = new Date(n.getFullYear(), n.getMonth(), n.getDate(), Number(hh)||0, Number(mm)||0, Number(ss)||0, 0);
-        return n.getTime() > due.getTime();
-      } catch { return false; }
-    };
+    // Do not treat past-time tasks as expired; they remain due today
+    const isExpiredForToday = (_t: Task) => false;
 
-    const todayList = filtered.filter((t) => t.active && todayTaskIds.has(t.id) && !isExpiredForToday(t));
+    const todayList = filtered.filter((t) => t.active && todayTaskIds.has(t.id));
     // Consider tasks overdue (>1 day since last completion) as inactive for display, but only for daily schedules
     const isOverdue = (t: Task) => {
       if (!t.active) return false; // already inactive handled below
@@ -419,8 +411,8 @@ export default function TasksPage() {
       const diffDays = Math.floor((today.getTime() - last.getTime()) / (1000*60*60*24));
       return diffDays > 1;
     };
-    const inactiveList = filtered.filter((t) => !t.active || isOverdue(t) || isExpiredForToday(t));
-    const activeList = filtered.filter((t) => t.active && !todayTaskIds.has(t.id) && !isOverdue(t) && !isExpiredForToday(t));
+    const inactiveList = filtered.filter((t) => !t.active || isOverdue(t));
+    const activeList = filtered.filter((t) => t.active && !todayTaskIds.has(t.id) && !isOverdue(t));
     return { todayList, activeList, inactiveList };
   }, [filtered, schedules, clockTick, todayTaskIds]);
 
