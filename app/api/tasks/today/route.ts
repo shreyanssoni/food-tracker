@@ -18,9 +18,9 @@ const dateStrInTZ = (tz?: string | null, at?: Date) => {
 };
 const dowInTZ = (tz?: string | null, at?: Date) => {
   try {
-    const s = (at || new Date()).toLocaleString('en-US', { timeZone: normalizeTz(tz) });
-    const d = new Date(s);
-    return d.getDay();
+    const wd = new Intl.DateTimeFormat('en-US', { timeZone: normalizeTz(tz), weekday: 'short' }).format(at || new Date());
+    const map: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    return map[wd as keyof typeof map] ?? (at || new Date()).getDay();
   } catch {
     return (at || new Date()).getDay();
   }
@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const nowParam = searchParams.get('now');
+    const debug = searchParams.get('debug') === '1';
     const now = nowParam ? new Date(nowParam) : new Date();
 
     // Load all tasks first, similar to /api/tasks
@@ -195,6 +196,27 @@ export async function GET(req: NextRequest) {
 
     const dueTodayTasks = tasksWithFlag.filter((t) => t.active && isDueToday(t.id));
     const dueSchedules = schedules.filter((s) => dueTodayTasks.some((t) => t.id === s.task_id));
+
+    if (debug) {
+      const diag = (tasks ?? []).map((t: any) => {
+        const s: any = schedByTask[t.id];
+        const res = isDueToday(t.id);
+        const todayStr = s ? dateStrInTZ(s.timezone, now) : dateStrInTZ(undefined, now);
+        const dow = s ? dowInTZ(s.timezone, now) : dowInTZ(undefined, now);
+        return {
+          id: t.id,
+          title: t.title,
+          active: t.active,
+          due: res,
+          schedule: s || null,
+          todayStr,
+          dow,
+          week_count: weekCountByTask[t.id] || 0,
+          week_quota: weeklyQuotaByTask[t.id] ?? null,
+        };
+      });
+      return NextResponse.json({ tasks: dueTodayTasks, schedules: dueSchedules, debug: { now: now.toISOString(), diagnostics: diag } });
+    }
 
     return NextResponse.json({ tasks: dueTodayTasks, schedules: dueSchedules });
   } catch (err: any) {
