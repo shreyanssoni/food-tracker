@@ -69,3 +69,12 @@ export default async function handler(
     res.status(500).json({ error: "Failed to analyze photo" });
   }
 }
+
+// Allow larger base64 payloads from camera captures
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "10mb",
+    },
+  },
+};

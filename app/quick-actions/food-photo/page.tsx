@@ -15,13 +15,42 @@ export default function FoodPhotoQuickAction() {
     return () => clearTimeout(t);
   }, []);
 
-  const toBase64 = (file: File) =>
+  const readDataUrl = (file: File) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+      reader.onload = () => resolve(String(reader.result) || "");
       reader.onerror = (e) => reject(e);
       reader.readAsDataURL(file);
     });
+
+  // Compress image using canvas to stay within API limits
+  const compressImage = async (
+    file: File,
+    opts: { maxW?: number; maxH?: number; quality?: number } = {}
+  ): Promise<{ base64: string; mime: string }> => {
+    const { maxW = 1280, maxH = 1280, quality = 0.8 } = opts;
+    const dataUrl = await readDataUrl(file);
+    const img = document.createElement("img");
+    await new Promise<void>((res, rej) => {
+      img.onload = () => res();
+      img.onerror = () => rej(new Error("Failed to load image"));
+      img.src = dataUrl;
+    });
+    let { width, height } = img;
+    const ratio = Math.min(1, maxW / width, maxH / height);
+    width = Math.max(1, Math.round(width * ratio));
+    height = Math.max(1, Math.round(height * ratio));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas not supported");
+    ctx.drawImage(img, 0, 0, width, height);
+    const mime = file.type && file.type.startsWith("image/") ? file.type : "image/jpeg";
+    const outUrl = canvas.toDataURL(mime, quality);
+    const base64 = outUrl.split(",")[1] || "";
+    return { base64, mime };
+  };
 
   const handleFile = async (file?: File) => {
     if (!file) {
@@ -33,8 +62,11 @@ export default function FoodPhotoQuickAction() {
       setError(null);
       setStatus("Analyzing photo…");
 
-      const imageBase64 = await toBase64(file);
-      const mimeType = file.type || "image/jpeg";
+      const { base64: imageBase64, mime: mimeType } = await compressImage(file, {
+        maxW: 1600,
+        maxH: 1600,
+        quality: 0.8,
+      });
 
       // 1) Send to AI photo analyzer
       const aiRes = await fetch("/api/ai/photo", {
