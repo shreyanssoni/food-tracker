@@ -177,10 +177,19 @@ export async function GET(req: NextRequest) {
       const todayStr = dateStrInTZ(s.timezone, now);
       if (s.start_date) {
         const start = String(s.start_date || '').slice(0, 10);
-        const end = String(s.end_date || s.start_date || '').slice(0, 10);
-        if (!(todayStr >= start && todayStr <= end)) return false;
+        const end = s.end_date ? String(s.end_date).slice(0, 10) : null;
+        if (s.frequency === 'once') {
+          // One-time tasks: due only on the exact start_date
+          return todayStr === start;
+        }
+        // For recurring schedules: open-ended if no end_date; else bounded window
+        if (end) {
+          if (!(todayStr >= start && todayStr <= end)) return false;
+        } else {
+          if (!(todayStr >= start)) return false;
+        }
       }
-      if (s.frequency === 'once') return Boolean(s.start_date);
+      if (s.frequency === 'once') return false; // already handled above
       if (s.frequency === 'daily') return true;
       if (s.frequency === 'weekly') {
         const d = dowInTZ(s.timezone, now);
