@@ -131,10 +131,29 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const supabase = createClient();
 
-    // Use UTC-based date keys to avoid timezone drift between server and DB (which stores DATE in UTC)
+    // Determine user's timezone; fall back to DEFAULT_TIMEZONE or Asia/Kolkata
+    const { data: pref } = await supabase
+      .from("user_preferences")
+      .select("timezone")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const userTz = (pref as any)?.timezone || process.env.DEFAULT_TIMEZONE || "Asia/Kolkata";
+
+    // Helpers for local YMD in a timezone and deriving yesterday/today keys aligned with finalize job
+    const ymdInTZ = (d: Date, tz: string) =>
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: tz,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(d);
     const now = new Date();
-    const todayKey = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const localTodayYmd = ymdInTZ(now, userTz); // YYYY-MM-DD in user's TZ
+    const localTodayAtUtcMidnight = new Date(`${localTodayYmd}T00:00:00Z`);
+    const localYesterdayDate = new Date(localTodayAtUtcMidnight.getTime() - 24 * 60 * 60 * 1000);
+    const yKeyLocal = isoDay(localYesterdayDate); // matches how finalize stores rows
+    const todayKey = isoDay(localTodayAtUtcMidnight);
+    const yesterday = localYesterdayDate;
 
     // Ensure table exists gracefully (skip if not created yet)
     let days = await getStreakDays(supabase, user.id);
@@ -272,18 +291,29 @@ export async function GET() {
       (d) => d.status === "counted" || d.status === "revived"
     ).length;
 
-    // Revive eligibility: yesterday missed (eligible day) and not counted nor revived
-    const yKey = isoDay(yesterday);
-    const yRow = (days as any).find((d: any) => d.day === yKey);
+    // Revive eligibility (24h window): if local yesterday was an eligible day and was missed,
+    // allow revive during the local "today" only. We must allow when a missed row already exists.
+    const yRow = (days as any).find((d: any) => d.day === yKeyLocal);
     let canRevive = false;
-    if (!yRow) {
-      const { eligible, allDone } = await allTasksCompletedForDate(
-        supabase,
-        user.id,
-        yesterday
-      );
-      if (eligible && !allDone) canRevive = true;
-    }
+    try {
+      // Only allow during local today (window after the miss)
+      const nowLocalYmd = localTodayYmd;
+      const windowOpen = nowLocalYmd === isoDay(localTodayAtUtcMidnight);
+      if (windowOpen) {
+        // If a row exists and is not counted/revived, it's a missed day eligible for revive
+        if (yRow && !yRow.counted && !yRow.revived) {
+          canRevive = true;
+        } else if (!yRow) {
+          // If finalize hasn't written the missed row yet, compute eligibility directly
+          const { eligible, allDone } = await allTasksCompletedForDate(
+            supabase,
+            user.id,
+            yesterday
+          );
+          if (eligible && !allDone) canRevive = true;
+        }
+      }
+    } catch {}
 
     return NextResponse.json({
       lifeStreak: {

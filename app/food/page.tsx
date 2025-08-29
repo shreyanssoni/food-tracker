@@ -35,30 +35,25 @@ export default function FoodPage() {
       .catch(() => setTargets(null));
   }, []);
 
-  // Fetch logs for selected day
+  // Fetch logs for selected day (via server API to avoid client-side RLS/session issues)
   useEffect(() => {
     const fetchLogs = async () => {
       setLoading(true);
-      const start = new Date(date + 'T00:00:00');
-      const end = new Date(date + 'T23:59:59.999');
-      const q = supabase
-        .from('food_logs')
-        .select('*')
-        .gte('eaten_at', start.toISOString())
-        .lte('eaten_at', end.toISOString())
-        .order('eaten_at', { ascending: false });
-      // Scope to current user to avoid cross-account leakage.
-      // If no session, fetch nothing for privacy.
-      const { data, error } = await (
-        session?.user?.id
-          ? q.eq('user_id', session.user.id)
-          : q.eq('user_id', '__none__') // always empty for anonymous viewers
-      );
-      if (!error && data) setLogs(data as any);
-      setLoading(false);
+      try {
+        if (!session?.user?.id) { setLogs([]); return; }
+        const res = await fetch(`/api/food_logs/day?date=${encodeURIComponent(date)}`, { cache: 'no-store' });
+        const j = await res.json().catch(() => ({}));
+        if (res.ok && Array.isArray(j?.data)) {
+          setLogs(j.data as any);
+        } else {
+          setLogs([]);
+        }
+      } finally {
+        setLoading(false);
+      }
     };
     fetchLogs();
-  }, [supabase, date, session?.user?.id]);
+  }, [date, session?.user?.id]);
 
   // Fetch macro override for selected day
   useEffect(() => {

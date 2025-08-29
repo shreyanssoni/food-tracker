@@ -23,10 +23,39 @@ export default async function handler(
     const jsonStart = out.indexOf("{");
     const jsonEnd = out.lastIndexOf("}");
     const parsed = JSON.parse(out.slice(jsonStart, jsonEnd + 1));
+
+    // Coerce numeric fields
+    let calories = Number(parsed?.calories);
+    let protein_g = Number(parsed?.protein_g);
+    let carbs_g = Number(parsed?.carbs_g);
+    let fat_g = Number(parsed?.fat_g);
+    if (!Number.isFinite(calories)) calories = 0;
+    if (!Number.isFinite(protein_g)) protein_g = 0;
+    if (!Number.isFinite(carbs_g)) carbs_g = 0;
+    if (!Number.isFinite(fat_g)) fat_g = 0;
+    if ((protein_g > 0 || carbs_g > 0 || fat_g > 0) && calories === 0) {
+      calories = Math.round(protein_g * 4 + carbs_g * 4 + fat_g * 9);
+    }
+
+    // Validate eaten_at
+    const eaten_at = parsed?.eaten_at && !Number.isNaN(Date.parse(parsed.eaten_at))
+      ? new Date(parsed.eaten_at).toISOString()
+      : null;
+
+    const items = Array.isArray(parsed?.items) ? parsed.items : [];
+
     res.json({
-      log: parsed?.items ?? parsed,
+      log: {
+        items,
+        calories,
+        protein_g,
+        carbs_g,
+        fat_g,
+        eaten_at,
+        note: parsed?.note ?? null,
+      },
       suggestion: parsed?.suggestion || null,
-      eaten_at: parsed?.eaten_at || null,
+      eaten_at,
     });
   } catch (e: any) {
     if (

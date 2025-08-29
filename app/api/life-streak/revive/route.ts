@@ -62,11 +62,19 @@ export async function POST() {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const supabase = createClient();
 
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-    const yKey = isoDay(yesterday);
+    // Determine user's timezone for local-day window
+    const { data: pref } = await supabase
+      .from('user_preferences')
+      .select('timezone')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    const userTz = (pref as any)?.timezone || process.env.DEFAULT_TIMEZONE || 'Asia/Kolkata';
+    const ymdInTZ = (d: Date, tz: string) => new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+    const now = new Date();
+    const localTodayYmd = ymdInTZ(now, userTz);
+    const localTodayAtUtcMidnight = new Date(`${localTodayYmd}T00:00:00Z`);
+    const yesterday = new Date(localTodayAtUtcMidnight.getTime() - 24 * 60 * 60 * 1000);
+    const yKey = isoDay(yesterday); // matches finalize
 
     // Check if yesterday already counted or revived
     const { data: yRowData, error: yErr } = await supabase
@@ -76,7 +84,12 @@ export async function POST() {
       .eq('day', yKey)
       .maybeSingle();
     if (yErr) throw yErr;
-    if (yRowData) return NextResponse.json({ error: 'Already counted' }, { status: 409 });
+    if (yRowData) {
+      if (yRowData.counted || yRowData.revived) {
+        return NextResponse.json({ error: 'Already counted' }, { status: 409 });
+      }
+      // else it's a missed row; allow revive to proceed
+    }
 
     // Ensure yesterday was an eligible day with at least one scheduled task but not all completed
     const { eligible, allDone } = await allTasksCompletedForDate(supabase, user.id, yesterday);
@@ -94,7 +107,7 @@ export async function POST() {
     const diamonds = prog?.diamonds ?? 0;
     if (diamonds < cost) return NextResponse.json({ error: 'Insufficient diamonds' }, { status: 402 });
 
-    // Perform atomic updates: deduct diamonds, ledger, insert life_streak_days
+    // Perform atomic updates: deduct diamonds, ledger, insert/update life_streak_days
     // Supabase JS client lacks multi-op transaction; emulate with sequential ops assuming RLS and constraints
     const { error: uErr } = await supabase.rpc('perform_life_streak_revive', { p_user_id: user.id, p_day: yKey, p_cost: cost });
     if (uErr) {
@@ -108,10 +121,20 @@ export async function POST() {
         .from('diamond_ledger')
         .insert({ user_id: user.id, delta: -cost, reason: 'life_streak_revive' });
       if (ledErr) throw ledErr;
-      const { error: insErr } = await supabase
-        .from('life_streak_days')
-        .insert({ user_id: user.id, day: yKey, counted: true, revived: true });
-      if (insErr) throw insErr;
+      if (yRowData) {
+        // Update existing missed row to counted+revived
+        const { error: upDayErr } = await supabase
+          .from('life_streak_days')
+          .update({ counted: true, revived: true })
+          .eq('user_id', user.id)
+          .eq('day', yKey);
+        if (upDayErr) throw upDayErr;
+      } else {
+        const { error: insErr } = await supabase
+          .from('life_streak_days')
+          .insert({ user_id: user.id, day: yKey, counted: true, revived: true });
+        if (insErr) throw insErr;
+      }
     }
 
     // Return updated diamonds

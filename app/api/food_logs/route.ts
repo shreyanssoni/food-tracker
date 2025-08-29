@@ -141,6 +141,7 @@ export async function POST(req: Request) {
       entries["timestamp"] ??
       entries["time"] ??
       findFirst(["eaten_at", "timestamp", "time", "date"], entries);
+      
     const eaten_at = (() => {
       const coerceDate = (val: any): string | null => {
         if (val === null || val === undefined) return null;
@@ -163,7 +164,14 @@ export async function POST(req: Request) {
         }
         return null;
       };
-      return coerceDate(eaten_atRaw) ?? nowIso;
+      const coerced = coerceDate(eaten_atRaw);
+      if (coerced) {
+        const parsed = new Date(coerced);
+        const now = new Date();
+        if (parsed < now) return nowIso; // default to current local time if in the past
+        return coerced;
+      }
+      return nowIso;
     })();
 
     const note = ((): string | null => {

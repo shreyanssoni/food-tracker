@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import AvatarCanvas from "./AvatarCanvas";
 import EpBar from "./EpBar";
+import { toast } from "sonner";
 
 export default function AvatarPanel() {
   const [loading, setLoading] = useState(true);
@@ -22,6 +23,7 @@ export default function AvatarPanel() {
     week?: Array<{ day: string; status: 'counted' | 'revived' | 'missed' | 'none' }>;
     weekly?: { consecutive: number; longest: number; currentWeekDays?: number };
   }>(null);
+  const [reviving, setReviving] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -180,6 +182,36 @@ export default function AvatarPanel() {
                 <span aria-hidden>🔥</span>
                 <span>Life Streak</span>
               </div>
+              {lifeStreak?.canRevive ? (
+                <button
+                  disabled={reviving}
+                  onClick={async () => {
+                    if (reviving) return;
+                    try {
+                      setReviving(true);
+                      const res = await fetch("/api/life-streak/revive", { method: "POST" });
+                      const j = await res.json().catch(() => ({}));
+                      if (!res.ok) throw new Error(j.error || "Revive failed");
+                      // refresh life streak + progress
+                      const [lsRes, pRes] = await Promise.all([
+                        fetch("/api/life-streak", { cache: 'no-store' }),
+                        fetch("/api/progress", { cache: 'no-store' }),
+                      ]);
+                      const [lsJson, pJson] = await Promise.all([lsRes.json().catch(()=>({})), pRes.json().catch(()=>({}))]);
+                      if (lsRes.ok && lsJson?.lifeStreak) setLifeStreak(lsJson.lifeStreak);
+                      if (pRes.ok && pJson?.progress) setProgress(pJson.progress);
+                      toast.success("Streak revived 🔥");
+                    } catch (e: any) {
+                      toast.error(e?.message || "Revive failed");
+                    } finally {
+                      setReviving(false);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] sm:text-xs bg-blue-600 text-white disabled:opacity-60"
+                >
+                  💎 Revive
+                </button>
+              ) : null}
             </div>
             <div className="mt-1 flex items-baseline gap-2">
               <div className="text-2xl font-extrabold text-orange-700 dark:text-orange-300">
