@@ -14,19 +14,19 @@ const redis =
     : null;
 
 const limiterDefault = redis
-  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(60, "1 m") })
-  : null; // 60 req/min/IP default
+  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(300, "1 m") })
+  : null; // 300 req/min/IP default
 const limiterAI = redis
-  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, "1 m") })
+  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(30, "1 m") })
   : null; // AI endpoints
 const limiterSendTest = redis
-  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, "1 m") })
+  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(30, "1 m") })
   : null; // device test
 const limiterSendToUser = redis
-  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(30, "1 m") })
+  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(60, "1 m") })
   : null; // targeted sends
 const limiterScheduler = redis
-  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(2, "1 m") })
+  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, "1 m") })
   : null; // scheduler
 
 function getClientIp(req: NextRequest) {
@@ -67,6 +67,15 @@ export async function middleware(request: NextRequest) {
   // Edge rate limiting for API routes (even if public), if Upstash configured
   if (process.env.NODE_ENV !== "development") {
     if (redis && pathname.startsWith("/api/")) {
+      // Exempt critical low-cost endpoints from rate limiting to prevent perceived logouts
+      const exempt = [
+        "/api/session/heartbeat",
+        "/api/me",
+        "/api/notifications/messages",
+      ];
+      if (exempt.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
+        return NextResponse.next();
+      }
       const ip = getClientIp(request);
       const isVercelCron = request.headers.get("x-vercel-cron");
       const providedSecret =

@@ -439,12 +439,17 @@ export default function Navbar() {
           }
 
           const res = await fetch("/api/me");
-          if (res.status === 404) {
-            // App user was deleted; clean up this device's push and sign out
+          // Only force logout for explicit auth/user errors
+          if (res.status === 401 || res.status === 404) {
             try {
               await disableNotifications();
             } catch {}
             await signOut({ callbackUrl: "/" });
+            return;
+          }
+          if (!res.ok) {
+            // For transient errors like 429/500, keep the session and skip logout
+            setIsAdmin(false);
             return;
           }
           const j = await res.json().catch(() => ({}));
