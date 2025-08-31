@@ -4,7 +4,6 @@ import withPWAInit from '@ducanh2912/next-pwa';
 const nextConfig = {
   experimental: {
     typedRoutes: true,
-    serverActions: true,
   },
   eslint: {
     ignoreDuringBuilds: true,

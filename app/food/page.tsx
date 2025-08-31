@@ -11,13 +11,18 @@ import CoachSummary from '@/components/CoachSummary';
 import { MessageSquareText, Sparkles } from 'lucide-react';
 import { createClient as createBrowserClient } from '@/utils/supabase/client';
 import type { FoodLog } from '@/types';
+import { getReliableTimeZone } from '@/utils/timezone';
 
 export default function FoodPage() {
   const supabase = createBrowserClient();
   const { data: session } = useSession();
   const [logs, setLogs] = useState<FoodLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0, 10)); // yyyy-mm-dd
+  const [tz] = useState<string>(() => getReliableTimeZone());
+  const [date, setDate] = useState<string>(() => {
+    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: getReliableTimeZone(), year: 'numeric', month: '2-digit', day: '2-digit' });
+    return fmt.format(new Date());
+  }); // yyyy-mm-dd in user tz
   const [targets, setTargets] = useState<{ calories: number; protein_g: number; carbs_g: number; fat_g: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [override, setOverride] = useState<{ calories: number; protein_g: number; carbs_g: number; fat_g: number } | null>(null);
@@ -41,7 +46,7 @@ export default function FoodPage() {
       setLoading(true);
       try {
         if (!session?.user?.id) { setLogs([]); return; }
-        const res = await fetch(`/api/food_logs/day?date=${encodeURIComponent(date)}`, { cache: 'no-store' });
+        const res = await fetch(`/api/food_logs/day?date=${encodeURIComponent(date)}&tz=${encodeURIComponent(tz)}`, { cache: 'no-store' });
         const j = await res.json().catch(() => ({}));
         if (res.ok && Array.isArray(j?.data)) {
           setLogs(j.data as any);
@@ -53,7 +58,7 @@ export default function FoodPage() {
       }
     };
     fetchLogs();
-  }, [date, session?.user?.id]);
+  }, [date, tz, session?.user?.id]);
 
   // Fetch macro override for selected day
   useEffect(() => {
@@ -80,7 +85,8 @@ export default function FoodPage() {
   }, [supabase, date, session?.user?.id]);
 
   const onLogged = (log: FoodLog) => {
-    const logDate = new Date(log.eaten_at).toISOString().slice(0, 10);
+    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+    const logDate = fmt.format(new Date(log.eaten_at));
     if (logDate === date) setLogs((prev) => [log, ...prev]);
   };
 

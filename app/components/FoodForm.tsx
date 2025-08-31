@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { useSession } from "next-auth/react";
-import { PlusCircle, Loader2, Soup, Mic, Pause, Play, Square } from "lucide-react";
+import { PlusCircle, Loader2, Soup, Mic, MicOff } from "lucide-react";
 import type { FoodLog } from "@/types";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
 
@@ -24,286 +24,128 @@ export function FoodForm({ onLogged }: { onLogged: (log: FoodLog) => void }) {
   const [isFocused, setIsFocused] = useState(false);
   const supabase = createBrowserClient();
 
-  // Voice dictation state
-  const [recording, setRecording] = useState(false);
-  const [paused, setPaused] = useState(false);
-  const [processing, setProcessing] = useState(false); // UI: after stop, while engine finalizes
-  const [serverSttEnabled, setServerSttEnabled] = useState<boolean>(false);
-  const recognitionRef = useRef<any>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const mediaChunksRef = useRef<BlobPart[]>([]);
-  const autoStopTimerRef = useRef<number | null>(null);
-  const processingTimeoutRef = useRef<number | null>(null);
+  // Speech recognition state
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const timeoutRef = useRef<NodeJS.Timeout>();
 
-  const getRecognition = () => {
-    const SR: any = (typeof window !== "undefined" && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)) || null;
-    if (!SR) return null;
-    const rec = new SR();
-    rec.lang = "en-US"; // English transcription
-    rec.interimResults = true;
-    rec.continuous = true;
-    return rec;
-  };
-
-  const hasWebSpeech = () =>
-    typeof window !== "undefined" && Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
-
-  const stopDictation = () => {
-    try {
-      if (recognitionRef.current) {
-        recognitionRef.current.onresult = null;
-        recognitionRef.current.onerror = null;
-        recognitionRef.current.onend = null;
-        recognitionRef.current.stop();
+  useEffect(() => {
+    // Initialize speech recognition
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        console.warn('Speech recognition not supported in this browser');
+        return;
       }
-    } catch {}
-    recognitionRef.current = null;
-    setRecording(false);
-    setPaused(false);
-    setProcessing(true);
-    // schedule safety timeout for processing to avoid stuck UI
-    if (processingTimeoutRef.current) {
-      clearTimeout(processingTimeoutRef.current);
+
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        const results = event.results;
+        const transcript = Array.from(results)
+          .map(result => result[0])
+          .filter(Boolean) // Filter out any undefined results
+          .map(result => result.transcript)
+          .join('');
+        
+        setTranscript(transcript);
+        setText(transcript);
+      };
+
+      recognition.onerror = (event: Event) => {
+        const errorEvent = event as SpeechRecognitionErrorEvent;
+        console.error('Speech recognition error', errorEvent.error);
+        addMessage('error', `Speech recognition error: ${errorEvent.error}`);
+        stopDictation();
+      };
+
+      recognition.onend = () => {
+        if (isListening) {
+          // If we're still supposed to be listening, restart recognition
+          try {
+            recognition.start();
+          } catch (err) {
+            console.error('Error restarting recognition:', err);
+            stopDictation();
+          }
+        }
+      };
+
+      recognitionRef.current = recognition;
+
+      return () => {
+        recognition.stop();
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+      };
     }
-    processingTimeoutRef.current = window.setTimeout(() => {
-      setProcessing(false);
-      addMessage("error", "Transcription took too long. You can resume recording or type your meal.");
-    }, 15000) as unknown as number;
-    // If we were using server recording, stop that path too
-    if (mediaRecorderRef.current) {
-      stopServerRecording();
+  }, [isListening]);
+
+  useEffect(() => {
+    if (transcript) {
+      setText(transcript);
     }
-    // clear any running auto-stop timers
-    if (autoStopTimerRef.current) {
-      clearTimeout(autoStopTimerRef.current);
-      autoStopTimerRef.current = null;
-    }
-  };
+  }, [transcript]);
 
   const startDictation = async () => {
-    if (loading) return;
-    const rec = getRecognition();
-    if (!rec) {
-      // Prefer front-end only: do not auto-fallback to server
-      addMessage(
-        "info",
-        "Voice input isn’t supported on this device/browser. For fastest English dictation, try Chrome. You can also type your meal or add a photo."
-      );
+    if (loading || !recognitionRef.current) {
+      if (!recognitionRef.current) {
+        addMessage('error', 'Speech recognition not available in your browser.');
+      }
       return;
     }
-
-    // Preflight permission
-    const allowed = await ensureMicPermission();
-    if (!allowed) {
-      addMessage(
-        "error",
-        "Microphone permission is blocked. In Chrome: click the lock icon > Site settings > Allow Microphone. You can also type your meal or add a photo."
-      );
-      return;
-    }
-
-    let pendingFinal = "";
-
-    rec.onresult = (event: any) => {
-      let finalChunk = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          finalChunk += result[0].transcript;
-        } else {
-          // Optionally we could show interim text; we keep UI simple.
-        }
-      }
-      if (finalChunk.trim()) {
-        pendingFinal += (pendingFinal ? " " : "") + finalChunk.trim();
-        setText((prev) => {
-          const sep = prev && !prev.endsWith(" ") ? " " : "";
-          return (prev + sep + pendingFinal).trimStart();
-        });
-        pendingFinal = "";
-      }
-    };
-
-
-    rec.onerror = (e: any) => {
-      const err: string | undefined = e?.error;
-      if (err === "not-allowed") {
-        addMessage("error", "Microphone access denied. Please allow the mic in browser settings, or type your meal/add a photo.");
-      } else if (err === "audio-capture") {
-        addMessage("error", "No microphone found. Connect a mic or type your meal/add a photo.");
-      } else if (err === "network") {
-        addMessage("error", "Network error during transcription. Please try again, type your meal, or add a photo.");
-      } else if (err === "no-speech") {
-        addMessage("info", "Didn't catch that. Try again, or type your meal/add a photo.");
-      } else {
-        addMessage("error", "Could not record or transcribe. Please type your meal or add a photo.");
-      }
-      stopDictation();
-      setProcessing(false);
-    };
-
-    rec.onend = () => {
-      // Auto-stop callback from engine (silence etc.)
-      if (!paused) {
-        setRecording(false);
-        setProcessing(false);
-        if (processingTimeoutRef.current) {
-          clearTimeout(processingTimeoutRef.current);
-          processingTimeoutRef.current = null;
-        }
-      }
-    };
-
+    
     try {
-      rec.start();
-      recognitionRef.current = rec;
-      setRecording(true);
-      setPaused(false);
-      // 60s auto-stop
-      if (autoStopTimerRef.current) clearTimeout(autoStopTimerRef.current);
-      autoStopTimerRef.current = window.setTimeout(() => {
-        addMessage("info", "Auto-stopped after 1 minute and transcribing.");
+      setTranscript('');
+      setText('');
+      setIsListening(true);
+      
+      // Start recognition with error handling
+      try {
+        recognitionRef.current.start();
+      } catch (err) {
+        console.error('Error starting recognition:', err);
+        throw new Error('Failed to start voice input');
+      }
+      
+      // Auto-stop after 60 seconds
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        addMessage('info', 'Auto-stopped after 1 minute.');
         stopDictation();
-      }, 60000) as unknown as number;
-    } catch {
-      addMessage("error", "Could not start voice input");
+      }, 60000);
+      
+    } catch (err) {
+      console.error('Error in startDictation:', err);
+      addMessage('error', 'Could not start voice input. Please try again or type your meal.');
+      setIsListening(false);
+      setIsProcessing(false);
     }
   };
 
-  const ensureMicPermission = async (): Promise<boolean> => {
-    try {
-      if (!(navigator as any)?.mediaDevices?.getUserMedia) return true; // continue; SR may still prompt
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Immediately stop tracks; SR will handle audio
-      stream.getTracks().forEach((t) => t.stop());
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  // Server STT recording using MediaRecorder
-  const startServerRecording = async () => {
-    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
-      addMessage("info", "Voice input not supported. Please type your meal or add a photo.");
-      return;
-    }
-    const allowed = await ensureMicPermission();
-    if (!allowed) {
-      addMessage(
-        "error",
-        "Microphone permission is blocked. In Chrome: click the lock icon > Site settings > Allow Microphone. You can also type your meal or add a photo."
-      );
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
-      mediaChunksRef.current = [];
-      mr.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) mediaChunksRef.current.push(e.data);
-      };
-      mr.onstop = async () => {
-        try {
-          // stop all tracks
-          stream.getTracks().forEach((t) => t.stop());
-        } catch {}
-        setProcessing(true);
-        const blob = new Blob(mediaChunksRef.current, { type: "audio/webm" });
-        mediaChunksRef.current = [];
-        try {
-          const form = new FormData();
-          form.append("file", blob, "audio.webm");
-          // Add fetch timeout to avoid stuck processing
-          const controller = new AbortController();
-          const fetchTimeout = window.setTimeout(() => controller.abort(), 30000);
-          const res = await fetch("/api/ai/stt", { method: "POST", body: form, signal: controller.signal });
-          clearTimeout(fetchTimeout);
-          if (!res.ok) {
-            const j = await res.json().catch(() => ({}));
-            throw new Error(j?.error || `Transcription failed (${res.status})`);
-          }
-          const j = await res.json();
-          const t = (j?.text || "").trim();
-          if (t) {
-            setText((prev) => {
-              const sep = prev && !prev.endsWith(" ") ? " ": "";
-              return (prev + sep + t).trimStart();
-            });
-          } else {
-            addMessage("info", "Didn't catch that. Try again, or type your meal/add a photo.");
-          }
-        } catch (e: any) {
-          if (e?.name === 'AbortError') {
-            addMessage("error", "Transcription timed out. Please try again or type your meal.");
-          } else {
-            addMessage("error", e?.message || "Could not transcribe. Please type your meal or add a photo.");
-          }
-        } finally {
-          setProcessing(false);
-          if (processingTimeoutRef.current) {
-            clearTimeout(processingTimeoutRef.current);
-            processingTimeoutRef.current = null;
-          }
-        }
-      };
-      mediaRecorderRef.current = mr;
-      // Use timeslice to periodically flush data and allow idle timers if needed
-      mr.start(1000);
-      setRecording(true);
-      setPaused(false);
-      // Auto-stop after 60s
-      if (autoStopTimerRef.current) clearTimeout(autoStopTimerRef.current);
-      autoStopTimerRef.current = window.setTimeout(() => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-          addMessage("info", "Auto-stopped after 1 minute and transcribing.");
-          stopServerRecording();
-        }
-      }, 60000) as unknown as number;
-    } catch (e) {
-      addMessage("error", "Could not start recording. Please type your meal or add a photo.");
-    }
-  };
-
-  const stopServerRecording = () => {
-    try {
-      const mr = mediaRecorderRef.current;
-      if (mr && mr.state !== "inactive") {
-        mr.stop();
-      }
-    } catch {}
-    mediaRecorderRef.current = null;
-    setRecording(false);
-    setPaused(false);
-    if (autoStopTimerRef.current) {
-      clearTimeout(autoStopTimerRef.current);
-      autoStopTimerRef.current = null;
-    }
-  };
-
-  // Pause/Resume handlers
-  const togglePause = () => {
-    if (!recording) return;
-    // Web Speech API: emulate pause by stopping engine without processing, resume by startDictation
+  const stopDictation = () => {
+    setIsListening(false);
+    setIsProcessing(false);
+    
     if (recognitionRef.current) {
-      if (!paused) {
-        try { recognitionRef.current.stop?.(); } catch {}
-        setPaused(true);
-      } else {
-        startDictation();
+      try {
+        recognitionRef.current.stop();
+      } catch (err) {
+        console.error('Error stopping recognition:', err);
       }
-      return;
     }
-    // Server recording
-    const mr = mediaRecorderRef.current;
-    if (mr) {
-      if (!paused && mr.state === "recording" && (mr as any).pause) {
-        (mr as any).pause();
-        setPaused(true);
-      } else if (paused && (mr as any).resume) {
-        (mr as any).resume();
-        setPaused(false);
-      }
+    
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = undefined;
     }
   };
 
@@ -415,36 +257,6 @@ export function FoodForm({ onLogged }: { onLogged: (log: FoodLog) => void }) {
     }
   };
 
-  // Fetch server STT availability
-  useEffect(() => {
-    fetch("/api/ai/stt")
-      .then((r) => r.ok ? r.json() : { enabled: false })
-      .then((d) => setServerSttEnabled(Boolean(d?.enabled)))
-      .catch(() => setServerSttEnabled(false));
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      try {
-        if (recognitionRef.current) {
-          recognitionRef.current.stop?.();
-        }
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-          mediaRecorderRef.current.stop();
-        }
-      } catch {}
-      if (autoStopTimerRef.current) {
-        clearTimeout(autoStopTimerRef.current);
-        autoStopTimerRef.current = null;
-      }
-      if (processingTimeoutRef.current) {
-        clearTimeout(processingTimeoutRef.current);
-        processingTimeoutRef.current = null;
-      }
-    };
-  }, []);
-
   return (
     <div className="space-y-4">
       <form onSubmit={submit} className="space-y-3">
@@ -463,92 +275,33 @@ export function FoodForm({ onLogged }: { onLogged: (log: FoodLog) => void }) {
             aria-label="Quick log: what did you eat?"
             maxLength={140}
             className={`w-full pl-10 pr-36 py-4 rounded-xl border bg-white/80 backdrop-blur dark:bg-zinc-900/70 border-zinc-200 dark:border-zinc-700 focus:border-transparent transition-all duration-200 shadow-sm ${
-              recording
-                ? "ring-2 ring-rose-500/50 sm:animate-pulse"
-                : processing
-                  ? "ring-2 ring-blue-500/50 sm:animate-pulse"
+              isListening
+                ? "ring-2 ring-rose-400/40"
+                : isProcessing
+                  ? "ring-2 ring-blue-400/40"
                   : "focus:ring-2 focus:ring-blue-500"
             }`}
             disabled={loading}
           />
-          {(recording || processing) && (
-            <div
-              aria-live="polite"
-              className="sm:absolute sm:-top-2 sm:right-2 sm:translate-y-[-100%] mt-2 sm:mt-0 flex items-center gap-2 text-[12px] sm:text-[11px] rounded-full px-2.5 py-1.5 sm:px-2 sm:py-1 border backdrop-blur shadow-sm select-none
-              bg-white/80 border-zinc-200 text-zinc-700 dark:bg-zinc-900/70 dark:border-zinc-700 dark:text-zinc-200"
-            >
-              {recording && !paused ? (
-                <>
-                  <span className="relative inline-flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-60" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600" />
-                  </span>
-                  Listening…
-                  <button type="button" onClick={togglePause} className="ml-2 px-2 py-0.5 rounded-full underline hover:no-underline">Pause</button>
-                  <button type="button" onClick={stopDictation} className="ml-1 px-2 py-0.5 rounded-full text-zinc-600 hover:text-zinc-800">Stop</button>
-                  {/* mini equalizer */}
-                  <span className="ml-1 flex items-end gap-[2px]" aria-hidden>
-                    <span className="w-[2px] h-2 bg-rose-500 animate-[bounce_0.9s_ease-in-out_infinite]" />
-                    <span className="w-[2px] h-3 bg-rose-500 animate-[bounce_1.1s_ease-in-out_infinite]" />
-                    <span className="w-[2px] h-2 bg-rose-500 animate-[bounce_0.8s_ease-in-out_infinite]" />
-                  </span>
-                </>
-              ) : processing ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" />
-                  Transcribing…
-                </>
-              ) : (
-                <>
-                  <Mic className="h-3.5 w-3.5 text-zinc-500" />
-                  Paused
-                  <button type="button" onClick={togglePause} className="ml-2 px-2 py-0.5 rounded-full underline hover:no-underline">Resume</button>
-                  <button type="button" onClick={stopDictation} className="ml-1 px-2 py-0.5 rounded-full text-zinc-600 hover:text-zinc-800">Stop</button>
-                </>
-              )}
-            </div>
-          )}
-          {/* voice dictation toggle (responsive for mobile) */}
+          {/* Removed the separate status pill to keep UI simple */}
+          {/* Single mic button toggles start/stop */}
           <button
             type="button"
-            onClick={() => (recording ? togglePause() : startDictation())}
-            className={`group absolute right-14 sm:right-12 top-1/2 -translate-y-1/2 h-11 w-11 sm:h-10 sm:w-10 inline-flex items-center justify-center rounded-full transition-all duration-200 z-10
-              ${loading ? "cursor-not-allowed opacity-60" : "hover:scale-[1.04] active:scale-[0.98]"}
-              ${recording
-                ? "text-rose-700 dark:text-rose-300 bg-rose-50/70 dark:bg-rose-400/10 border border-rose-200/70 dark:border-rose-500/30 shadow-sm"
-                : "text-zinc-700 dark:text-zinc-200 bg-white/70 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-700 shadow-sm hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60"}
-            `}
-            aria-label={recording ? (paused ? "Resume voice input" : "Pause voice input") : "Start voice input"}
-            aria-pressed={recording}
-            title={recording ? (paused ? "Resume voice input" : "Pause voice input") : "Start voice input"}
+            onClick={isListening ? stopDictation : startDictation}
             disabled={loading}
+            className={`absolute right-14 top-1/2 -translate-y-1/2 h-11 w-11 sm:h-10 sm:w-10 inline-flex items-center justify-center rounded-full transition-all z-20 ${
+              isListening 
+                ? 'text-white bg-red-600 hover:bg-red-700 focus:ring-2 focus:ring-red-400' 
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700/50'
+            }`}
+            aria-label={isListening ? 'Stop recording' : 'Start voice input'}
+            title={isListening ? 'Stop voice input' : 'Start voice input'}
           >
-            {/* gradient ring */}
-            <span
-              className={`absolute inset-0 rounded-full pointer-events-none transition-opacity hidden sm:block ${recording ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-              aria-hidden
-              style={{
-                background: "linear-gradient(135deg, rgba(244,63,94,0.25), rgba(14,165,233,0.15))",
-                padding: 1,
-                WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
-                WebkitMaskComposite: "xor" as any,
-                maskComposite: "exclude" as any,
-              }}
-            />
-            {/* glow when recording */}
-            {recording && (
-              <span className="absolute -inset-0.5 sm:-inset-1 rounded-full bg-rose-500/15 blur-sm sm:blur-md sm:animate-pulse" aria-hidden />
+            {isListening ? (
+              <MicOff className="h-5 w-5" />
+            ) : (
+              <Mic className="h-5 w-5" />
             )}
-            <span className="relative">
-              {recording ? (
-                paused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />
-              ) : (
-                <Mic className="h-5 w-5" />
-              )}
-              <span className="sr-only">{recording ? (paused ? "Resume" : "Pause") : "Start"} voice input</span>
-            </span>
-            {/* focus ring */}
-            <span className="absolute inset-0 rounded-full ring-2 ring-transparent focus-within:ring-rose-400" aria-hidden />
           </button>
           {/* submit button (responsive for mobile) */}
           <button
@@ -581,15 +334,6 @@ export function FoodForm({ onLogged }: { onLogged: (log: FoodLog) => void }) {
               }}
               className="underline hover:no-underline">add a photo</button>.
           </div>
-          {!hasWebSpeech() && serverSttEnabled && (
-            <div className="mt-1">
-              No browser dictation? <button
-                type="button"
-                onClick={() => startServerRecording()}
-                className="underline hover:no-underline"
-              >Use server transcription (slower)</button>
-            </div>
-          )}
         </div>
       </form>
 
