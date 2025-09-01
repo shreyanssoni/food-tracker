@@ -47,7 +47,7 @@ export const handler = async (req: Request): Promise<Response> => {
     }
   };
 
-  // Allow running a single target via query param ?only=push|eod|pre
+  // Allow running a single target via query param ?only=push|eod|pre|shadow-generate|shadow-close|shadow-notify
   const urlObj = new URL(req.url);
   const only = urlObj.searchParams.get('only');
   const allTargets = {
@@ -55,6 +55,9 @@ export const handler = async (req: Request): Promise<Response> => {
     eod: `${base}/api/life-streak/finalize?secret=${encodeURIComponent(secret)}`,
     'pre-eod': `${base}/api/streaks/pre-eod-reminder?secret=${encodeURIComponent(secret)}`,
     reminders: `${base}/api/tasks/reminders/run?secret=${encodeURIComponent(secret)}`,
+    'shadow-generate': `${base}/api/shadow/cron/generate-daily-admin?secret=${encodeURIComponent(secret)}`,
+    'shadow-close': `${base}/api/shadow/cron/close-overdue-admin?secret=${encodeURIComponent(secret)}`,
+    'shadow-notify': `${base}/api/shadow/cron/notify-admin?secret=${encodeURIComponent(secret)}`,
   } as const;
 
   let targets: string[];
@@ -72,8 +75,24 @@ export const handler = async (req: Request): Promise<Response> => {
     case 'reminders':
       targets = [allTargets.reminders];
       break;
+    case 'shadow-generate':
+      targets = [allTargets['shadow-generate']];
+      break;
+    case 'shadow-close':
+      targets = [allTargets['shadow-close']];
+      break;
+    case 'shadow-notify':
+      targets = [allTargets['shadow-notify']];
+      break;
     default:
-      targets = [allTargets.push, allTargets.eod, allTargets['pre-eod']];
+      targets = [
+        allTargets.push,
+        allTargets.eod,
+        allTargets['pre-eod'],
+        allTargets['shadow-generate'],
+        allTargets['shadow-close'],
+        allTargets['shadow-notify'],
+      ];
   }
 
   console.time?.('pinger_total');

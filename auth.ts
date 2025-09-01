@@ -2,6 +2,7 @@ import NextAuth from 'next-auth';
 import Google from 'next-auth/providers/google';
 import Credentials from 'next-auth/providers/credentials';
 import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin';
 import type { NextAuthConfig } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import { OAuth2Client } from 'google-auth-library';
@@ -49,11 +50,15 @@ const config: NextAuthConfig = {
       },
     }),
   ],
+  // Allow Auth.js to accept the current host in development and when using tunnels.
+  // Alternatively, you can set AUTH_TRUST_HOST=true in the environment.
+  trustHost: true,
   callbacks: {
     async signIn({ user }) {
       if (!user?.email) return false;
       try {
         const supabase = createClient();
+        const admin = createAdminClient();
 
         // 1) If a user already exists with this email, reuse its id
         const { data: existingByEmail, error: findErr } = await supabase
@@ -89,7 +94,20 @@ const config: NextAuthConfig = {
           return false;
         }
 
-        // 3) Ensure default preferences row exists for normalized id, but
+        // 3) Resolve Supabase Auth user id by email so we can use it for FKs to auth.users
+        let supabaseId: string | null = null;
+        try {
+          const { data: list, error: supaErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 100 });
+          if (supaErr) {
+            console.warn('Could not list Supabase auth users:', supaErr?.message);
+          }
+          const match = list?.users?.find((u: any) => (u?.email || '').toLowerCase() === user.email!.toLowerCase());
+          supabaseId = match?.id ?? null;
+        } catch (e: any) {
+          console.warn('Supabase admin listUsers error:', e?.message || e);
+        }
+
+        // 4) Ensure default preferences row exists for normalized id, but
         // do NOT overwrite timezone with server's timezone (often 'UTC').
         // Preserve existing timezone if present; otherwise, set only if it's a non-UTC IANA zone.
         const serverTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -118,6 +136,9 @@ const config: NextAuthConfig = {
           console.warn('Preferences upsert warning:', prefsErr.message);
         }
 
+        // Attach supabase_id into the temporary user object so jwt callback can pick it up
+        (user as any).supabase_id = supabaseId;
+
         return true;
       } catch (e) {
         console.error('signIn callback error:', e);
@@ -126,11 +147,15 @@ const config: NextAuthConfig = {
     },
     async session({ session, token }: { session: any; token: JWT }) {
       if (token?.sub && session?.user) session.user.id = token.sub;
+      if (session?.user) (session.user as any).supabase_id = (token as any)?.supabase_id || null;
       return session;
     },
     async jwt({ token, user }: { token: JWT; user?: any }) {
       // On first sign-in, user is present; ensure token.sub uses our normalized user.id
       if (user?.id) token.sub = user.id;
+      // Persist supabase_id into JWT for server usage
+      const incomingSupa = (user as any)?.supabase_id;
+      if (incomingSupa !== undefined) (token as any).supabase_id = incomingSupa;
       return token;
     },
   },

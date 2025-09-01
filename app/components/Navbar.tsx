@@ -30,7 +30,8 @@ type NavPath =
   | "/workouts"
   | "/collectibles"
   | "/collectibles/shop"
-  | "/goals";
+  | "/goals"
+  | "/shadow";
 type DropdownPath = "/profile" | "/settings";
 type AuthPath = "/auth/signin";
 
@@ -69,6 +70,7 @@ const moreNav: NavItem[] = [
   { path: "/suggestions", label: "Suggestions" },
   { path: "/collectibles", label: "My Collectibles" },
   { path: "/chat", label: "Coach" },
+  { path: "/shadow", label: "Shadow" },
 ];
 
 // Dropdown items
@@ -128,6 +130,15 @@ export default function Navbar() {
       created_at: string;
     }>
   >([]);
+  const [modalMsg, setModalMsg] = useState<{
+    id: string;
+    title: string;
+    body: string;
+    url?: string | null;
+    created_at: string;
+  } | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalActionPending, setModalActionPending] = useState(false);
 
   // Handwritten typewriter phrases for logged-out faux search bar
   const phrases = [
@@ -320,6 +331,50 @@ export default function Navbar() {
         onUpdated as EventListener
       );
   }, [dropdownOpen, status]);
+
+  // Helper: identify high/critical messages via simple heuristics until priority is exposed
+  const isHighPriority = (m: { title: string; body: string; url?: string | null }) => {
+    const t = (m.title || '').toLowerCase();
+    const b = (m.body || '').toLowerCase();
+    const u = (m.url || '').toLowerCase();
+    return (
+      t.includes('[high]') ||
+      t.includes('[critical]') ||
+      b.includes('[high]') ||
+      b.includes('[critical]') ||
+      (u && (u.includes('modal=1') || u.includes('priority=high') || u.includes('priority=critical')))
+    );
+  };
+
+  // Helper: parse challenge id from a known set of url formats
+  const parseChallengeIdFromUrl = (url?: string | null): string | null => {
+    if (!url) return null;
+    try {
+      const u = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'https://app.local');
+      const q1 = u.searchParams.get('challenge');
+      if (q1) return q1;
+      const q2 = u.searchParams.get('challenge_id');
+      if (q2) return q2;
+      // match /shadow/challenges/<id>
+      const m = u.pathname.match(/\/shadow\/challenges\/([0-9a-fA-F-]{6,})/);
+      if (m && m[1]) return m[1];
+    } catch {}
+    return null;
+  };
+
+  // Helper: validate UUID format (v4-ish, accepts canonical UUIDs)
+  const isValidUuid = (s: string | null | undefined) =>
+    !!s && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(s);
+
+  // When new unread messages arrive, show a modal for high/critical ones (first one)
+  useEffect(() => {
+    if (modalOpen || modalMsg) return;
+    const firstHigh = unreadMsgs.find((m) => isHighPriority(m));
+    if (firstHigh) {
+      setModalMsg(firstHigh);
+      setModalOpen(true);
+    }
+  }, [unreadMsgs, modalOpen, modalMsg]);
 
   // Navigation link component
   const NavLink = ({ path, label }: NavItem) => (
@@ -1238,6 +1293,154 @@ export default function Navbar() {
             </div>
           </div>
         </>
+        )}
+      {/* High/Critical Notification Modal */}
+      {modalOpen && modalMsg && (
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => {
+              setModalOpen(false);
+              setModalMsg(null);
+            }}
+          />
+          <div className="relative z-[110] m-3 w-full max-w-md rounded-2xl border border-gray-200/70 dark:border-gray-800/70 bg-white dark:bg-gray-900 shadow-xl">
+            <div className="px-4 py-3 border-b border-gray-200/70 dark:border-gray-800/70 flex items-center justify-between">
+              <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">Important</div>
+              <button
+                className="text-gray-600 dark:text-gray-300 text-sm hover:underline"
+                onClick={() => {
+                  setModalOpen(false);
+                  setModalMsg(null);
+                }}
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-4">
+              <div className="text-base font-semibold text-gray-900 dark:text-gray-100">{modalMsg!.title}</div>
+              <div className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{modalMsg!.body}</div>
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                {modalMsg!.url && (
+                  <button
+                    disabled={modalActionPending}
+                    className={`px-3 py-1.5 text-sm rounded-full border border-blue-600/40 text-blue-700 dark:text-blue-300 hover:bg-blue-50/50 ${modalActionPending ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    onClick={async () => {
+                      if (modalActionPending) return;
+                      try {
+                        setModalActionPending(true);
+                        const id = modalMsg!.id;
+                        const chId = parseChallengeIdFromUrl(modalMsg!.url);
+                        const target = chId && isValidUuid(chId)
+                          ? (`/shadow/challenges/${chId}` as Route)
+                          : (modalMsg!.url as Route);
+                        await markMsgRead(id);
+                        setModalOpen(false);
+                        setModalMsg(null);
+                        router.push(target);
+                      } finally {
+                        setModalActionPending(false);
+                      }
+                    }}
+                  >
+                    View
+                  </button>
+                )}
+                <button
+                  disabled={modalActionPending}
+                  className={`px-3 py-1.5 text-sm rounded-full border border-gray-200/70 dark:border-gray-800/70 hover:bg-gray-100/70 dark:hover:bg-white/5 ${modalActionPending ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  onClick={async () => {
+                    if (modalActionPending) return;
+                    try {
+                      setModalActionPending(true);
+                      const id = modalMsg!.id;
+                      await markMsgRead(id);
+                      setModalOpen(false);
+                      setModalMsg(null);
+                    } finally {
+                      setModalActionPending(false);
+                    }
+                  }}
+                >
+                  Mark read
+                </button>
+                {/* Inline Accept/Decline for challenge offers if url encodes challenge id */}
+                {(() => {
+                  const chId = parseChallengeIdFromUrl(modalMsg.url);
+                  if (!chId || !isValidUuid(chId)) return null;
+                  return (
+                    <>
+                      <button
+                        disabled={modalActionPending}
+                        className={`px-3 py-1.5 text-sm rounded-full border border-emerald-600/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50/50 ${modalActionPending ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        onClick={async () => {
+                          if (modalActionPending) return;
+                          try {
+                            setModalActionPending(true);
+                            const res = await fetch(`/api/shadow/challenges/${chId}/accept`, { method: 'POST' });
+                            if (!res.ok) {
+                              let msg = 'Accept failed';
+                              try { const j = await res.json(); if (j?.error) msg = j.error; } catch {}
+                              throw new Error(msg);
+                            }
+                            toast.success('Challenge accepted');
+                            const id = modalMsg!.id;
+                            await markMsgRead(id);
+                            setModalOpen(false);
+                            setModalMsg(null);
+                            try {
+                              const j = await res.json();
+                              const tid = j?.user_task_id as string | undefined;
+                              if (tid) router.push((`/tasks/${tid}`) as Route);
+                              else router.push('/tasks' as Route);
+                            } catch {
+                              router.push('/tasks' as Route);
+                            }
+                            window.dispatchEvent(new Event('notifications:updated'));
+                          } catch (e: any) {
+                            toast.error(e?.message || 'Failed to accept');
+                          } finally {
+                            setModalActionPending(false);
+                          }
+                        }}
+                      >
+                        Accept
+                      </button>
+                      <button
+                        disabled={modalActionPending}
+                        className={`px-3 py-1.5 text-sm rounded-full border border-red-600/40 text-red-700 dark:text-red-300 hover:bg-red-50/50 ${modalActionPending ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        onClick={async () => {
+                          if (modalActionPending) return;
+                          try {
+                            setModalActionPending(true);
+                            const res = await fetch(`/api/shadow/challenges/${chId}/decline`, { method: 'POST' });
+                            if (!res.ok) {
+                              let msg = 'Decline failed';
+                              try { const j = await res.json(); if (j?.error) msg = j.error; } catch {}
+                              throw new Error(msg);
+                            }
+                            toast.success('Challenge declined');
+                            const id = modalMsg!.id;
+                            await markMsgRead(id);
+                            setModalOpen(false);
+                            setModalMsg(null);
+                            window.dispatchEvent(new Event('notifications:updated'));
+                          } catch (e: any) {
+                            toast.error(e?.message || 'Failed to decline');
+                          } finally {
+                            setModalActionPending(false);
+                          }
+                        }}
+                      >
+                        Decline
+                      </button>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </nav>
   );

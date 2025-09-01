@@ -18,6 +18,11 @@ interface Task {
   goal?: { id: string; title: string } | null;
   week_count?: number;
   week_quota?: number | null;
+  // New fields for Shadow Challenges
+  owner_type?: 'user' | 'shadow';
+  category?: string | null;
+  challenge_id?: string | null;
+  challenge?: { id: string; state: string; due_time: string | null } | null;
 }
 
 interface Schedule {
@@ -352,6 +357,8 @@ export default function TasksPage() {
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
     return tasks.filter((t) => {
+      // Hide shadow-owned tasks from Tasks tab (Shadow tasks appear only in Shadow tab)
+      if (t.owner_type === 'shadow') return false;
       if (statusFilter !== 'all') {
         if (statusFilter === 'active' && !t.active) return false;
         if (statusFilter === 'inactive' && t.active) return false;
@@ -415,6 +422,17 @@ export default function TasksPage() {
     const activeList = filtered.filter((t) => t.active && !todayTaskIds.has(t.id) && !isOverdue(t));
     return { todayList, activeList, inactiveList };
   }, [filtered, schedules, clockTick, todayTaskIds]);
+
+  // Challenge helpers
+  const isChallenge = (t: Task) => t.category === 'challenge' || !!t.challenge_id;
+  const isChallengeBlocked = (t: Task) => {
+    if (!isChallenge(t)) return false;
+    const st = t.challenge?.state || 'unknown';
+    if (st && st !== 'accepted') return true;
+    const due = t.challenge?.due_time ? new Date(t.challenge.due_time) : null;
+    if (due && new Date() > due) return true;
+    return false;
+  };
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -671,6 +689,11 @@ export default function TasksPage() {
                                 {t.goal?.title && (
                                   <span className="shrink-0 text-[10px] uppercase tracking-wide bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800 whitespace-nowrap">Goal: {t.goal.title}</span>
                                 )}
+                                {isChallenge(t) && (
+                                  <span className={`shrink-0 text-[10px] uppercase tracking-wide px-2 py-0.5 rounded border whitespace-nowrap ${isChallengeBlocked(t) ? 'bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-700' : 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'}`}>
+                                    Challenge{t.challenge?.state ? `: ${t.challenge.state}` : ''}{isChallengeBlocked(t) ? ' (blocked)' : ''}
+                                  </span>
+                                )}
                                 {!t.active && <span className="text-[10px] uppercase tracking-wide bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded whitespace-nowrap">inactive</span>}
                               </div>
                               {t.description && (
@@ -720,7 +743,7 @@ export default function TasksPage() {
                               </button>
                               {menuOpen===t.id && (
                                 <div className="absolute right-0 bottom-full mb-1 w-40 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow-soft z-30">
-                                  <button className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-900 ${!t.completedToday && due ? 'text-blue-700 dark:text-blue-300 font-medium' : ''}`} onClick={()=>{ setMenuOpen(null); if(!t.completedToday) completeTask(t); }} disabled={!!busy || t.completedToday}>{t.completedToday? 'Completed' : 'Complete'}</button>
+                                  <button className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-900 ${!t.completedToday && due && !isChallengeBlocked(t) ? 'text-blue-700 dark:text-blue-300 font-medium' : ''}`} onClick={()=>{ setMenuOpen(null); if(!t.completedToday && !isChallengeBlocked(t)) completeTask(t); }} disabled={!!busy || t.completedToday || isChallengeBlocked(t)}>{t.completedToday? 'Completed' : isChallengeBlocked(t) ? 'Blocked' : 'Complete'}</button>
                                   <button className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={()=>{ setMenuOpen(null); startEdit(t.id); }}>Edit</button>
                                   <button className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={()=>{ setMenuOpen(null); deleteTask(t.id); }} disabled={!!busy}>Delete</button>
                                 </div>
@@ -736,17 +759,19 @@ export default function TasksPage() {
                             {/* Mobile actions moved to overflow menu */}
                           </div>
                           <button
-                            disabled={!!busy || t.completedToday}
+                            disabled={!!busy || t.completedToday || isChallengeBlocked(t)}
                             onClick={() => completeTask(t)}
                             className={`px-2.5 py-1.5 rounded-md text-xs disabled:opacity-60 transition w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-blue-500/60 active:scale-[0.98] ${
                               t.completedToday
                                 ? 'bg-gray-400 text-white'
-                                : due
-                                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                                  : 'border border-blue-300 text-blue-700 dark:text-blue-300 bg-transparent hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                                : isChallengeBlocked(t)
+                                  ? 'bg-gray-300 text-white'
+                                  : due
+                                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                    : 'border border-blue-300 text-blue-700 dark:text-blue-300 bg-transparent hover:bg-blue-50 dark:hover:bg-blue-900/20'
                             } ${busy===t.id && !t.completedToday ? 'animate-pulse':''}`}
                           >
-                            {t.completedToday ? 'Completed' : busy === t.id ? 'Completing…' : 'Complete'}
+                            {t.completedToday ? 'Completed' : isChallengeBlocked(t) ? 'Blocked' : busy === t.id ? 'Completing…' : 'Complete'}
                           </button>
                         </div>
                       </div>

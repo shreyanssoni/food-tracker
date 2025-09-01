@@ -11,7 +11,7 @@ export async function GET() {
     // Get all tasks for this user (active and inactive)
     const { data: tasks, error } = await supabase
       .from('tasks')
-      .select('id, user_id, title, description, ep_value, min_level, active')
+      .select('id, user_id, title, description, ep_value, min_level, active, owner_type, category, challenge_id')
       .eq('user_id', user.id)
       .order('title');
 
@@ -28,6 +28,8 @@ export async function GET() {
     const weeklyQuotaByTask: Record<string, number> = {};
     // this week's completion counts per task
     const weekCountByTask: Record<string, number> = {};
+    // challenge metadata per challenge_id
+    const challengeMeta: Record<string, { id: string; state: string; due_time: string | null }> = {};
     if (ids.length) {
       const { data: scheds, error: sErr } = await supabase.from('task_schedules').select('*').in('task_id', ids);
       if (sErr) throw sErr;
@@ -56,6 +58,17 @@ export async function GET() {
           lastCompleted[row.task_id] = row.completed_on as any;
           seen.add(row.task_id);
         }
+
+      // collect challenge metadata for tasks that have a challenge_id
+      const challengeIds = Array.from(new Set((tasks || []).map((t: any) => t.challenge_id).filter(Boolean)));
+      if (challengeIds.length) {
+        const { data: chs, error: chErr } = await supabase
+          .from('challenges')
+          .select('id, state, due_time')
+          .in('id', challengeIds as any);
+        if (chErr) throw chErr;
+        for (const c of chs || []) challengeMeta[c.id] = { id: c.id as any, state: c.state as any, due_time: (c.due_time as any) || null };
+      }
       }
 
       // fetch goal linkage and metadata (if any)
@@ -132,6 +145,7 @@ export async function GET() {
       goal: goalByTask[t.id] || null,
       week_count: weekCountByTask[t.id] || 0,
       week_quota: weeklyQuotaByTask[t.id] ?? null,
+      challenge: t.challenge_id ? (challengeMeta[t.challenge_id] || { id: t.challenge_id, state: 'unknown', due_time: null }) : null,
     }));
 
     return NextResponse.json({ tasks: tasksWithFlag, schedules });
@@ -194,6 +208,53 @@ export async function POST(req: Request) {
         .from('task_schedules')
         .insert({ task_id: inserted.id, frequency, byweekday, at_time, timezone: tz, start_date, end_date: end_date || start_date });
       if (sErr) throw sErr;
+    }
+
+    // Auto-mirror to Shadow (best-effort; do not fail user task if shadow mirroring fails)
+    try {
+      const { data: sp } = await supabase
+        .from('shadow_profile')
+        .select('id, activated_at')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (sp?.id) {
+        // create shadow task with owner_type/owner_id
+        const { data: shadowTask, error: stErr } = await supabase
+          .from('tasks')
+          .insert({
+            user_id: user.id,
+            title,
+            description,
+            ep_value,
+            min_level: 1,
+            owner_type: 'shadow',
+            owner_id: sp.id,
+          })
+          .select('*')
+          .single();
+        if (!stErr && schedule) {
+          const { frequency, byweekday = null, at_time = null, timezone = 'UTC', start_date = null, end_date = null } = schedule;
+          // reuse tz resolution above
+          let tz2 = String((schedule.timezone as string) || '').trim();
+          if (!tz2 || tz2 === 'UTC') {
+            try {
+              const { data: pref } = await supabase
+                .from('user_preferences')
+                .select('timezone')
+                .eq('user_id', user.id)
+                .maybeSingle();
+              tz2 = String(pref?.timezone || '').trim() || process.env.DEFAULT_TIMEZONE || 'Asia/Kolkata';
+            } catch {
+              tz2 = process.env.DEFAULT_TIMEZONE || 'Asia/Kolkata';
+            }
+          }
+          await supabase
+            .from('task_schedules')
+            .insert({ task_id: shadowTask.id, frequency, byweekday, at_time, timezone: tz2, start_date, end_date: end_date || start_date });
+        }
+      }
+    } catch {
+      // ignore shadow mirroring failures
     }
 
     return NextResponse.json(inserted);

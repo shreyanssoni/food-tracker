@@ -11,10 +11,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const supabase = createClient();
     const admin = createAdminClient();
 
-    // Fetch task
+    // Fetch task (include optional challenge fields; defaults preserve behavior)
     const { data: task, error: tErr } = await supabase
       .from('tasks')
-      .select('id, user_id, ep_value, min_level, active')
+      .select('id, user_id, ep_value, min_level, active, category, challenge_id')
       .eq('id', params.id)
       .single();
     if (tErr) throw tErr;
@@ -57,11 +57,26 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       throw cErr;
     }
 
-    // EP ledger entry
+    // EP ledger entry (legacy table)
     const { error: lErr } = await supabase
       .from('ep_ledger')
       .insert({ user_id: user.id, source: 'task', source_id: completion.id, delta_ep: ep_awarded });
     if (lErr) throw lErr;
+
+    // New unified entity_ep_ledger (non-breaking addition)
+    try {
+      await supabase
+        .from('entity_ep_ledger')
+        .insert({
+          entity_type: 'user',
+          entity_id: user.id,
+          source: 'task',
+          amount: ep_awarded,
+          task_id: task.id,
+        } as any);
+    } catch {}
+
+    
 
     // Ensure user_progress row
     let oldLevel = 1;
@@ -203,6 +218,64 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     // Always notify task completion
     await notify('Task completed', `You earned +${ep_awarded} EP`, '/tasks');
+
+    // Challenge resolution hook (guarded)
+    try {
+      if ((task as any)?.category === 'challenge' && (task as any)?.challenge_id) {
+        const challengeId = (task as any).challenge_id as string;
+        const { data: ch, error: chErr } = await supabase
+          .from('challenges')
+          .select('id, state, user_id, shadow_profile_id, win_condition_type, base_ep, reward_multiplier, start_time, due_time, linked_user_task_id, linked_shadow_task_id')
+          .eq('id', challengeId)
+          .maybeSingle();
+        if (!chErr && ch && ch.user_id === user.id && (ch.state === 'accepted')) {
+          const now = new Date();
+          const start = ch.start_time ? new Date(ch.start_time) : null;
+          const due = ch.due_time ? new Date(ch.due_time) : null;
+          let userWins = false;
+          let expired = false;
+          switch (ch.win_condition_type) {
+            case 'before_time':
+              userWins = !!(due && now <= due);
+              expired = !!(due && now > due);
+              break;
+            case 'within_window':
+              userWins = !!(start && due && now >= start && now <= due);
+              expired = !!(due && now > due);
+              break;
+            // Other types will be handled by resolver cron; no-op here
+            default:
+              break;
+          }
+
+          if (userWins) {
+            const payout = Number(ch.base_ep || 10) * Number(ch.reward_multiplier || 1);
+            // entity ledger for user win
+            try {
+              await supabase
+                .from('entity_ep_ledger')
+                .insert({ entity_type: 'user', entity_id: user.id, source: 'challenge', amount: payout, challenge_id: ch.id } as any);
+            } catch {}
+            // update challenge state
+            await supabase.from('challenges').update({ state: 'completed_win' }).eq('id', ch.id);
+            // alignment log: mark ahead for narrative (optional best-effort)
+            try {
+              await supabase.from('alignment_log').insert({
+                user_id: user.id,
+                shadow_id: ch.shadow_profile_id,
+                alignment_status: 'ahead',
+                user_task_id: task.id,
+              } as any);
+            } catch {}
+            // notify
+            await notify('Challenge won!', `You won +${payout} bonus EP`, '/shadow');
+          } else if (expired) {
+            await supabase.from('challenges').update({ state: 'expired' }).eq('id', ch.id);
+            await notify('Challenge expired', `Time ran out for a challenge`, '/shadow');
+          }
+        }
+      }
+    } catch {}
 
     // Level up notification
     if (levelsGained > 0) {
