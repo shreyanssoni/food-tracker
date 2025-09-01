@@ -100,6 +100,71 @@ export async function POST(req: Request) {
 
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
 
+    // Auto-seed per-user shadow_config based on difficulty
+    try {
+      const diff: string = String((preferences?.difficulty ?? updated.preferences?.difficulty ?? 'medium') as string).toLowerCase();
+      // Tuned presets per difficulty
+      const presets: Record<string, any> = {
+        easy: {
+          base_speed: 2,
+          min_speed: 1,
+          max_speed: 6,
+          adapt_up_factor: 1.1,
+          adapt_down_factor: 0.9,
+          smoothing_alpha: 0.3,
+          recovery_grace_days: 2,
+          carryover_cap: 5,
+          enabled_race: true,
+          ghost_mode_ai: false,
+          max_notifications_per_day: 8,
+          min_seconds_between_notifications: 1200,
+        },
+        medium: {
+          base_speed: 3,
+          min_speed: 1,
+          max_speed: 10,
+          adapt_up_factor: 1.2,
+          adapt_down_factor: 0.85,
+          smoothing_alpha: 0.25,
+          recovery_grace_days: 1,
+          carryover_cap: 10,
+          enabled_race: true,
+          ghost_mode_ai: false,
+          max_notifications_per_day: 10,
+          min_seconds_between_notifications: 900,
+        },
+        hard: {
+          base_speed: 4,
+          min_speed: 2,
+          max_speed: 12,
+          adapt_up_factor: 1.35,
+          adapt_down_factor: 0.8,
+          smoothing_alpha: 0.2,
+          recovery_grace_days: 0,
+          carryover_cap: 15,
+          enabled_race: true,
+          ghost_mode_ai: true,
+          max_notifications_per_day: 12,
+          min_seconds_between_notifications: 600,
+        },
+      };
+      const cfg = presets[diff] || presets.medium;
+
+      await admin
+        .from('shadow_config')
+        .upsert(
+          {
+            user_id: user.id,
+            ...cfg,
+            shadow_speed_target: cfg.base_speed,
+          } as any,
+          { onConflict: 'user_id' }
+        );
+    } catch (e) {
+      // non-fatal
+      console.error('auto-seed shadow_config failed', e);
+    }
+
     // Fire-and-forget: trigger daily challenge generation right after activation
     try {
       if (!shadow.activated_at) {

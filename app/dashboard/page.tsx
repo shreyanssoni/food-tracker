@@ -72,6 +72,13 @@ export default function DashboardPage() {
   // Server-calculated set of tasks due today
   const [todayTaskIds, setTodayTaskIds] = useState<Set<string>>(new Set());
   const { data: session } = useSession();
+  // Shadow pace (Phase 10)
+  const [shadowCommit, setShadowCommit] = useState<null | {
+    delta: number;
+    target_today: number;
+    completed_today: number;
+    decision_kind: 'boost' | 'slowdown' | 'nudge' | 'noop';
+  }>(null);
 
 
   useEffect(() => {
@@ -196,6 +203,28 @@ export default function DashboardPage() {
           setTodayTaskIds(new Set((j.tasks as any[]).map((x) => x.id)));
         }
       } catch {}
+    })();
+  }, [clockTick]);
+
+  // Load today's shadow commit for the small widget
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/shadow/progress/commit', { cache: 'no-store' });
+        const j = await res.json().catch(() => ({}));
+        if (res.ok && j?.commit) {
+          setShadowCommit({
+            delta: Number(j.commit.delta || 0),
+            target_today: Number(j.commit.target_today || 0),
+            completed_today: Number(j.commit.completed_today || 0),
+            decision_kind: j.commit.decision_kind || 'noop',
+          });
+        } else {
+          setShadowCommit(null);
+        }
+      } catch {
+        setShadowCommit(null);
+      }
     })();
   }, [clockTick]);
 
@@ -693,6 +722,8 @@ export default function DashboardPage() {
             label="Rewards"
             kind="violet"
           />
+          <QuickAction href="/shadow" emoji="👻" label="Shadow" kind="slate" />
+          <QuickAction href="/museum" emoji="🏛️" label="Museum" kind="slate" />
         </div>
       </section>
 
@@ -714,6 +745,39 @@ export default function DashboardPage() {
                 })}
               </div>
             )}
+
+      {/* Shadow Pace (Phase 10) */}
+      <section className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white/70 dark:bg-slate-950/60 p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-md font-semibold text-slate-900 dark:text-slate-100">Shadow Pace</h2>
+            {shadowCommit ? (
+              <div className="mt-1 text-[12px] sm:text-[13px] text-slate-700 dark:text-slate-300">
+                <span className="font-semibold">Delta:</span> {shadowCommit.delta >= 0 ? '+' : ''}{shadowCommit.delta}
+                <span className="mx-2 opacity-60">•</span>
+                <span className="font-semibold">Target:</span> {shadowCommit.target_today}
+                <span className="mx-2 opacity-60">•</span>
+                <span className="font-semibold">Done:</span> {shadowCommit.completed_today}
+              </div>
+            ) : (
+              <div className="mt-1 text-[12px] text-slate-500">No pace decision yet today.</div>
+            )}
+          </div>
+          {shadowCommit && (
+            <span className="self-start inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+              style={{
+                borderColor: 'var(--tw-prose-borders, rgba(148,163,184,0.25))',
+                background: 'rgba(99,102,241,0.08)'
+              }}
+            >
+              {shadowCommit.decision_kind === 'boost' && '🚀 Boost'}
+              {shadowCommit.decision_kind === 'slowdown' && '🧘 Slowdown'}
+              {shadowCommit.decision_kind === 'nudge' && '👉 Nudge'}
+              {shadowCommit.decision_kind === 'noop' && '• Noop'}
+            </span>
+          )}
+        </div>
+      </section>
           </div>
           <button
             className="px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-medium bg-blue-600 text-white"

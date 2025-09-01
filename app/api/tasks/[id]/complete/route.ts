@@ -28,7 +28,21 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     // Daily EP cap (server-side): prevents farming too much EP in a single day
     const DAILY_EP_CAP = 1000;
-    const todayStr = new Date().toISOString().slice(0, 10);
+    // Resolve user's timezone for correct local day accounting (align with DEFAULT_TIMEZONE)
+    let tz = String(process.env.DEFAULT_TIMEZONE || 'Asia/Kolkata');
+    try {
+      const { data: pref } = await supabase
+        .from('user_preferences')
+        .select('timezone')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (pref?.timezone) tz = pref.timezone as any;
+    } catch {}
+    const todayInTz = (tzStr: string) => {
+      const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: tzStr, year: 'numeric', month: '2-digit', day: '2-digit' });
+      return fmt.format(new Date());
+    };
+    const todayStr = todayInTz(tz);
     const { data: todayRows, error: sumErr } = await supabase
       .from('task_completions')
       .select('ep_awarded')
@@ -45,7 +59,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     // Insert completion (one per day per task enforced by unique index)
     const { data: completion, error: cErr } = await supabase
       .from('task_completions')
-      .insert({ user_id: user.id, task_id: task.id, ep_awarded })
+      .insert({ user_id: user.id, task_id: task.id, ep_awarded, completed_on: todayStr })
       .select('*')
       .single();
 
@@ -215,6 +229,78 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         });
       } catch {}
     };
+
+    // Mirror into shadow-side log and daily aggregates
+    try {
+      // Build schedule minute for this task using events override in user's tz
+      const fmtHM = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false });
+      const partsNow = fmtHM.formatToParts(new Date());
+      const hh = Number(partsNow.find(p => p.type === 'hour')?.value || '0');
+      const mm = Number(partsNow.find(p => p.type === 'minute')?.value || '0');
+      const nowMin = hh * 60 + mm;
+      const minuteOf = (iso: string) => {
+        const parts = fmtHM.formatToParts(new Date(iso));
+        const h = Number(parts.find(p => p.type === 'hour')?.value || '0');
+        const m = Number(parts.find(p => p.type === 'minute')?.value || '0');
+        return h * 60 + m;
+      };
+      // Read today's event for this task (due_end preferred)
+      let schedMin: number | null = null;
+      try {
+        const { data: evs } = await supabase
+          .from('events')
+          .select('due_start, due_end, routine_item_id')
+          .eq('user_id', user.id)
+          .eq('routine_item_id', task.id)
+          .order('due_start', { ascending: true })
+          .limit(1);
+        const ev = (evs || [])[0];
+        const when = ev?.due_end || ev?.due_start || null;
+        if (when) schedMin = minuteOf(when);
+      } catch {}
+      // ahead/behind at completion time
+      const ahead = typeof schedMin === 'number' ? (nowMin <= schedMin) : true;
+      try {
+        // find shadow profile id
+        const { data: sp } = await supabase
+          .from('shadow_profile')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (sp?.id) {
+          await supabase.from('alignment_log').insert({
+            user_id: user.id,
+            shadow_id: sp.id,
+            user_completion_id: completion.id,
+            alignment_status: ahead ? 'ahead' : 'behind',
+          } as any);
+        }
+      } catch {}
+      // Upsert daily aggregates minimally: increment user_distance, recompute lead later via cron
+      try {
+        const { data: dayRow } = await supabase
+          .from('shadow_progress_daily')
+          .select('date, user_distance, shadow_distance')
+          .eq('user_id', user.id)
+          .order('date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const todayISO = new Date().toISOString().slice(0,10);
+        const sameDay = (dayRow?.date || '').slice(0,10) === todayISO;
+        if (dayRow && sameDay) {
+          const nd = Number(dayRow.user_distance || 0) + 1;
+          await supabase
+            .from('shadow_progress_daily')
+            .update({ user_distance: nd, lead: nd - (Number(dayRow.shadow_distance||0)) })
+            .eq('user_id', user.id)
+            .eq('date', dayRow.date);
+        } else {
+          await supabase
+            .from('shadow_progress_daily')
+            .insert({ user_id: user.id, date: todayISO, user_distance: 1, shadow_distance: 0, lead: 1 } as any);
+        }
+      } catch {}
+    } catch {}
 
     // Always notify task completion
     await notify('Task completed', `You earned +${ep_awarded} EP`, '/tasks');

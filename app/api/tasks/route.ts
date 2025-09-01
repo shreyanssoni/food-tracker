@@ -31,16 +31,28 @@ export async function GET() {
     // challenge metadata per challenge_id
     const challengeMeta: Record<string, { id: string; state: string; due_time: string | null }> = {};
     if (ids.length) {
+      // Resolve user's timezone for correct local day matching
+      let tz = 'UTC';
+      try {
+        const { data: pref } = await supabase
+          .from('user_preferences')
+          .select('timezone')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (pref?.timezone) tz = String(pref.timezone);
+      } catch {}
+      const todayInTz = (tzStr: string) => new Intl.DateTimeFormat('en-CA', { timeZone: tzStr, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      const todayStr = todayInTz(tz);
       const { data: scheds, error: sErr } = await supabase.from('task_schedules').select('*').in('task_id', ids);
       if (sErr) throw sErr;
       schedules = scheds ?? [];
 
-      // today's completions for these tasks
+      // today's completions for these tasks (user's local day)
       const { data: completes, error: cErr } = await supabase
         .from('task_completions')
         .select('task_id')
         .eq('user_id', user.id)
-        .eq('completed_on', new Date().toISOString().slice(0, 10));
+        .eq('completed_on', todayStr);
       if (cErr) throw cErr;
       for (const c of completes || []) completedToday[c.task_id] = true;
 

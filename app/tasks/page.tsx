@@ -73,7 +73,7 @@ export default function TasksPage() {
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all'|'active'|'inactive'>('all');
   const [freqFilter, setFreqFilter] = useState<'all'|'daily'|'weekly'|'custom'|'once'>('all');
-  const [sectionsOpen, setSectionsOpen] = useState<{today:boolean; inactive:boolean}>({ today: true, inactive: false });
+  const [sectionsOpen, setSectionsOpen] = useState<{today:boolean; completed:boolean; inactive:boolean}>({ today: true, completed: true, inactive: false });
 
   useEffect(() => {
     let mounted = true;
@@ -187,7 +187,8 @@ export default function TasksPage() {
 
   async function refresh() {
     try {
-      const res = await fetch('/api/tasks');
+      // Refresh full task list and schedules
+      const res = await fetch('/api/tasks', { cache: 'no-store' });
       const data = await res.json();
       if (!data.error) {
         setTasks(data.tasks || []);
@@ -195,6 +196,15 @@ export default function TasksPage() {
         (data.schedules || []).forEach((s: Schedule) => { map[s.task_id] = s; });
         setSchedules(map);
       }
+      // Also refresh today's task ids so Today section drops completed items immediately
+      try {
+        const nowIso = new Date().toISOString();
+        const resToday = await fetch(`/api/tasks/today?now=${encodeURIComponent(nowIso)}`, { cache: 'no-store' });
+        const j = await resToday.json().catch(() => ({}));
+        if (resToday.ok && Array.isArray(j.tasks)) {
+          setTodayTaskIds(new Set((j.tasks as any[]).map((x) => x.id)));
+        }
+      } catch {}
     } catch {}
   }
 
@@ -333,19 +343,8 @@ export default function TasksPage() {
         const amt = data.rewards.level_up_diamonds;
         toast.success(`Level up! +${amt} diamonds`);
       }
-      // refresh list to update completedToday flags
-      try {
-        const res2 = await fetch('/api/tasks');
-        const d2 = await res2.json();
-        if (!d2.error) {
-          setTasks(d2.tasks || []);
-          const schedMap: Record<string, Schedule> = {};
-          (d2.schedules || []).forEach((s: Schedule) => {
-            schedMap[s.task_id] = s;
-          });
-          setSchedules(schedMap);
-        }
-      } catch {}
+      // Single refresh handles tasks, schedules, and today's ids
+      await refresh();
     } catch (e: any) {
       toast.error(e?.message || 'Failed to complete');
     } finally {
@@ -406,7 +405,8 @@ export default function TasksPage() {
     // Do not treat past-time tasks as expired; they remain due today
     const isExpiredForToday = (_t: Task) => false;
 
-    const todayList = filtered.filter((t) => t.active && todayTaskIds.has(t.id));
+    const todayList = filtered.filter((t) => t.active && todayTaskIds.has(t.id) && !t.completedToday);
+    const completedTodayList = filtered.filter((t) => t.active && todayTaskIds.has(t.id) && !!t.completedToday);
     // Consider tasks overdue (>1 day since last completion) as inactive for display, but only for daily schedules
     const isOverdue = (t: Task) => {
       if (!t.active) return false; // already inactive handled below
@@ -420,7 +420,7 @@ export default function TasksPage() {
     };
     const inactiveList = filtered.filter((t) => !t.active || isOverdue(t));
     const activeList = filtered.filter((t) => t.active && !todayTaskIds.has(t.id) && !isOverdue(t));
-    return { todayList, activeList, inactiveList };
+    return { todayList, completedTodayList, activeList, inactiveList };
   }, [filtered, schedules, clockTick, todayTaskIds]);
 
   // Challenge helpers
@@ -839,6 +839,92 @@ export default function TasksPage() {
           </section>
 
           {/* Upcoming section removed */}
+
+          {/* Completed Today */}
+          <section className="rounded-2xl border border-emerald-200 dark:border-emerald-900/40 bg-white dark:bg-gray-950 overflow-visible">
+            <button onClick={()=>setSectionsOpen(s=>({...s,completed:!s.completed}))} className="w-full flex items-center justify-between px-4 py-3 bg-emerald-50 dark:bg-emerald-900/20">
+              <div className="flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-300">
+                {sectionsOpen.completed ? <ChevronDown className="w-4 h-4"/> : <ChevronRight className="w-4 h-4"/>}
+                Completed Today
+              </div>
+              <span className="text-xs text-emerald-700/70 dark:text-emerald-300/70">{grouped.completedTodayList.length}</span>
+            </button>
+            {sectionsOpen.completed && (
+              <ul className="divide-y divide-gray-100 dark:divide-gray-900">
+                {grouped.completedTodayList.map((t) => {
+                  const s = schedules[t.id];
+                  return (
+                    <li key={t.id} className={`p-4 bg-emerald-50/40 dark:bg-emerald-900/10`}>
+                      <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                        <div className="mt-1 shrink-0">
+                          <CheckCircle2 className={`w-5 h-5 text-emerald-500`} />
+                        </div>
+                        <div className="flex-1">
+                          {/* Title row with EP pill on the right */}
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-[15px] sm:text-base flex items-center gap-2">
+                                <span className="truncate">{t.title}</span>
+                                {t.goal?.title && (
+                                  <span className="text-[10px] uppercase tracking-wide bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800 whitespace-nowrap">Goal: {t.goal.title}</span>
+                                )}
+                                {isChallenge(t) && (
+                                  <span className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded border whitespace-nowrap ${isChallengeBlocked(t) ? 'bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-700' : 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'}`}>
+                                    Challenge{t.challenge?.state ? `: ${t.challenge.state}` : ''}{isChallengeBlocked(t) ? ' (blocked)' : ''}
+                                  </span>
+                                )}
+                              </div>
+                              {t.description && (
+                                <div className="text-[13px] sm:text-sm text-gray-600 dark:text-gray-400 mt-0.5 overflow-hidden" style={{display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
+                                  {t.description}
+                                </div>
+                              )}
+                            </div>
+                            <span className="ml-2 inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-300 text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 shrink-0">+{t.ep_value} EP</span>
+                          </div>
+                          <div className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-500 mt-2 flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                            {s ? (
+                              <span className="inline-flex items-center gap-1 flex-wrap">
+                                {s.frequency === 'daily' && <Sun className="w-3.5 h-3.5"/>}
+                                {s.frequency === 'weekly' && <CalendarDays className="w-3.5 h-3.5"/>}
+                                {s.frequency === 'custom' && <Clock className="w-3.5 h-3.5"/>}
+                                {s.frequency === 'once' && <CalendarDays className="w-3.5 h-3.5"/>}
+                                <span className="px-1.5 py-0.5 sm:px-2 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+                                  {s.frequency === 'daily' && 'Daily'}
+                                  {s.frequency === 'weekly' && 'Weekly'}
+                                  {s.frequency === 'custom' && 'Custom'}
+                                  {s.frequency === 'once' && 'One time'}
+                                </span>
+                                {s.frequency === 'weekly' && Array.isArray(s.byweekday) && s.byweekday.length ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {s.byweekday?.map((d) => (
+                                      <span key={d} className="px-1.5 py-0.5 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-[10px] sm:text-[11px]">
+                                        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d] ?? d}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : null}
+                                {s.at_time ? (
+                                  <span className="px-1.5 py-0.5 sm:px-2 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">{String(s.at_time).slice(0,5)}</span>
+                                ) : null}
+                                {s.frequency === 'once' && s.start_date ? (
+                                  <span className="px-1.5 py-0.5 sm:px-2 rounded-full border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">{s.start_date}</span>
+                                ) : null}
+                              </span>
+                            ) : (
+                              <span>No schedule</span>
+                            )}
+                          </div>
+                        </div>
+                        {/* No action buttons for completed tasks */}
+                      </div>
+                    </li>
+                  );
+                })}
+                {!loading && !grouped.completedTodayList.length && <li className="p-4 text-sm text-gray-500">No completed tasks today</li>}
+              </ul>
+            )}
+          </section>
 
           {/* Inactive */}
           <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-visible">

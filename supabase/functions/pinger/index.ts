@@ -23,7 +23,7 @@ export const handler = async (req: Request): Promise<Response> => {
     });
   }
 
-  const headers = {
+  const baseHeaders = {
     'User-Agent': 'supabase-schedule/pinger',
     'Accept': 'application/json',
   } as const;
@@ -31,36 +31,58 @@ export const handler = async (req: Request): Promise<Response> => {
   // Add a per-request timeout to avoid hanging if any target stalls
   const TIMEOUT_MS = 2500; // 2.5s per request
   const OVERALL_TIMEOUT_MS = 9000; // 9s hard cap for the whole function (avoid 10s edge timeout)
-  const fetchWithTimeout = async (url: string) => {
+  type Target = { url: string; method?: 'GET' | 'POST'; headers?: Record<string, string> };
+  const fetchWithTimeout = async (t: Target) => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
-      console.log('pinger fetch ->', url);
-      const res = await fetch(url, { method: 'GET', headers, signal: controller.signal });
+      const method = t.method || 'GET';
+      const headers = { ...baseHeaders, ...(t.headers || {}) } as Record<string, string>;
+      console.log('pinger fetch ->', t.url, method);
+      const res = await fetch(t.url, { method, headers, signal: controller.signal });
       const text = await res.text();
-      return { url, status: res.status, ok: res.ok, body: text.slice(0, 500) } as const;
+      return { url: t.url, status: res.status, ok: res.ok, body: text.slice(0, 500) } as const;
     } catch (e) {
-      console.error('pinger fetch error', url, String(e));
-      return { url, status: 0, ok: false, error: String(e) } as const;
+      console.error('pinger fetch error', t.url, String(e));
+      return { url: t.url, status: 0, ok: false, error: String(e) } as const;
     } finally {
       clearTimeout(timeout);
     }
   };
 
-  // Allow running a single target via query param ?only=push|eod|pre|shadow-generate|shadow-close|shadow-notify
+  // Allow running a single target via query param
+  // ?only=push|eod|pre|shadow-generate|shadow-close|shadow-notify|shadow-run-today|shadow-weekly|shadow-nightly
   const urlObj = new URL(req.url);
   const only = urlObj.searchParams.get('only');
-  const allTargets = {
-    push: `${base}/api/push/run-scheduler?secret=${encodeURIComponent(secret)}`,
-    eod: `${base}/api/life-streak/finalize?secret=${encodeURIComponent(secret)}`,
-    'pre-eod': `${base}/api/streaks/pre-eod-reminder?secret=${encodeURIComponent(secret)}`,
-    reminders: `${base}/api/tasks/reminders/run?secret=${encodeURIComponent(secret)}`,
-    'shadow-generate': `${base}/api/shadow/cron/generate-daily-admin?secret=${encodeURIComponent(secret)}`,
-    'shadow-close': `${base}/api/shadow/cron/close-overdue-admin?secret=${encodeURIComponent(secret)}`,
-    'shadow-notify': `${base}/api/shadow/cron/notify-admin?secret=${encodeURIComponent(secret)}`,
-  } as const;
+  const allTargets: Record<string, Target> = {
+    push: { url: `${base}/api/push/run-scheduler?secret=${encodeURIComponent(secret)}` },
+    eod: { url: `${base}/api/life-streak/finalize?secret=${encodeURIComponent(secret)}` },
+    'pre-eod': { url: `${base}/api/streaks/pre-eod-reminder?secret=${encodeURIComponent(secret)}` },
+    reminders: { url: `${base}/api/tasks/reminders/run?secret=${encodeURIComponent(secret)}` },
+    'shadow-generate': { url: `${base}/api/shadow/cron/generate-daily-admin?secret=${encodeURIComponent(secret)}` },
+    'shadow-close': { url: `${base}/api/shadow/cron/close-overdue-admin?secret=${encodeURIComponent(secret)}` },
+    'shadow-notify': { url: `${base}/api/shadow/cron/notify-admin?secret=${encodeURIComponent(secret)}` },
+    // New orchestrator cron route uses POST + x-cron-secret header
+    'shadow-run-today': {
+      url: `${base}/api/cron/shadow/run-today-all`,
+      method: 'POST',
+      headers: { 'x-cron-secret': secret },
+    },
+    // Weekly summarizer — not included in default set; call with ?only=shadow-weekly
+    'shadow-weekly': {
+      url: `${base}/api/cron/shadow/weekly-summarize`,
+      method: 'POST',
+      headers: { 'x-cron-secret': secret },
+    },
+    // Nightly smoother — not included in default set; call with ?only=shadow-nightly
+    'shadow-nightly': {
+      url: `${base}/api/cron/shadow/nightly-smooth`,
+      method: 'POST',
+      headers: { 'x-cron-secret': secret },
+    },
+  };
 
-  let targets: string[];
+  let targets: Target[];
   switch (only) {
     case 'push':
       targets = [allTargets.push];
@@ -84,6 +106,15 @@ export const handler = async (req: Request): Promise<Response> => {
     case 'shadow-notify':
       targets = [allTargets['shadow-notify']];
       break;
+    case 'shadow-run-today':
+      targets = [allTargets['shadow-run-today']];
+      break;
+    case 'shadow-weekly':
+      targets = [allTargets['shadow-weekly']];
+      break;
+    case 'shadow-nightly':
+      targets = [allTargets['shadow-nightly']];
+      break;
     default:
       targets = [
         allTargets.push,
@@ -92,6 +123,7 @@ export const handler = async (req: Request): Promise<Response> => {
         allTargets['shadow-generate'],
         allTargets['shadow-close'],
         allTargets['shadow-notify'],
+        allTargets['shadow-run-today'],
       ];
   }
 

@@ -5,6 +5,7 @@ export default function AdminHome() {
     { href: "/admin/collectibles", title: "Collectibles", desc: "Edit name, icon, rarity, public slug, lore and full story." },
     { href: "/admin/rewards", title: "Rewards", desc: "Configure rewards by level or EP thresholds." },
     { href: "/admin/push-logs", title: "Push Logs", desc: "Inspect push notification logs." },
+    { href: "/admin/shadow", title: "Shadow", desc: "Mirror status, dry-run logs, and run-today-all orchestrator." },
   ];
   return (
     <div className="p-6 max-w-5xl mx-auto">
