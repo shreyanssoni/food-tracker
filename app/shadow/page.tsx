@@ -525,8 +525,23 @@ export default function ShadowPage() {
       </h1>
 
       {/* Hero */}
-      <section className="rounded-2xl border border-purple-200 dark:border-purple-900/40 bg-gradient-to-br from-gray-900 to-gray-950 p-4 mb-4 relative overflow-hidden">
-        <div className="flex items-center justify-between mb-2">
+      <section className="rounded-2xl border border-purple-200 dark:border-purple-900/40 bg-gray-900 md:bg-gradient-to-br md:from-gray-900 md:to-gray-950 p-3 pr-16 md:p-4 md:pr-28 mb-4 relative overflow-hidden">
+        {/* Compact mobile header */}
+        <div className="mb-2 md:hidden">
+          <div className="flex items-end justify-between text-gray-200">
+            <div>
+              <div className="text-[11px] text-gray-400">You</div>
+              <div className="text-lg font-semibold text-blue-300">{todayUserEP}</div>
+            </div>
+            <div className="text-[11px] text-gray-500">vs</div>
+            <div className="text-right">
+              <div className="text-[11px] text-gray-400">Shadow</div>
+              <div className="text-lg font-semibold text-purple-300">{todayShadowEP}</div>
+            </div>
+          </div>
+        </div>
+        {/* Detailed header for md+ */}
+        <div className="hidden md:flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 text-sm text-gray-300">
             <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-600/20 text-blue-300 border border-blue-600/30">
               Your EP (today)
@@ -551,7 +566,7 @@ export default function ShadowPage() {
           <div className="h-full bg-blue-600" style={{ width: `${userPct}%` }} />
           {/* Leader indicator */}
           {todayUserEP !== todayShadowEP && (
-            <div className="absolute -top-4 right-2 flex items-center gap-1 text-xs">
+            <div className="hidden md:flex absolute -top-4 right-2 items-center gap-1 text-xs">
               {todayUserEP > todayShadowEP ? (
                 <span className="inline-flex items-center gap-1 text-blue-300">
                   <Crown className="w-3.5 h-3.5" /> You lead
@@ -567,7 +582,7 @@ export default function ShadowPage() {
         <div className="mt-1 text-[10px] text-gray-500">You {userPct}% • Shadow {shadowPct}%</div>
         {/* Floating shadow avatar pop */}
         <div
-          className={`pointer-events-none absolute -top-2 right-3 transition-all duration-500 ${
+          className={`pointer-events-none absolute -top-2 right-3 transition-all duration-500 hidden md:block ${
             ghostPop ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
           }`}
         >
@@ -577,8 +592,17 @@ export default function ShadowPage() {
           </div>
         </div>
 
-        {/* Large decorative Shadow on the right */}
-        <div className="pointer-events-none absolute -bottom-2 right-2 opacity-70">
+        {/* Compact decorative Shadow on mobile */}
+        <div className="pointer-events-none absolute bottom-1 right-2 opacity-60 md:hidden">
+          <ShadowFigure
+            size={56}
+            pose={todayUserEP < todayShadowEP ? "run" : "idle"}
+            className="drop-shadow-[0_2px_8px_rgba(124,58,237,0.18)]"
+          />
+        </div>
+
+        {/* Large decorative Shadow on the right (hidden on small screens) */}
+        <div className="pointer-events-none absolute bottom-0 right-2 opacity-70 hidden md:block">
           <ShadowFigure
             size={96}
             pose={todayUserEP < todayShadowEP ? "run" : "idle"}
@@ -660,7 +684,7 @@ export default function ShadowPage() {
       )}
 
       {/* Race Dashboard (dark panel) */}
-      <section className="rounded-2xl border border-gray-800 bg-gradient-to-br from-slate-900 to-black p-4 mb-4">
+      <section className="rounded-2xl border border-gray-800 bg-slate-900 md:bg-gradient-to-br md:from-slate-900 md:to-black p-3 md:p-4 mb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-medium">
             <Gauge className="w-4 h-4 text-purple-600" /> Live Pace
@@ -670,20 +694,20 @@ export default function ShadowPage() {
           </div>
         </div>
         {/* KPIs */}
-        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-          <div className="rounded-lg border border-gray-100 dark:border-gray-900 p-3">
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <div className="rounded-lg p-3 bg-white/5 dark:bg-white/5 md:border md:border-gray-900/50">
             <div className="text-gray-500">Delta now</div>
             <div className="text-lg font-semibold">
               {deltaAnim ?? shadowState?.metrics?.progress_delta_now ?? "—"}
             </div>
           </div>
-          <div className="rounded-lg border border-gray-100 dark:border-gray-900 p-3">
+          <div className="rounded-lg p-3 bg-white/5 dark:bg-white/5 md:border md:border-gray-900/50">
             <div className="text-gray-500">Projected (1h)</div>
             <div className="text-lg font-semibold">
               {shadowState?.metrics?.progress_delta_projected ?? "—"}
             </div>
           </div>
-          <div className="rounded-lg border border-gray-100 dark:border-gray-900 p-3">
+          <div className="rounded-lg p-3 bg-white/5 dark:bg-white/5 md:border md:border-gray-900/50">
             <div className="text-gray-500">Time saved</div>
             {(() => {
               const ts = typeof shadowState?.metrics?.time_saved_minutes === "number" ? shadowState.metrics.time_saved_minutes : 0;
@@ -697,7 +721,7 @@ export default function ShadowPage() {
               );
             })()}
           </div>
-          <div className="rounded-lg border border-gray-100 dark:border-gray-900 p-3">
+          <div className="rounded-lg p-3 bg-white/5 dark:bg-white/5 md:border md:border-gray-900/50">
             <div className="text-gray-500 mb-1">Pace consistency</div>
             {(() => {
               const pc = typeof shadowState?.metrics?.pace_consistency === "number" ? shadowState.metrics.pace_consistency : null;
@@ -713,7 +737,7 @@ export default function ShadowPage() {
               );
             })()}
           </div>
-          <div className="rounded-lg border border-gray-100 dark:border-gray-900 p-3">
+          <div className="rounded-lg p-3 bg-white/5 dark:bg-white/5 md:border md:border-gray-900/50">
             <div className="text-gray-500">Your speed</div>
             <div className="text-lg font-semibold">
               {typeof shadowState?.metrics?.user_speed_now === "number"
@@ -721,7 +745,7 @@ export default function ShadowPage() {
                 : "—"}
             </div>
           </div>
-          <div className="rounded-lg border border-gray-100 dark:border-gray-900 p-3">
+          <div className="rounded-lg p-3 bg-white/5 dark:bg-white/5 md:border md:border-gray-900/50">
             <div className="text-gray-500">Shadow speed</div>
             <div className="text-lg font-semibold">
               {typeof shadowState?.metrics?.shadow_speed_now === "number"

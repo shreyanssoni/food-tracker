@@ -9,7 +9,7 @@ import {
   Home,
   ListTodo,
   Plus,
-  Target,
+  Ghost,
   Sparkles,
   MessageSquareText,
 } from "lucide-react";
@@ -18,7 +18,7 @@ const items = [
   { href: "/dashboard", label: "Today", icon: Home },
   { href: "/tasks", label: "Tasks", icon: ListTodo },
   { href: "/food", label: "Log", icon: Plus },
-  { href: "/goals", label: "Goals", icon: Target },
+  { href: "/shadow", label: "Shadow", icon: Ghost },
   { href: "/suggestions", label: "Suggest", icon: Sparkles },
   // { href: "/chat", label: "Chat", icon: MessageSquareText },
 ];
