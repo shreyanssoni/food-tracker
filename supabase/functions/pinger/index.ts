@@ -51,7 +51,7 @@ export const handler = async (req: Request): Promise<Response> => {
   };
 
   // Allow running a single target via query param
-  // ?only=push|eod|pre|shadow-generate|shadow-close|shadow-notify|shadow-run-today|shadow-weekly|shadow-nightly
+  // ?only=push|eod|pre|shadow-generate|shadow-close|shadow-notify|shadow-run-today|shadow-weekly|shadow-nightly|shadow-taunt
   const urlObj = new URL(req.url);
   const only = urlObj.searchParams.get('only');
   const allTargets: Record<string, Target> = {
@@ -77,6 +77,12 @@ export const handler = async (req: Request): Promise<Response> => {
     // Nightly smoother — not included in default set; call with ?only=shadow-nightly
     'shadow-nightly': {
       url: `${base}/api/cron/shadow/nightly-smooth`,
+      method: 'POST',
+      headers: { 'x-cron-secret': secret },
+    },
+    // Taunt frequency controller — safe to call frequently; engine enforces caps and windows
+    'shadow-taunt': {
+      url: `${base}/api/cron/shadow/taunt-maybe`,
       method: 'POST',
       headers: { 'x-cron-secret': secret },
     },
@@ -115,6 +121,9 @@ export const handler = async (req: Request): Promise<Response> => {
     case 'shadow-nightly':
       targets = [allTargets['shadow-nightly']];
       break;
+    case 'shadow-taunt':
+      targets = [allTargets['shadow-taunt']];
+      break;
     default:
       targets = [
         allTargets.push,
@@ -124,6 +133,7 @@ export const handler = async (req: Request): Promise<Response> => {
         allTargets['shadow-close'],
         allTargets['shadow-notify'],
         allTargets['shadow-run-today'],
+        allTargets['shadow-taunt'],
       ];
   }
 
