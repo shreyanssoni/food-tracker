@@ -4,7 +4,23 @@ import AvatarCanvas from "./AvatarCanvas";
 import EpBar from "./EpBar";
 import { toast } from "sonner";
 
-export default function AvatarPanel() {
+type Progress = { level: number; ep_in_level: number; ep_required: number; diamonds?: number; total_ep?: number };
+type LifeStreak = {
+  current: number;
+  longest: number;
+  canRevive: boolean;
+  reviveCost: number;
+  week?: Array<{ day: string; status: 'counted' | 'revived' | 'missed' | 'none' }>;
+  weekly?: { consecutive: number; longest: number; currentWeekDays?: number };
+};
+
+export default function AvatarPanel({
+  progress: progressProp,
+  lifeStreak: lifeStreakProp,
+}: {
+  progress?: Progress | null;
+  lifeStreak?: LifeStreak | null;
+}) {
   const [loading, setLoading] = useState(true);
   const [avatarPayload, setAvatarPayload] = useState<null | {
     avatar: { appearance_stage: string } | null;
@@ -12,18 +28,12 @@ export default function AvatarPanel() {
     equippedMeta: Record<string, any>;
     imageUrl?: string | null;
   }>(null);
-  const [progress, setProgress] = useState<
-    null | { level: number; ep_in_level: number; ep_required: number; diamonds?: number; total_ep?: number }
-  >(null);
-  const [lifeStreak, setLifeStreak] = useState<null | {
-    current: number;
-    longest: number;
-    canRevive: boolean;
-    reviveCost: number;
-    week?: Array<{ day: string; status: 'counted' | 'revived' | 'missed' | 'none' }>;
-    weekly?: { consecutive: number; longest: number; currentWeekDays?: number };
-  }>(null);
+  const [progress, setProgress] = useState<Progress | null>(null);
+  const [lifeStreak, setLifeStreak] = useState<LifeStreak | null>(null);
   const [reviving, setReviving] = useState(false);
+  // Spotlighted goal-linked collectibles (from localStorage + API)
+  const [spotlightMap, setSpotlightMap] = useState<Record<string, boolean>>({});
+  const [spotlightItems, setSpotlightItems] = useState<any[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -36,13 +46,62 @@ export default function AvatarPanel() {
         ]);
         const [aJson, pJson, lsJson] = await Promise.all([aRes.json(), pRes.json(), lsRes.json()]);
         if (aRes.ok && alive) setAvatarPayload(aJson);
-        if (pRes.ok && pJson?.progress && alive) setProgress(pJson.progress);
-        if (lsRes.ok && lsJson?.lifeStreak && alive) setLifeStreak(lsJson.lifeStreak);
+        if (!progressProp && pRes.ok && pJson?.progress && alive) setProgress(pJson.progress);
+        if (!lifeStreakProp && lsRes.ok && lsJson?.lifeStreak && alive) setLifeStreak(lsJson.lifeStreak);
       } catch {} finally {
         if (alive) setLoading(false);
       }
     })();
     return () => { alive = false; };
+  }, []);
+
+  // Sync props from parent (dashboard) for instant updates
+  useEffect(() => {
+    if (progressProp) setProgress(progressProp);
+  }, [progressProp]);
+  useEffect(() => {
+    if (lifeStreakProp) setLifeStreak(lifeStreakProp);
+  }, [lifeStreakProp]);
+
+  // Load spotlight map and items
+  useEffect(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('profile_spotlight_collectibles') : null;
+      if (raw) {
+        const obj = JSON.parse(raw);
+        if (obj && typeof obj === 'object') setSpotlightMap(obj as Record<string, boolean>);
+      }
+    } catch {}
+    (async () => {
+      try {
+        const res = await fetch('/api/collectibles/mine');
+        const j = await res.json().catch(() => ({}));
+        if (res.ok && Array.isArray(j.items)) {
+          setSpotlightItems(j.items as any[]);
+        }
+      } catch {}
+    })();
+    const onLocal = () => {
+      try {
+        const r = localStorage.getItem('profile_spotlight_collectibles');
+        if (!r) return setSpotlightMap({});
+        const obj = JSON.parse(r);
+        if (obj && typeof obj === 'object') setSpotlightMap(obj as Record<string, boolean>);
+      } catch {}
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'profile_spotlight_collectibles') onLocal();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('profile_spotlight_collectibles_updated', onLocal as any);
+      window.addEventListener('storage', onStorage);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('profile_spotlight_collectibles_updated', onLocal as any);
+        window.removeEventListener('storage', onStorage);
+      }
+    };
   }, []);
 
   // Track previous values to trigger flare animations on increases
@@ -175,8 +234,9 @@ export default function AvatarPanel() {
             </div>
           </div>
 
-           {/* Life Streak (compact card-style) */}
-           <div className="mt-3 sm:mt-4 rounded-lg sm:rounded-xl border border-orange-200/60 dark:border-orange-900/40 bg-gradient-to-br from-orange-50/60 to-amber-50/40 dark:from-orange-900/10 dark:to-amber-900/10 p-2.5 sm:p-3">
+          {/* Spotlight chips now render inside the avatar box pills row */}
+          {/* Life Streak (compact card-style) */}
+          <div className="mt-3 sm:mt-4 rounded-lg sm:rounded-xl border border-orange-200/60 dark:border-orange-900/40 bg-gradient-to-br from-orange-50/60 to-amber-50/40 dark:from-orange-900/10 dark:to-amber-900/10 p-2.5 sm:p-3">
             <div className="flex items-start justify-between">
               <div className="text-sm font-semibold flex items-center gap-2 text-orange-900 dark:text-orange-100">
                 <span aria-hidden>🔥</span>
@@ -231,7 +291,15 @@ export default function AvatarPanel() {
               <div className={`absolute inset-0 rounded-[24px] ${levelFlare ? 'bg-[conic-gradient(at_20%_-10%,#22d3ee,#6366f1,#a855f7,#22d3ee)]' : 'bg-[conic-gradient(at_80%_110%,#fb923c,#f59e0b,#ef4444,#fb923c)]'} opacity-40 animate-ping`} />
             </div>
           )}
-          <AvatarCanvas appearanceStage={a.appearance_stage} imageUrl={avatarPayload.imageUrl || undefined} equipment={avatarPayload.equipment} equippedMeta={avatarPayload.equippedMeta} />
+          <AvatarCanvas
+            appearanceStage={a.appearance_stage}
+            imageUrl={avatarPayload.imageUrl || undefined}
+            equipment={avatarPayload.equipment}
+            equippedMeta={avatarPayload.equippedMeta}
+            spotlighted={(spotlightItems || [])
+              .filter((c: any) => spotlightMap[c.id] && c?.is_goal_collectible && c?.is_user_created)
+              .map((c: any) => ({ icon: c.icon, name: c.name, rarity: c.rarity }))}
+          />
         </div>
       </div>
     </section>

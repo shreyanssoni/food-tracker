@@ -485,10 +485,23 @@ function GoalCard({
   const start = new Date(goal.start_date);
   const deadline = new Date(goal.deadline);
   const pastDeadline = deadline <= now;
-  const total = summary?.totalWeeks ?? 0;
-  const success = summary?.successWeeks ?? 0;
-  const pct = total > 0 ? Math.round((success / total) * 100) : 0;
-  const daysLeft = Math.max(0, Math.ceil((deadline.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / (1000*60*60*24)));
+  // Time-based progress: from start_date to deadline
+  const totalMs = Math.max(0, deadline.getTime() - start.getTime());
+  const elapsedMs = Math.max(0, Math.min(totalMs, now.getTime() - start.getTime()));
+  const timePct = totalMs > 0 ? Math.round((elapsedMs / totalMs) * 100) : 0;
+  const daysLeft = Math.max(0, Math.ceil((deadline.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / (1000 * 60 * 60 * 24)));
+
+  const [showDeadlineModal, setShowDeadlineModal] = useState(false);
+  const [extendDate, setExtendDate] = useState<string>(deadline.toISOString().slice(0, 10));
+  const [showCongrats, setShowCongrats] = useState(false);
+
+  useEffect(() => {
+    // Auto-open modal when deadline reached and goal still active
+    if (pastDeadline && (goal.status === 'active')) {
+      setShowDeadlineModal(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pastDeadline, goal.status]);
 
   async function onRevive() {
     try {
@@ -526,14 +539,14 @@ function GoalCard({
         </div>
       </div>
 
-      {/* Compact progress row */}
+      {/* Compact time progress row */}
       <div className="mt-3">
         <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
-          <span className="inline-flex items-center gap-1"><Sparkles className="h-3.5 w-3.5 text-emerald-500"/> Weekly streak</span>
-          <span>{success}/{total} weeks ({pct}%)</span>
+          <span className="inline-flex items-center gap-1"><Sparkles className="h-3.5 w-3.5 text-emerald-500"/> Time progress</span>
+          <span>{timePct}%</span>
         </div>
         <div className="mt-1.5 h-2.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-          <div className="h-2.5 rounded-full bg-gradient-to-r from-blue-600 to-emerald-500" style={{ width: `${Math.max(5, Math.min(100, pct))}%` }}/>
+          <div className="h-2.5 rounded-full bg-gradient-to-r from-blue-600 to-emerald-500" style={{ width: `${Math.max(5, Math.min(100, timePct))}%` }}/>
         </div>
       </div>
 
@@ -545,14 +558,14 @@ function GoalCard({
             <div className="text-[13px] sm:text-sm text-gray-700 dark:text-gray-300">{goal.description}</div>
           ) : null}
 
-          {/* Progress from start */}
+          {/* Time progress from start */}
           <div className="mt-3">
             <div className="flex items-center justify-between text-[11px] sm:text-xs text-gray-600 dark:text-gray-400">
               <span>Progress since {start.toLocaleDateString()}</span>
-              <span>{success}/{total} weeks ({pct}%)</span>
+              <span>{timePct}%</span>
             </div>
             <div className="mt-1.5 h-2.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-              <div className="h-2.5 rounded-full bg-gradient-to-r from-blue-600 to-emerald-500" style={{ width: `${Math.max(5, Math.min(100, pct))}%` }}/>
+              <div className="h-2.5 rounded-full bg-gradient-to-r from-blue-600 to-emerald-500" style={{ width: `${Math.max(5, Math.min(100, timePct))}%` }}/>
             </div>
           </div>
 
@@ -619,6 +632,110 @@ function GoalCard({
           </div>
         </div>
       )}
+
+      {/* Deadline reached modal */}
+      {showDeadlineModal ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowDeadlineModal(false)} />
+          <div className="relative w-full max-w-sm sm:max-w-md rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white/90 dark:bg-gray-900/90 p-4 sm:p-5 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-start gap-2.5">
+              <div className="shrink-0 h-7 w-7 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-300 flex items-center justify-center">
+                <Trophy className="w-4 h-4"/>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[15px] sm:text-base font-semibold leading-snug text-gray-900 dark:text-gray-100">Deadline reached</div>
+                <div className="text-[12px] sm:text-[13px] text-gray-600 dark:text-gray-300 truncate">{goal.title}</div>
+              </div>
+            </div>
+
+            <div className="mt-3 sm:mt-4 space-y-3">
+              {/* Extend */}
+              <div className="rounded-xl ring-1 ring-gray-300/50 dark:ring-gray-700/50 bg-transparent p-2.5 sm:p-3">
+                <div className="text-[12px] sm:text-[13px] font-medium text-gray-800 dark:text-gray-200 mb-1.5">Extend deadline</div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="date"
+                    value={extendDate}
+                    onChange={e => setExtendDate(e.target.value)}
+                    className="flex-1 rounded-lg ring-1 ring-gray-300/60 dark:ring-gray-700/60 bg-transparent px-3 py-2 text-[13px]"
+                  />
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/goals?id=${encodeURIComponent(goal.id)}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ deadline: extendDate })
+                        });
+                        const j = await res.json().catch(() => ({}));
+                        if (!res.ok) throw new Error(j.error || 'Failed to extend');
+                        toast.success('Deadline extended');
+                        setShowDeadlineModal(false);
+                      } catch (e: any) {
+                        toast.error(e.message || 'Failed to extend');
+                      }
+                    }}
+                    className="w-full sm:w-auto px-3.5 py-2 text-[13px] rounded-lg bg-blue-600 text-white hover:opacity-95"
+                  >Extend</button>
+                </div>
+              </div>
+
+              {/* Complete */}
+              <div className="rounded-xl ring-1 ring-gray-300/50 dark:ring-gray-700/50 bg-transparent p-2.5 sm:p-3">
+                <div className="text-[12px] sm:text-[13px] font-medium mb-1.5 text-gray-800 dark:text-gray-200">Complete goal</div>
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(`/api/goals?id=${encodeURIComponent(goal.id)}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: 'completed' })
+                      });
+                      const j = await res.json().catch(() => ({}));
+                      if (!res.ok) throw new Error(j.error || 'Failed to complete');
+                      setShowDeadlineModal(false);
+                      setShowCongrats(true);
+                      toast.success('Congratulations! Goal completed');
+                    } catch (e: any) {
+                      toast.error(e.message || 'Failed to complete');
+                    }
+                  }}
+                  className="w-full sm:w-auto px-3.5 py-2 text-[13px] rounded-lg bg-emerald-600 text-white hover:opacity-95"
+                >Mark as Completed</button>
+              </div>
+
+              {/* Discard */}
+              <div className="rounded-xl ring-1 ring-gray-300/50 dark:ring-gray-700/50 bg-transparent p-2.5 sm:p-3">
+                <div className="text-[12px] sm:text-[13px] font-medium mb-1.5 text-red-600">Discard goal</div>
+                <button
+                  onClick={() => onDelete && onDelete()}
+                  className="w-full sm:w-auto px-3.5 py-2 text-[13px] rounded-lg ring-1 ring-red-300/70 text-red-600 hover:bg-red-50/70 dark:hover:bg-red-900/10"
+                >Delete Goal</button>
+              </div>
+            </div>
+
+            <div className="mt-4 sm:mt-5 flex sm:justify-end">
+              <button onClick={() => setShowDeadlineModal(false)} className="w-full sm:w-auto px-3.5 py-2 text-[13px] rounded-lg ring-1 ring-gray-300/70 dark:ring-gray-700/70">Close</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Congrats dialog */}
+      {showCongrats ? (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowCongrats(false)} />
+          <div className="relative w-[92%] max-w-md rounded-2xl border border-gray-200/70 dark:border-gray-800/70 bg-white dark:bg-gray-900 p-5 text-center">
+            <div className="text-4xl mb-2">🎉</div>
+            <div className="text-base font-semibold">Goal Completed!</div>
+            <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">Great job finishing "{goal.title}".</div>
+            <div className="text-xs text-gray-500 mt-2">If this goal had a reward, it's now available in your store.</div>
+            <div className="mt-4 flex justify-center">
+              <button onClick={() => setShowCongrats(false)} className="px-4 py-2 text-sm rounded-full bg-blue-600 text-white">Nice!</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

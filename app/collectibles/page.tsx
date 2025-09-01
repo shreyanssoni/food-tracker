@@ -16,6 +16,8 @@ export default function MyCollectiblesPage() {
   const [shareItem, setShareItem] = useState<{ slug?: string; name?: string; rarity?: string } | null>(null);
   const confettiRef = useRef<HTMLDivElement | null>(null);
   const burstRef = useRef<HTMLDivElement | null>(null);
+  // Profile spotlight for goal-linked collectibles (persisted locally for now)
+  const [spotlight, setSpotlight] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let alive = true;
@@ -35,6 +37,28 @@ export default function MyCollectiblesPage() {
     })();
     return () => { alive = false; };
   }, []);
+
+  // Load spotlight preferences from localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('profile_spotlight_collectibles');
+      if (raw) {
+        const obj = JSON.parse(raw);
+        if (obj && typeof obj === 'object') setSpotlight(obj as Record<string, boolean>);
+      }
+    } catch {}
+  }, []);
+
+  // Persist spotlight changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('profile_spotlight_collectibles', JSON.stringify(spotlight));
+      // notify other routes/tabs to refresh spotlight UIs immediately
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('profile_spotlight_collectibles_updated'));
+      }
+    } catch {}
+  }, [spotlight]);
 
   const rarityToClass = (r?: string) => {
     const rar = (r || 'common').toLowerCase();
@@ -185,20 +209,33 @@ export default function MyCollectiblesPage() {
             if (eq.armor === c.id) equippedSlots.push('armor');
             if (eq.cosmetic === c.id) equippedSlots.push('cosmetic');
             if (eq.pet === c.id) equippedSlots.push('pet');
+            const isGoalLinked = !!c?.is_goal_collectible && !!c?.is_user_created;
+            const isSpotlit = !!spotlight[c.id as string];
             return (
-              <div key={c.id} className="relative rounded-2xl p-4 border border-gray-200/70 dark:border-gray-800/70 bg-white/70 dark:bg-gray-950/60 shadow-sm">
+              <div
+                key={c.id}
+                className={`relative rounded-2xl p-4 border bg-white/70 dark:bg-gray-950/60 shadow-sm ${
+                  isGoalLinked
+                    ? 'border-pink-200/70 dark:border-pink-900/50 ring-1 ring-inset ring-pink-300/40 dark:ring-pink-800/40'
+                    : 'border-gray-200/70 dark:border-gray-800/70'
+                }`}
+              >
                 <div className="flex items-center justify-between gap-2">
                   <a href={c.public_slug ? `/collectibles/${encodeURIComponent(c.public_slug)}` : '#'} className="text-sm font-semibold truncate hover:underline" title={c.name}>{c.name}</a>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full bg-gradient-to-r ${rarityClass} text-white shadow-sm`}>{(c.rarity || 'Common')}</span>
                 </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">{c.lore || c.description || 'Collectible'}</div>
-                <a href={c.public_slug ? `/collectibles/${encodeURIComponent(c.public_slug)}` : '#'} className="mt-3 h-32 rounded-xl border border-gray-200/60 dark:border-gray-800/60 grid place-items-center bg-gray-50 dark:bg-gray-900 overflow-hidden">
+                <a href={c.public_slug ? `/collectibles/${encodeURIComponent(c.public_slug)}` : '#'}
+                   className={`mt-3 h-32 rounded-xl grid place-items-center overflow-hidden border ${
+                     isGoalLinked ? 'border-pink-200/70 dark:border-pink-900/50 bg-pink-50/60 dark:bg-pink-950/20' : 'border-gray-200/60 dark:border-gray-800/60 bg-gray-50 dark:bg-gray-900'
+                   } ${isGoalLinked ? 'shadow-[0_0_0_3px_rgba(236,72,153,0.12),0_10px_25px_-10px_rgba(236,72,153,0.45)]' : ''}`}
+                >
                   {/* Always render an image and fallback to default placeholder if missing or load fails */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={icon || '/images/collectibles/default.svg'}
                     alt={c.name}
-                    className="h-full w-full object-cover"
+                    className={`h-full w-full object-cover ${isGoalLinked ? 'saturate-110' : ''}`}
                     onError={(e) => {
                       const fallback = '/images/collectibles/default.svg';
                       // @ts-ignore
@@ -209,42 +246,63 @@ export default function MyCollectiblesPage() {
                     }}
                   />
                 </a>
-                {/* Equip controls */}
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-1">
-                    {allowedSlotsForCollectible(c).map((slot) => {
-                      const currentInSlot = (equipment as any)?.[slot] as string | null | undefined;
-                      const isEquippedHere = currentInSlot === c.id;
-                      const isBusy = eqBusy === `${slot}|${isEquippedHere ? 'none' : c.id}`;
-                      const disabled = !!eqBusy;
-                      const title = isEquippedHere ? `Unequip from ${slot}` : `Equip to ${slot}`;
-                      const label = isEquippedHere ? `Unequip ${slot}` : `Equip ${slot}`;
-                      return (
-                        <button
-                          key={slot}
-                          className={`text-[10px] px-2 py-1 rounded-full border ${isEquippedHere
-                            ? 'border-emerald-300 text-emerald-700 dark:text-emerald-300 dark:border-emerald-700 bg-emerald-500/10'
-                            : 'border-gray-200 dark:border-gray-700 hover:bg-white/70 dark:hover:bg-gray-900/60'}`}
-                          onClick={() => (isEquippedHere ? unequip(slot) : equip(slot, c.id))}
-                          disabled={disabled}
-                          title={title}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })}
+                {/* Controls */}
+                {isGoalLinked ? (
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <div className="text-[11px] text-pink-700 dark:text-pink-300 inline-flex items-center gap-1">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-pink-500" />
+                      Goal Reward
+                    </div>
+                    <button
+                      onClick={() => setSpotlight((m) => ({ ...m, [c.id]: !m[c.id] }))}
+                      className={`text-[11px] px-2.5 py-1.5 rounded-full border ${isSpotlit
+                        ? 'border-pink-300 text-pink-700 dark:text-pink-300 dark:border-pink-700 bg-pink-500/10'
+                        : 'border-gray-200 dark:border-gray-700 hover:bg-white/70 dark:hover:bg-gray-900/60'}`}
+                      title={isSpotlit ? 'Hide from profile' : 'Show on profile'}
+                    >
+                      {isSpotlit ? 'Shown on profile' : 'Show on profile'}
+                    </button>
                   </div>
-                  <div className="flex items-center gap-2">
-                  {c.public_slug && (
-                    <button onClick={() => openShare(c.public_slug, c.name, c.rarity)} className="text-xs px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-700 hover:bg-white/70 dark:hover:bg-gray-900/60">Share</button>
-                  )}
-                  {c.public_slug && (
-                    <a className="text-xs px-3 py-1.5 rounded-full border border-blue-200 text-blue-700 dark:text-blue-300 dark:border-blue-800 hover:bg-blue-50/50 dark:hover:bg-blue-950/30" href={`/collectibles/${encodeURIComponent(c.public_slug)}`}>View</a>
-                  )}
+                ) : (
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1">
+                      {allowedSlotsForCollectible(c).map((slot) => {
+                        const currentInSlot = (equipment as any)?.[slot] as string | null | undefined;
+                        const isEquippedHere = currentInSlot === c.id;
+                        const isBusy = eqBusy === `${slot}|${isEquippedHere ? 'none' : c.id}`;
+                        const disabled = !!eqBusy;
+                        const title = isEquippedHere ? `Unequip from ${slot}` : `Equip to ${slot}`;
+                        const label = isEquippedHere ? `Unequip ${slot}` : `Equip ${slot}`;
+                        return (
+                          <button
+                            key={slot}
+                            className={`text-[10px] px-2 py-1 rounded-full border ${isEquippedHere
+                              ? 'border-emerald-300 text-emerald-700 dark:text-emerald-300 dark:border-emerald-700 bg-emerald-500/10'
+                              : 'border-gray-200 dark:border-gray-700 hover:bg-white/70 dark:hover:bg-gray-900/60'}`}
+                            onClick={() => (isEquippedHere ? unequip(slot) : equip(slot, c.id))}
+                            disabled={disabled}
+                            title={title}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {c.public_slug && (
+                        <button onClick={() => openShare(c.public_slug, c.name, c.rarity)} className="text-xs px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-700 hover:bg-white/70 dark:hover:bg-gray-900/60">Share</button>
+                      )}
+                      {c.public_slug && (
+                        <a className="text-xs px-3 py-1.5 rounded-full border border-blue-200 text-blue-700 dark:text-blue-300 dark:border-blue-800 hover:bg-blue-50/50 dark:hover:bg-blue-950/30" href={`/collectibles/${encodeURIComponent(c.public_slug)}`}>View</a>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
                 {c.is_badge && (
                   <div className="absolute -top-2 -right-2 text-[10px] px-2 py-0.5 rounded-full border border-amber-400/50 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-900/30 dark:text-amber-200 shadow-sm">Badge</div>
+                )}
+                {isGoalLinked && (
+                  <div className="absolute -top-2 -left-2 text-[10px] px-2 py-0.5 rounded-full border border-pink-300/60 bg-pink-50 text-pink-700 dark:border-pink-700/50 dark:bg-pink-900/30 dark:text-pink-200 shadow-sm">Goal Reward</div>
                 )}
               </div>
             );

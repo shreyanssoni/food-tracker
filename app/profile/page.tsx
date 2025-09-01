@@ -34,6 +34,10 @@ export default function ProfilePage() {
     dietary: null,
   });
 
+  // Spotlighted goal-linked collectibles (profile strip)
+  const [spotlightMap, setSpotlightMap] = useState<Record<string, boolean>>({});
+  const [spotlightItems, setSpotlightItems] = useState<any[]>([]);
+
   useEffect(() => {
     const load = async () => {
       if (status === "authenticated") {
@@ -64,6 +68,46 @@ export default function ProfilePage() {
       }
     };
     load();
+  }, [status]);
+
+  // Load spotlight map and items once authenticated
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('profile_spotlight_collectibles') : null;
+      if (raw) {
+        const obj = JSON.parse(raw);
+        if (obj && typeof obj === 'object') setSpotlightMap(obj as Record<string, boolean>);
+      }
+    } catch {}
+    (async () => {
+      try {
+        const res = await fetch('/api/collectibles/mine');
+        const j = await res.json().catch(() => ({}));
+        if (res.ok && Array.isArray(j.items)) setSpotlightItems(j.items as any[]);
+      } catch {}
+    })();
+    const onLocal = () => {
+      try {
+        const r = localStorage.getItem('profile_spotlight_collectibles');
+        if (!r) return setSpotlightMap({});
+        const obj = JSON.parse(r);
+        if (obj && typeof obj === 'object') setSpotlightMap(obj as Record<string, boolean>);
+      } catch {}
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'profile_spotlight_collectibles') onLocal();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('profile_spotlight_collectibles_updated', onLocal as any);
+      window.addEventListener('storage', onStorage);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('profile_spotlight_collectibles_updated', onLocal as any);
+        window.removeEventListener('storage', onStorage);
+      }
+    };
   }, [status]);
 
   const onSave = async () => {
@@ -178,6 +222,32 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
+
+      {/* Spotlighted rewards (optional strip) */}
+      {(() => {
+        const items = (spotlightItems || []).filter((c: any) => spotlightMap[c.id] && c?.is_goal_collectible && c?.is_user_created);
+        if (!items.length) return null;
+        return (
+          <div className="rounded-xl border border-pink-200/70 dark:border-pink-900/50 bg-white/70 dark:bg-gray-950/60 p-3">
+            <div className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">Spotlighted rewards</div>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {items.map((c: any) => {
+                const icon = c.icon && (c.icon.startsWith('http') || c.icon.startsWith('/')) ? c.icon : (c.icon ? `/images/collectibles/${c.icon}.svg` : '/images/collectibles/default.svg');
+                return (
+                  <a key={c.id} href={c.public_slug ? `/collectibles/${encodeURIComponent(c.public_slug)}` : '#'} className="relative shrink-0 w-20">
+                    <div className="aspect-square rounded-lg overflow-hidden border border-pink-300/60 bg-pink-50/60 dark:border-pink-800/60 dark:bg-pink-900/20 shadow-[0_0_0_3px_rgba(236,72,153,0.12),0_10px_25px_-10px_rgba(236,72,153,0.45)]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={icon} alt={c.name} className="h-full w-full object-cover saturate-110" />
+                    </div>
+                    <div className="mt-1 text-[10px] leading-tight text-pink-700 dark:text-pink-300 line-clamp-2" title={c.name}>{c.name}</div>
+                    <div className="absolute -top-1 -left-1 text-[9px] px-1.5 py-0.5 rounded-full border border-pink-300/60 bg-pink-50 text-pink-700 dark:border-pink-700/50 dark:bg-pink-900/30 dark:text-pink-200 shadow-sm">Goal Reward</div>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {error && <div className="text-sm text-red-500">{error}</div>}
 

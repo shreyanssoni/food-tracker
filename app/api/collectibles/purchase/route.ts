@@ -85,16 +85,16 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Required badge not owned', code: 'BADGE_GATE' }, { status: 403 });
       }
     }
-    // Goal success gating (if configured)
+    // Goal completion gating (updated: rely on goal.status === 'completed')
     if (reqs?.require_goal_success && reqs?.required_goal_id) {
-      const [{ data: goal }, { data: weeks }] = await Promise.all([
-        supabase.from('goals').select('deadline').eq('id', reqs.required_goal_id).maybeSingle(),
-        supabase.rpc('fn_goal_weekly_success', { p_goal_id: reqs.required_goal_id })
-      ]);
-      const pastDeadline = goal?.deadline ? new Date(goal.deadline) <= new Date() : false;
-      const allWeeksSuccess = Array.isArray(weeks) ? weeks.every((w: any) => w.success) : false;
-      if (!(pastDeadline && allWeeksSuccess)) {
-        return NextResponse.json({ error: 'Goal not completed successfully', code: 'GOAL_GATE' }, { status: 403 });
+      const { data: goal } = await supabase
+        .from('goals')
+        .select('status')
+        .eq('id', reqs.required_goal_id)
+        .maybeSingle();
+      const isCompleted = (goal?.status || '').toLowerCase() === 'completed';
+      if (!isCompleted) {
+        return NextResponse.json({ error: 'Goal not completed yet', code: 'GOAL_GATE' }, { status: 403 });
       }
     }
 

@@ -34,7 +34,7 @@ export async function GET() {
     if (colIds.length) {
       const { data: rows, error: rErr } = await supabase
         .from('collectibles_requirements')
-        .select('collectible_id, min_level, required_badge_id')
+        .select('collectible_id, min_level, required_badge_id, require_goal_success, required_goal_id')
         .in('collectible_id', colIds as string[]);
       if (rErr) throw rErr;
       for (const r of rows || []) reqs[r.collectible_id] = r;
@@ -73,20 +73,18 @@ export async function GET() {
       })
       .map(async (i: any) => {
         const meta = metadata[i.collectible_id] || null;
-        const rq = reqs[i.collectible_id] || { min_level: 1, required_badge_id: null };
+        const rq = reqs[i.collectible_id] || { min_level: 1, required_badge_id: null, require_goal_success: false, required_goal_id: null };
         const owned = ownedSet.has(i.collectible_id);
         const owned_source = owned ? (ownedSource[i.collectible_id] || null) : null;
         const hasReqBadge = rq.required_badge_id ? ownedSet.has(rq.required_badge_id) : true;
         let goalOk = true;
         if (rq.require_goal_success && rq.required_goal_id) {
-          // Fetch goal and weekly success states
-          const [{ data: goal }, { data: weeks }] = await Promise.all([
-            supabase.from('goals').select('deadline').eq('id', rq.required_goal_id).maybeSingle(),
-            supabase.rpc('fn_goal_weekly_success', { p_goal_id: rq.required_goal_id })
-          ]);
-          const pastDeadline = goal?.deadline ? new Date(goal.deadline) <= new Date() : false;
-          const allWeeksSuccess = Array.isArray(weeks) ? weeks.every((w: any) => w.success) : false;
-          goalOk = pastDeadline && allWeeksSuccess;
+          const { data: goal } = await supabase
+            .from('goals')
+            .select('status')
+            .eq('id', rq.required_goal_id)
+            .maybeSingle();
+          goalOk = ((goal?.status || '').toLowerCase() === 'completed');
         }
         const can_purchase = i.active && !owned && level >= (rq.min_level ?? 1) && hasReqBadge && goalOk;
         let unavailable_reason: string | null = null;

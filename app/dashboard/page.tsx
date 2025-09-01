@@ -61,6 +61,8 @@ export default function DashboardPage() {
   const [goalSummaries, setGoalSummaries] = useState<
     Record<string, { totalWeeks: number; successWeeks: number }>
   >({});
+  // map of goalId -> { count, quota } for current week
+  const [goalWeekProgress, setGoalWeekProgress] = useState<Record<string, { count: number; quota: number }>>({});
   const [reviving, setReviving] = useState(false);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [nextUp, setNextUp] = useState<null | { task: any; when: Date | null }>(
@@ -138,25 +140,27 @@ export default function DashboardPage() {
           setGoalSummaries(gData.summaries || {});
           const ids = goals.map((g: any) => g.id).filter(Boolean);
           if (ids.length) {
-            const chunks = await Promise.all(
-              ids.map((id: string) =>
-                fetch(`/api/goals/${id}/streaks`)
-                  .then((r) => r.json())
-                  .catch(() => null)
-              )
-            );
-            let maxCur = 0,
-              maxLong = 0;
-            for (const j of chunks) {
-              if (!j || j.error) continue;
-              const cur = Number(j?.streaks?.consecutiveWeeks || 0);
-              const lng = Number(j?.streaks?.longest || 0);
-              if (cur > maxCur) maxCur = cur;
-              if (lng > maxLong) maxLong = lng;
+            const qs = encodeURIComponent(ids.join(','));
+            const bulk = await fetch(`/api/goals/streaks?ids=${qs}`).then((r) => r.json()).catch(() => null);
+            if (bulk && !bulk.error) {
+              const maxCur = Number(bulk?.max?.dailyCurrent || 0);
+              const maxLong = Number(bulk?.max?.dailyLongest || 0);
+              setStreakMax({ current: maxCur, longest: maxLong });
+              const map: Record<string, { count: number; quota: number }> = {};
+              for (const it of (bulk.items || [])) {
+                map[String(it.id)] = {
+                  count: Number(it.currentWeekCount || 0),
+                  quota: Number(it.currentWeekQuota || 0),
+                };
+              }
+              setGoalWeekProgress(map);
+            } else {
+              setStreakMax({ current: 0, longest: 0 });
+              setGoalWeekProgress({});
             }
-            setStreakMax({ current: maxCur, longest: maxLong });
           } else {
             setStreakMax({ current: 0, longest: 0 });
+            setGoalWeekProgress({});
           }
         }
       } catch {
@@ -268,23 +272,15 @@ export default function DashboardPage() {
           const goals: any[] = gData.goals || [];
           const ids = goals.map((g: any) => g.id).filter(Boolean);
           if (ids.length) {
-            const chunks = await Promise.all(
-              ids.map((id: string) =>
-                fetch(`/api/goals/${id}/streaks`)
-                  .then((r) => r.json())
-                  .catch(() => null)
-              )
-            );
-            let maxCur = 0,
-              maxLong = 0;
-            for (const j of chunks) {
-              if (!j || j.error) continue;
-              const cur = Number(j?.streaks?.dailyCurrent || 0);
-              const lng = Number(j?.streaks?.dailyLongest || 0);
-              if (cur > maxCur) maxCur = cur;
-              if (lng > maxLong) maxLong = lng;
+            const qs = encodeURIComponent(ids.join(','));
+            const bulk = await fetch(`/api/goals/streaks?ids=${qs}`).then((r) => r.json()).catch(() => null);
+            if (bulk && !bulk.error) {
+              const maxCur = Number(bulk?.max?.dailyCurrent || 0);
+              const maxLong = Number(bulk?.max?.dailyLongest || 0);
+              setStreakMax({ current: maxCur, longest: maxLong });
+            } else {
+              setStreakMax({ current: 0, longest: 0 });
             }
-            setStreakMax({ current: maxCur, longest: maxLong });
           } else {
             setStreakMax({ current: 0, longest: 0 });
           }
@@ -330,25 +326,27 @@ export default function DashboardPage() {
             setGoalSummaries(gData.summaries || {});
             const ids = goals.map((g: any) => g.id).filter(Boolean);
             if (ids.length) {
-              const chunks = await Promise.all(
-                ids.map((id: string) =>
-                  fetch(`/api/goals/${id}/streaks`)
-                    .then((r) => r.json())
-                    .catch(() => null)
-                )
-              );
-              let maxCur = 0,
-                maxLong = 0;
-              for (const j of chunks) {
-                if (!j || j.error) continue;
-                const cur = Number(j?.streaks?.consecutiveWeeks || 0);
-                const lng = Number(j?.streaks?.longest || 0);
-                if (cur > maxCur) maxCur = cur;
-                if (lng > maxLong) maxLong = lng;
+              const qs = encodeURIComponent(ids.join(','));
+              const bulk = await fetch(`/api/goals/streaks?ids=${qs}`).then((r) => r.json()).catch(() => null);
+              if (bulk && !bulk.error) {
+                const maxCur = Number(bulk?.max?.dailyCurrent || 0);
+                const maxLong = Number(bulk?.max?.dailyLongest || 0);
+                setStreakMax({ current: maxCur, longest: maxLong });
+                const map: Record<string, { count: number; quota: number }> = {};
+                for (const it of (bulk.items || [])) {
+                  map[String(it.id)] = {
+                    count: Number(it.currentWeekCount || 0),
+                    quota: Number(it.currentWeekQuota || 0),
+                  };
+                }
+                setGoalWeekProgress(map);
+              } else {
+                setStreakMax({ current: 0, longest: 0 });
+                setGoalWeekProgress({});
               }
-              setStreakMax({ current: maxCur, longest: maxLong });
             } else {
               setStreakMax({ current: 0, longest: 0 });
+              setGoalWeekProgress({});
             }
           }
         } catch {}
@@ -428,15 +426,17 @@ export default function DashboardPage() {
           ep: data?.completion?.ep_awarded || epValue,
         });
       } catch {}
-      // refresh tasks + progress + life streak (which auto-updates on GET)
-      const [tRes, pRes, lsRes] = await Promise.all([
+      // refresh tasks + progress + life streak + goals (to sync Goals Overview immediately)
+      const [tRes, pRes, gRes, lsRes] = await Promise.all([
         fetch("/api/tasks"),
         fetch("/api/progress"),
+        fetch("/api/goals"),
         fetch("/api/life-streak"),
       ]);
-      const [tData, pData, lsData] = await Promise.all([
+      const [tData, pData, gData, lsData] = await Promise.all([
         tRes.json(),
         pRes.json(),
+        gRes.json(),
         lsRes.json(),
       ]);
       if (!tData.error) {
@@ -450,6 +450,35 @@ export default function DashboardPage() {
       if (!pData.error) setProgress(pData.progress);
       if (!lsData?.error && lsData?.lifeStreak)
         setLifeStreak(lsData.lifeStreak);
+      if (!gData?.error) {
+        const goals: any[] = gData.goals || [];
+        setGoals(goals);
+        setGoalSummaries(gData.summaries || {});
+        const ids = goals.map((g: any) => g.id).filter(Boolean);
+        if (ids.length) {
+          const qs = encodeURIComponent(ids.join(','));
+          const bulk = await fetch(`/api/goals/streaks?ids=${qs}`).then((r) => r.json()).catch(() => null);
+          if (bulk && !bulk.error) {
+            const maxCur = Number(bulk?.max?.dailyCurrent || 0);
+            const maxLong = Number(bulk?.max?.dailyLongest || 0);
+            setStreakMax({ current: maxCur, longest: maxLong });
+            const map: Record<string, { count: number; quota: number }> = {};
+            for (const it of (bulk.items || [])) {
+              map[String(it.id)] = {
+                count: Number(it.currentWeekCount || 0),
+                quota: Number(it.currentWeekQuota || 0),
+              };
+            }
+            setGoalWeekProgress(map);
+          } else {
+            setStreakMax({ current: 0, longest: 0 });
+            setGoalWeekProgress({});
+          }
+        } else {
+          setStreakMax({ current: 0, longest: 0 });
+          setGoalWeekProgress({});
+        }
+      }
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -601,7 +630,7 @@ export default function DashboardPage() {
     <div className="space-y-7">
       {/* Avatar + EP Panel */}
       <section className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white/70 dark:bg-slate-950/60 p-4 sm:p-5">
-        <AvatarPanel />
+        <AvatarPanel progress={progress} lifeStreak={lifeStreak} />
       </section>
       {/* Player Card + Quick Actions */}
       <section className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gradient-to-br from-sky-600/15 via-indigo-600/10 to-emerald-500/10 dark:from-sky-900/25 dark:via-indigo-900/20 dark:to-emerald-900/20 p-5 sm:p-6">
@@ -1097,15 +1126,12 @@ export default function DashboardPage() {
         {goals && goals.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {goals.map((g: any) => {
-              const summary = goalSummaries[g.id] || {
-                totalWeeks: 0,
-                successWeeks: 0,
-              };
-              const total = Number(summary.totalWeeks || 0);
-              const success = Number(summary.successWeeks || 0);
-              const pct = total > 0 ? Math.round((success / total) * 100) : 0;
               const now = new Date();
+              const start = new Date(g.start_date);
               const deadline = new Date(g.deadline);
+              const totalMs = Math.max(0, deadline.getTime() - start.getTime());
+              const elapsedMs = Math.max(0, Math.min(totalMs, now.getTime() - start.getTime()));
+              const timePct = totalMs > 0 ? Math.round((elapsedMs / totalMs) * 100) : 0;
               const daysLeft = Math.max(
                 0,
                 Math.ceil(
@@ -1142,15 +1168,13 @@ export default function DashboardPage() {
                   </div>
                   <div className="mt-3">
                     <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400">
-                      <span>Weekly streak</span>
-                      <span>
-                        {success}/{total} weeks ({pct}%)
-                      </span>
+                      <span>Time progress</span>
+                      <span>{timePct}%</span>
                     </div>
                     <div className="mt-1.5 h-2.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
                       <div
                         className="h-2.5 rounded-full bg-gradient-to-r from-blue-600 to-emerald-500"
-                        style={{ width: `${Math.max(5, Math.min(100, pct))}%` }}
+                        style={{ width: `${Math.max(5, Math.min(100, timePct))}%` }}
                       />
                     </div>
                   </div>

@@ -13,9 +13,10 @@ type Props = {
   equipment?: { weapon?: string | null; armor?: string | null; cosmetic?: string | null; pet?: string | null } | null;
   equippedMeta?: EquippedMeta;
   className?: string;
+  spotlighted?: Array<{ icon?: string; name?: string; rarity?: string }>; // goal-linked spotlight chips
 };
 
-export default function AvatarCanvas({ appearanceStage, imageUrl, equipment, equippedMeta, className = "" }: Props) {
+export default function AvatarCanvas({ appearanceStage, imageUrl, equipment, equippedMeta, className = "", spotlighted = [] }: Props) {
   // Helper to resolve icon path or http url -> fallback
   const resolveIcon = (icon?: string | null) => {
     if (!icon) return "/images/collectibles/default.svg";
@@ -59,6 +60,9 @@ export default function AvatarCanvas({ appearanceStage, imageUrl, equipment, equ
     pet ? { key: 'pet', item: pet } : null,
   ].filter(Boolean) as Array<{ key: string; item: { icon?: string; name?: string; rarity?: string } }>;
 
+  // Spotlight chips (no slot letter relevance)
+  const spotChips = (spotlighted || []).map((it, i) => ({ key: `goal-${i}`, item: it }));
+
   const slotLetter = (slot: string) => ({ weapon: 'W', armor: 'A', cosmetic: 'C', pet: 'P' } as Record<string, string>)[slot] || '?';
 
   return (
@@ -78,6 +82,8 @@ export default function AvatarCanvas({ appearanceStage, imageUrl, equipment, equ
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={resolveAvatarSrc(imageUrl, appearanceStage)}
+          loading="lazy"
+          decoding="async"
           onError={(e) => {
             const fallback = "/images/collectibles/default.svg";
             // @ts-ignore
@@ -91,8 +97,8 @@ export default function AvatarCanvas({ appearanceStage, imageUrl, equipment, equ
         />
       </div>
 
-      {/* Equipped chips row (bottom, non-obtrusive) */}
-      {equippedList.length > 0 && (
+      {/* Equipped + spotlight chips row (bottom, non-obtrusive) */}
+      {(equippedList.length > 0 || spotChips.length > 0) && (
         <div className="absolute inset-x-0 bottom-2 sm:bottom-3 flex items-center justify-center gap-1.5 sm:gap-2 px-2">
           {equippedList.map(({ key, item }) => (
             <div
@@ -109,7 +115,46 @@ export default function AvatarCanvas({ appearanceStage, imageUrl, equipment, equ
               <img
                 src={resolveIcon(item.icon)}
                 alt={item.name || key}
+                loading="lazy"
+                decoding="async"
                 className="h-4 w-4 sm:h-5 sm:w-5 object-contain"
+                onError={(e) => {
+                  const fallback = "/images/collectibles/default.svg";
+                  // @ts-ignore
+                  if (!e.currentTarget.src.endsWith(fallback)) {
+                    // @ts-ignore
+                    e.currentTarget.src = fallback;
+                  }
+                }}
+              />
+            </div>
+          ))}
+          {spotChips.map(({ key, item }) => (
+            <div
+              key={key}
+              className={`flex items-center gap-1 px-2 py-1 rounded-full border border-pink-300/70 dark:border-pink-700/60 bg-pink-50/70 dark:bg-pink-900/20 text-pink-800 dark:text-pink-200 shadow-[0_0_14px_rgba(236,72,153,0.30)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md`}
+              title={item.name || 'Goal collectible'}
+            >
+              <span
+                className="inline-flex h-4 min-w-4 items-center justify-center rounded bg-white text-pink-700 dark:bg-white/10 dark:text-pink-200 text-[9px] font-bold px-[6px] leading-none border border-pink-200/70 dark:border-white/10 shadow-sm"
+                aria-label={`Goal collectible`}
+              >
+                G
+              </span>
+              <img
+                src={resolveIcon(item.icon)}
+                alt={item.name || 'goal'}
+                loading="lazy"
+                decoding="async"
+                className="h-4 w-4 sm:h-5 sm:w-5 object-contain"
+                onError={(e) => {
+                  const fallback = "/images/collectibles/default.svg";
+                  // @ts-ignore
+                  if (!e.currentTarget.src.endsWith(fallback)) {
+                    // @ts-ignore
+                    e.currentTarget.src = fallback;
+                  }
+                }}
               />
             </div>
           ))}

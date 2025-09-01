@@ -374,6 +374,14 @@ export async function PATCH(req: Request) {
         );
       patch.deadline = body.deadline;
     }
+    // Optional: update status (e.g., mark goal completed)
+    if (typeof body.status === "string") {
+      const allowedStatuses = new Set(["active", "completed"]);
+      if (!allowedStatuses.has(body.status)) {
+        return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+      }
+      patch.status = body.status;
+    }
     if (Object.keys(patch).length === 0)
       return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
 
