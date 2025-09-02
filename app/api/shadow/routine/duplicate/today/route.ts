@@ -48,20 +48,25 @@ export async function POST() {
       .eq('shadow_id', profile.id);
     if (rowsErr) throw rowsErr;
 
-    const active = (rows || []).filter((r: any) => (r.status === 'active') && (r.tasks?.active ?? true));
+    // Supabase nested join arrays helper
+    const getTask = (r: any) => (Array.isArray(r?.tasks) ? r.tasks[0] : r?.tasks);
+
+    const active = (rows || []).filter((r: any) => (r.status === 'active') && (getTask(r)?.active ?? true));
 
     // Order tasks similar to state API
     const anchorOrder = ['morning','midday','evening','night','anytime'];
     const sorted = active.sort((a: any, b: any) => {
-      const aA = String(a.tasks?.time_anchor || 'anytime');
-      const bA = String(b.tasks?.time_anchor || 'anytime');
+      const at = getTask(a);
+      const bt = getTask(b);
+      const aA = String(at?.time_anchor || 'anytime');
+      const bA = String(bt?.time_anchor || 'anytime');
       const ao = anchorOrder.indexOf(aA);
       const bo = anchorOrder.indexOf(bA);
       if (ao !== bo) return ao - bo;
-      const ah = a.tasks?.order_hint == null ? Number.POSITIVE_INFINITY : Number(a.tasks?.order_hint);
-      const bh = b.tasks?.order_hint == null ? Number.POSITIVE_INFINITY : Number(b.tasks?.order_hint);
+      const ah = at?.order_hint == null ? Number.POSITIVE_INFINITY : Number(at?.order_hint);
+      const bh = bt?.order_hint == null ? Number.POSITIVE_INFINITY : Number(bt?.order_hint);
       if (ah !== bh) return ah - bh;
-      return new Date(a.tasks?.created_at).getTime() - new Date(b.tasks?.created_at).getTime();
+      return new Date(at?.created_at).getTime() - new Date(bt?.created_at).getTime();
     });
 
     // Base times and spacing
@@ -89,7 +94,8 @@ export async function POST() {
 
     const anchorBuckets: Record<string, any[]> = { morning: [], midday: [], evening: [], night: [], anytime: [] };
     for (const r of sorted) {
-      const a = String(r.tasks?.time_anchor || 'anytime');
+      const t = getTask(r);
+      const a = String(t?.time_anchor || 'anytime');
       (anchorBuckets[a] ||= []).push(r);
     }
     for (const a of anchorOrder) {
