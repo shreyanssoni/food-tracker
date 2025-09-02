@@ -36,7 +36,6 @@ export async function GET(req: NextRequest) {
     const nowParam = searchParams.get('now');
     const debug = searchParams.get('debug') === '1';
     const now = nowParam ? new Date(nowParam) : new Date();
-    const includeCompleted = searchParams.get('include_completed') === '1';
 
     // Load all tasks first, similar to /api/tasks
     const { data: tasks, error } = await supabase
@@ -48,8 +47,8 @@ export async function GET(req: NextRequest) {
 
     const ids = (tasks ?? []).map((t) => t.id);
     let schedules: any[] = [];
-    const completedToday: Record<string, boolean> = {};
-    const lastCompleted: Record<string, string> = {};
+    let completedToday: Record<string, boolean> = {};
+    let lastCompleted: Record<string, string> = {};
     const goalByTask: Record<string, { id: string; title: string }> = {};
     const weeklyQuotaByTask: Record<string, number> = {};
     const weekCountByTask: Record<string, number> = {};
@@ -62,28 +61,12 @@ export async function GET(req: NextRequest) {
       if (sErr) throw sErr;
       schedules = scheds ?? [];
 
-      // Resolve user's timezone and compute their local "today" for accurate filtering
-      let tz = 'UTC';
-      try {
-        const { data: pref } = await supabase
-          .from('user_preferences')
-          .select('timezone')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        if (pref?.timezone) tz = String(pref.timezone);
-      } catch {}
-      const todayStr = new Intl.DateTimeFormat('en-CA', {
-        timeZone: normalizeTz(tz),
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(now);
-      // today's completions for these tasks (user's local day)
+      // today's completions for these tasks (server local "today" used only for flagging; UI will filter separately)
       const { data: completes, error: cErr } = await supabase
         .from('task_completions')
         .select('task_id')
         .eq('user_id', user.id)
-        .eq('completed_on', todayStr);
+        .eq('completed_on', now.toISOString().slice(0, 10));
       if (cErr) throw cErr;
       for (const c of completes || []) completedToday[c.task_id] = true;
 
@@ -230,9 +213,7 @@ export async function GET(req: NextRequest) {
     }));
 
     const dueTodayTasks = tasksWithFlag.filter((t) => t.active && isDueToday(t.id));
-    // By default, hide tasks already completed today unless explicitly requested
-    const visibleTasks = includeCompleted ? dueTodayTasks : dueTodayTasks.filter((t) => !t.completedToday);
-    const dueSchedules = schedules.filter((s) => visibleTasks.some((t) => t.id === s.task_id));
+    const dueSchedules = schedules.filter((s) => dueTodayTasks.some((t) => t.id === s.task_id));
 
     if (debug) {
       const diag = (tasks ?? []).map((t: any) => {
@@ -252,10 +233,10 @@ export async function GET(req: NextRequest) {
           week_quota: weeklyQuotaByTask[t.id] ?? null,
         };
       });
-      return NextResponse.json({ tasks: visibleTasks, schedules: dueSchedules, debug: { now: now.toISOString(), diagnostics: diag } });
+      return NextResponse.json({ tasks: dueTodayTasks, schedules: dueSchedules, debug: { now: now.toISOString(), diagnostics: diag } });
     }
 
-    return NextResponse.json({ tasks: visibleTasks, schedules: dueSchedules });
+    return NextResponse.json({ tasks: dueTodayTasks, schedules: dueSchedules });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
   }
