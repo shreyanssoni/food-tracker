@@ -14,6 +14,7 @@ export async function GET() {
       .from('shadow_challenges')
       .select('id, challenge_text, deadline, status, ep_awarded')
       .eq('user_id', user.id)
+      .eq('status', 'pending')
       .gte('deadline', start.toISOString())
       .lte('deadline', end.toISOString())
       .order('deadline', { ascending: true })

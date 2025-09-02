@@ -28,6 +28,39 @@ export async function GET(req: NextRequest) {
       .limit(100);
     if (error) throw error;
 
+    // If requesting history, also include resolved daily shadow_challenges mapped into the same shape
+    if (view === 'history') {
+      const { data: sh, error: shErr } = await admin
+        .from('shadow_challenges')
+        .select('id, user_id, challenge_text, deadline, status, resolved_at, created_at, updated_at')
+        .eq('user_id', me.id)
+        .neq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (shErr) throw shErr;
+
+      const mapped = (sh || []).map((r: any) => ({
+        id: `shadow-${r.id}`,
+        user_id: r.user_id,
+        shadow_profile_id: null,
+        state: r.status === 'won' ? 'completed_win' : (r.status === 'lost' ? 'completed_loss' : 'expired'),
+        created_at: r.created_at,
+        updated_at: r.updated_at ?? r.resolved_at ?? r.deadline,
+        due_time: r.deadline,
+        linked_user_task_id: null,
+        linked_shadow_task_id: null,
+        task_template: { title: r.challenge_text },
+      }));
+
+      const merged = [...(data || []), ...mapped].sort((a, b) => {
+        const at = new Date(a.updated_at || a.created_at || a.due_time || 0).getTime();
+        const bt = new Date(b.updated_at || b.created_at || b.due_time || 0).getTime();
+        return bt - at;
+      });
+
+      return NextResponse.json({ challenges: merged });
+    }
+
     return NextResponse.json({ challenges: data || [] });
   } catch (e) {
     console.error('shadow challenges list error', e);
