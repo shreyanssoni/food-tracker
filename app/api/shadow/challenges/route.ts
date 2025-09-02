@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     if (view === 'history') {
       const { data: sh, error: shErr } = await admin
         .from('shadow_challenges')
-        .select('id, user_id, challenge_text, deadline, status, resolved_at, created_at, updated_at')
+        .select('id, user_id, challenge_text, deadline, status, resolved_at, created_at')
         .eq('user_id', me.id)
         .neq('status', 'pending')
         .order('created_at', { ascending: false })
