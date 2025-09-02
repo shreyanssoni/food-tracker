@@ -268,22 +268,17 @@ export default function DashboardPage() {
 
   // ---------- existing effects below ----------
 
-  // Load latest non-expired shadow message for the inbox
+  // Load latest non-expired shadow message for the inbox (via server API)
   useEffect(() => {
     (async () => {
       try {
-        const uid = session?.user?.id;
-        if (!uid) return;
-        const nowIso = new Date().toISOString();
-        const { data, error } = await supabase
-          .from("shadow_messages")
-          .select("id,type,text,expiry,created_at")
-          .eq("user_id", uid)
-          .gt("expiry", nowIso)
-          .order("created_at", { ascending: false })
-          .limit(1);
-        if (!error && Array.isArray(data) && data.length > 0) {
-          const m: any = data[0];
+        if (!session?.user?.id) return;
+        const res = await fetch("/api/shadow/messages/latest", {
+          cache: "no-store",
+        });
+        const j = await res.json().catch(() => ({}));
+        if (res.ok && j?.message) {
+          const m = j.message as any;
           const t =
             m?.type === "taunt" ||
             m?.type === "encouragement" ||
@@ -302,25 +297,21 @@ export default function DashboardPage() {
         setShadowMessage(null);
       }
     })();
-  }, [session?.user?.id, clockTick, supabase]);
+  }, [session?.user?.id, clockTick]);
 
-  // Realtime: subscribe to shadow_messages changes for instant inbox refresh
+  // Realtime: subscribe to shadow_messages changes for instant inbox refresh (triggers server API fetch)
   useEffect(() => {
     const uid = session?.user?.id;
     if (!uid) return;
     const ch = supabase.channel("rt-shadow-messages");
     const refresh = async () => {
       try {
-        const nowIso = new Date().toISOString();
-        const { data, error } = await supabase
-          .from("shadow_messages")
-          .select("id,type,text,expiry,created_at")
-          .eq("user_id", uid)
-          .gt("expiry", nowIso)
-          .order("created_at", { ascending: false })
-          .limit(1);
-        if (!error && Array.isArray(data) && data.length > 0) {
-          const m: any = data[0];
+        const res = await fetch("/api/shadow/messages/latest", {
+          cache: "no-store",
+        });
+        const j = await res.json().catch(() => ({}));
+        if (res.ok && j?.message) {
+          const m = j.message as any;
           const t =
             m?.type === "taunt" ||
             m?.type === "encouragement" ||
@@ -332,9 +323,7 @@ export default function DashboardPage() {
             type: t,
             text: String(m.text || ""),
           });
-        } else {
-          setShadowMessage(null);
-        }
+        } else setShadowMessage(null);
       } catch {
         setShadowMessage(null);
       }
@@ -1062,7 +1051,7 @@ export default function DashboardPage() {
                   <div className="mt-3">
                     <Link
                       href="/tasks"
-                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-accent text-white text-accent-foreground bg-blue-600"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold text-white text-accent-foreground bg-blue-600"
                       onClick={() => {
                         try {
                           track("quick_action_use", {

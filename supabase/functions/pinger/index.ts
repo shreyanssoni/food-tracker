@@ -1,6 +1,6 @@
 // Supabase Edge Function (Deno)
 // deno-lint-ignore-file
-// @ts-ignore Deno is provided by the Edge runtime
+// @ts-expect-error Deno is provided by the Edge runtime
 declare const Deno: any;
 // Name: pinger
 // Purpose: Ping app cron endpoints. Schedule this function to run every 5 minutes in Supabase.
@@ -51,7 +51,7 @@ export const handler = async (req: Request): Promise<Response> => {
   };
 
   // Allow running a single target via query param
-  // ?only=push|eod|pre|shadow-generate|shadow-close|shadow-notify|shadow-run-today|shadow-audit-fix-all|shadow-generate-events-today-all|shadow-weekly|shadow-nightly|shadow-taunt
+  // ?only=push|eod|pre|shadow-generate|shadow-close|shadow-notify|shadow-run-today|shadow-audit-fix-all|shadow-generate-events-today-all|shadow-weekly|shadow-nightly|shadow-taunt|shadow-messages-generate
   const urlObj = new URL(req.url);
   const only = urlObj.searchParams.get('only');
   const allTargets: Record<string, Target> = {
@@ -95,6 +95,12 @@ export const handler = async (req: Request): Promise<Response> => {
     // Taunt frequency controller — safe to call frequently; engine enforces caps and windows
     'shadow-taunt': {
       url: `${base}/api/cron/shadow/taunt-maybe`,
+      method: 'POST',
+      headers: { 'x-cron-secret': secret },
+    },
+    // Generate shadow messages for all users — our new 3-hourly job
+    'shadow-messages-generate': {
+      url: `${base}/api/shadow/messages/generate?all=1`,
       method: 'POST',
       headers: { 'x-cron-secret': secret },
     },
@@ -142,7 +148,13 @@ export const handler = async (req: Request): Promise<Response> => {
     case 'shadow-taunt':
       targets = [allTargets['shadow-taunt']];
       break;
+    case 'shadow-messages-generate':
+      targets = [allTargets['shadow-messages-generate']];
+      break;
     default:
+      // Build default targets. Include shadow-messages-generate only every 3 hours.
+      const nowUtc = new Date();
+      const shouldShadowMsgs = nowUtc.getUTCHours() % 3 === 0 && nowUtc.getUTCMinutes() < 5;
       targets = [
         allTargets.push,
         allTargets.eod,
@@ -154,6 +166,7 @@ export const handler = async (req: Request): Promise<Response> => {
         allTargets['shadow-audit-fix-all'],
         allTargets['shadow-generate-events-today-all'],
         allTargets['shadow-taunt'],
+        ...(shouldShadowMsgs ? [allTargets['shadow-messages-generate']] : []),
       ];
   }
 
