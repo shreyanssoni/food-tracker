@@ -152,16 +152,19 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Build maps
-    const schedByTask: Record<string, any> = {};
-    for (const s of schedules) schedByTask[s.task_id] = s;
+    // Build maps (support multiple schedules per task)
+    const schedulesByTask: Record<string, any[]> = {};
+    for (const s of schedules) {
+      const k = String(s.task_id);
+      (schedulesByTask[k] = schedulesByTask[k] || []).push(s);
+    }
 
     // isDueToday server-side (uses provided now instant, formats by schedule timezone)
     const isDueToday = (taskId: string) => {
-      const s = schedByTask[taskId];
+      const arr = schedulesByTask[taskId] || [];
       // If there is NO explicit schedule but the task has a weekly quota via goal template,
       // treat it as due on any day of the week until the quota is met.
-      if (!s) {
+      if (!arr.length) {
         if (typeof weeklyQuotaByTask[taskId] === 'number') {
           const done = Number(weekCountByTask[taskId] || 0);
           const quota = weeklyQuotaByTask[taskId] as number;
@@ -169,37 +172,54 @@ export async function GET(req: NextRequest) {
         }
         return false;
       }
-      const t = (tasks || []).find((x) => x.id === taskId);
-      if (t && typeof weeklyQuotaByTask[taskId] === 'number') {
+      // If quota is already met, short-circuit to false
+      if (typeof weeklyQuotaByTask[taskId] === 'number') {
         const done = Number(weekCountByTask[taskId] || 0);
         const quota = weeklyQuotaByTask[taskId] as number;
         if (done >= quota) return false;
       }
-      const todayStr = dateStrInTZ(s.timezone, now);
-      if (s.start_date) {
-        const start = String(s.start_date || '').slice(0, 10);
-        const end = s.end_date ? String(s.end_date).slice(0, 10) : null;
+      // Due if ANY schedule instance for the task says due today
+      for (const s of arr) {
+        const todayStr = dateStrInTZ(s.timezone, now);
+        if (s.start_date) {
+          const start = String(s.start_date || '').slice(0, 10);
+          const end = s.end_date ? String(s.end_date).slice(0, 10) : null;
+          if (s.frequency === 'once') {
+            if (todayStr === start) return true; // one-time due today
+            continue; // otherwise not due by this schedule
+          }
+          // Recurring schedules: enforce window
+          if (end) {
+            if (!(todayStr >= start && todayStr <= end)) continue;
+          } else {
+            if (!(todayStr >= start)) continue;
+          }
+        }
         if (s.frequency === 'once') {
-          // One-time tasks: due only on the exact start_date
-          return todayStr === start;
+          // handled above
+          continue;
         }
-        // For recurring schedules: open-ended if no end_date; else bounded window
-        if (end) {
-          if (!(todayStr >= start && todayStr <= end)) return false;
-        } else {
-          if (!(todayStr >= start)) return false;
+        if (s.frequency === 'daily') return true;
+        if (s.frequency === 'weekly') {
+          const d = dowInTZ(s.timezone, now);
+          const hasDays = Array.isArray(s.byweekday) && (s.byweekday as any[]).length > 0;
+          if (hasDays) {
+            if ((s.byweekday as any[]).includes(d)) return true;
+          } else {
+            // No explicit weekdays: use weekly quota fallback if present
+            const quota = weeklyQuotaByTask[taskId];
+            if (typeof quota === 'number') {
+              const done = Number(weekCountByTask[taskId] || 0);
+              if (done < quota) return true;
+            }
+          }
+          continue;
         }
-      }
-      if (s.frequency === 'once') return false; // already handled above
-      if (s.frequency === 'daily') return true;
-      if (s.frequency === 'weekly') {
-        const d = dowInTZ(s.timezone, now);
-        const hasDays = Array.isArray(s.byweekday) && (s.byweekday as any[]).length > 0;
-        return hasDays ? (s.byweekday as any[]).includes(d) : true;
-      }
-      if (s.frequency === 'custom') {
-        const d = dowInTZ(s.timezone, now);
-        return Array.isArray(s.byweekday) && s.byweekday.includes(d);
+        if (s.frequency === 'custom') {
+          const d = dowInTZ(s.timezone, now);
+          if (Array.isArray(s.byweekday) && s.byweekday.includes(d)) return true;
+          continue;
+        }
       }
       return false;
     };
@@ -213,32 +233,26 @@ export async function GET(req: NextRequest) {
       week_quota: weeklyQuotaByTask[t.id] ?? null,
     }));
 
-    const dueTodayTasks = tasksWithFlag.filter((t) => t.active && isDueToday(t.id));
-    const dueSchedules = schedules.filter((s) => dueTodayTasks.some((t) => t.id === s.task_id));
+    // Filter tasks that are active and due today
+    const dueTasks = tasksWithFlag.filter((t: any) => Boolean(t.active) && isDueToday(t.id));
+    const dueIds = new Set(dueTasks.map((t: any) => t.id));
+    const dueSchedules = (schedules || []).filter((s: any) => dueIds.has(s.task_id));
 
     if (debug) {
-      const diag = (tasks ?? []).map((t: any) => {
-        const s: any = schedByTask[t.id];
-        const res = isDueToday(t.id);
-        const todayStr = s ? dateStrInTZ(s.timezone, now) : dateStrInTZ(undefined, now);
-        const dow = s ? dowInTZ(s.timezone, now) : dowInTZ(undefined, now);
-        return {
-          id: t.id,
-          title: t.title,
-          active: t.active,
-          due: res,
-          schedule: s || null,
-          todayStr,
-          dow,
-          week_count: weekCountByTask[t.id] || 0,
-          week_quota: weeklyQuotaByTask[t.id] ?? null,
-        };
-      });
-      return NextResponse.json({ tasks: dueTodayTasks, schedules: dueSchedules, debug: { now: now.toISOString(), diagnostics: diag } });
+      const diag = dueTasks.map((t: any) => ({
+        id: t.id,
+        title: t.title,
+        active: t.active,
+        week_count: t.week_count,
+        week_quota: t.week_quota,
+        hasSchedule: Array.isArray((schedulesByTask as any)[t.id]) && (schedulesByTask as any)[t.id].length > 0,
+      }));
+      console.debug("/api/tasks/today returning", { count: dueTasks.length, schedules: dueSchedules.length, diag });
     }
 
-    return NextResponse.json({ tasks: dueTodayTasks, schedules: dueSchedules });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
+    return NextResponse.json({ tasks: dueTasks, schedules: dueSchedules });
+  } catch (e: any) {
+    console.error("/api/tasks/today error", e);
+    return NextResponse.json({ error: e?.message || "Internal error" }, { status: 500 });
   }
 }

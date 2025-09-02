@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
-import { requireUser } from '@/utils/auth';
-import { createClient } from '@/utils/supabase/server';
-import { createAdminClient } from '@/utils/supabase/admin';
-import { getShadowConfig, logDryRun } from '@/utils/shadow/config';
+import { NextResponse } from "next/server";
+import { requireUser } from "@/utils/auth";
+import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
+import { getShadowConfig, logDryRun } from "@/utils/shadow/config";
+import { headers } from "next/headers";
 
 export async function GET() {
   try {
@@ -13,12 +14,12 @@ export async function GET() {
     const cfg = await getShadowConfig(user.id);
 
     // Fetch timezone from user_preferences; fallback to DEFAULT_TIMEZONE (align with cron)
-    let tz = String(process.env.DEFAULT_TIMEZONE || 'Asia/Kolkata');
+    let tz = String(process.env.DEFAULT_TIMEZONE || "Asia/Kolkata");
     try {
       const { data: pref } = await supabase
-        .from('user_preferences')
-        .select('timezone')
-        .eq('user_id', user.id)
+        .from("user_preferences")
+        .select("timezone")
+        .eq("user_id", user.id)
         .maybeSingle();
       if (pref?.timezone) tz = pref.timezone as any;
     } catch {}
@@ -31,16 +32,18 @@ export async function GET() {
       lead: 0,
       user_speed_avg: null as number | null,
       shadow_speed_target: cfg.shadow_speed_target ?? cfg.base_speed,
-      difficulty_tier: (cfg as any).default_difficulty_tier || 'normal',
+      difficulty_tier: (cfg as any).default_difficulty_tier || "normal",
       next_checkpoints: [] as any[],
     };
 
     try {
       const { data } = await supabase
-        .from('shadow_progress_daily')
-        .select('date, user_distance, shadow_distance, lead, user_speed_avg, shadow_speed_target, difficulty_tier')
-        .eq('user_id', user.id)
-        .order('date', { ascending: false })
+        .from("shadow_progress_daily")
+        .select(
+          "date, user_distance, shadow_distance, lead, user_speed_avg, shadow_speed_target, difficulty_tier"
+        )
+        .eq("user_id", user.id)
+        .order("date", { ascending: false })
         .limit(1)
         .maybeSingle();
       if (data) {
@@ -55,32 +58,42 @@ export async function GET() {
     let eventsToday: any[] = [];
     try {
       const { data: evs } = await supabase
-        .from('events')
-        .select('id, due_start, due_end, status, routine_item_id')
-        .eq('user_id', user.id)
-        .order('due_start', { ascending: true })
+        .from("events")
+        .select("id, due_start, due_end, status, routine_item_id")
+        .eq("user_id", user.id)
+        .order("due_start", { ascending: true })
         .limit(100);
       if (evs && evs.length) {
         const sameDay = (iso: string | null | undefined, tzStr: string) => {
           if (!iso) return false;
           const d = new Date(iso);
-          const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: tzStr, year: 'numeric', month: '2-digit', day: '2-digit' });
+          const fmt = new Intl.DateTimeFormat("en-CA", {
+            timeZone: tzStr,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          });
           const today = fmt.format(new Date());
           return fmt.format(d) === today;
         };
-        eventsToday = evs.filter(e => sameDay(e.due_end || e.due_start, tz));
+        eventsToday = evs.filter((e) => sameDay(e.due_end || e.due_start, tz));
         state.next_checkpoints = eventsToday;
       }
     } catch {}
 
     // Phase 2B: dry-run snapshot log
-    await logDryRun(user.id, 'state_snapshot', { cfg, tz, state });
+    await logDryRun(user.id, "state_snapshot", { cfg, tz, state });
 
     // Build a routine-like projection from tasks (tasks are the source of truth)
     try {
       // Resolve today's local day string for the user
       const todayInTz = (tzStr: string) => {
-        const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: tzStr, year: 'numeric', month: '2-digit', day: '2-digit' });
+        const fmt = new Intl.DateTimeFormat("en-CA", {
+          timeZone: tzStr,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        });
         return fmt.format(new Date()); // YYYY-MM-DD
       };
       const dayStr = todayInTz(tz);
@@ -88,50 +101,93 @@ export async function GET() {
       // Note: we no longer use persisted shadow passes; schedule rules drive deadlines.
 
       // Minute math helpers in user's timezone
-      const partsNow = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
-      const hh = Number(partsNow.find(p => p.type === 'hour')?.value || '0');
-      const mm = Number(partsNow.find(p => p.type === 'minute')?.value || '0');
+      const partsNow = new Intl.DateTimeFormat("en-GB", {
+        timeZone: tz,
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).formatToParts(new Date());
+      const hh = Number(partsNow.find((p) => p.type === "hour")?.value || "0");
+      const mm = Number(
+        partsNow.find((p) => p.type === "minute")?.value || "0"
+      );
       const nowMin = hh * 60 + mm; // minutes since midnight in user's TZ
+
+      // Use internal endpoint to get today's due tasks and schedules
+      const hdrs = headers();
+      const cookie = hdrs.get("cookie") || "";
+      const host = hdrs.get("host") || "localhost:3000";
+      const proto = hdrs.get("x-forwarded-proto") || "http";
+      const baseUrl = `${proto}://${host}`;
+      const resp = await fetch(`${baseUrl}/api/tasks/today`, {
+        headers: { cookie },
+        cache: "no-store",
+      });
+      if (!resp.ok) throw new Error(`tasks/today failed: ${resp.status}`);
+      const duePayload: any = await resp.json();
+      const dueTasks: any[] = Array.isArray(duePayload?.tasks)
+        ? duePayload.tasks
+        : [];
+      const dueSchedules: any[] = Array.isArray(duePayload?.schedules)
+        ? duePayload.schedules
+        : [];
+
+      // Fetch extra fields for these tasks (anchor/order/created_at etc.)
+      const dueIds = Array.from(new Set(dueTasks.map((t: any) => t.id)));
       const { data: tasks } = await supabase
-        .from('tasks')
-        .select('id, title, time_anchor, order_hint, owner_type, created_at, active, ep_value')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
+        .from("tasks")
+        .select(
+          "id, title, time_anchor, order_hint, owner_type, created_at, active, ep_value"
+        )
+        .eq("user_id", user.id)
+        .in("id", dueIds.length ? (dueIds as any) : ["-"]) // guard for empty list
+        .order("created_at", { ascending: true });
 
-      const baseTasks = (tasks || []).filter((t: any) => (t.active ?? true) && (t.owner_type ?? 'user') === 'user');
+      const baseTasks = (tasks || []).filter(
+        (t: any) => (t.active ?? true) && (t.owner_type ?? "user") === "user"
+      );
 
-      // Load schedules for these tasks
-      const taskIds = baseTasks.map((t: any) => t.id);
+      // Build schedulesByTask from endpoint schedules
       const schedulesByTask: Record<string, any[]> = {};
-      if (taskIds.length) {
-        try {
-          const { data: scheds } = await supabase
-            .from('task_schedules')
-            .select('task_id, frequency, byweekday, at_time, start_date, end_date, timezone')
-            .in('task_id', taskIds as any);
-          for (const s of scheds || []) {
-            (schedulesByTask[s.task_id] = schedulesByTask[s.task_id] || []).push(s);
-          }
-        } catch {}
+      for (const s of dueSchedules) {
+        (schedulesByTask[s.task_id] = schedulesByTask[s.task_id] || []).push(s);
       }
 
-      const anchorOrder = ['morning', 'midday', 'evening', 'night', 'anytime'];
+      const anchorOrder = ["morning", "midday", "evening", "night", "anytime"];
       const sorted = [...baseTasks].sort((a: any, b: any) => {
-        const aA = String(a.time_anchor || 'anytime');
-        const bA = String(b.time_anchor || 'anytime');
+        const aA = String(a.time_anchor || "anytime");
+        const bA = String(b.time_anchor || "anytime");
         const ao = anchorOrder.indexOf(aA);
         const bo = anchorOrder.indexOf(bA);
         if (ao !== bo) return ao - bo;
-        const ah = a.order_hint == null ? Number.POSITIVE_INFINITY : Number(a.order_hint);
-        const bh = b.order_hint == null ? Number.POSITIVE_INFINITY : Number(b.order_hint);
+        const ah =
+          a.order_hint == null
+            ? Number.POSITIVE_INFINITY
+            : Number(a.order_hint);
+        const bh =
+          b.order_hint == null
+            ? Number.POSITIVE_INFINITY
+            : Number(b.order_hint);
         if (ah !== bh) return ah - bh;
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        return (
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
       });
 
-      const grouped: Record<string, any[]> = { morning: [], midday: [], evening: [], night: [], anytime: [] };
+      const grouped: Record<string, any[]> = {
+        morning: [],
+        midday: [],
+        evening: [],
+        night: [],
+        anytime: [],
+      };
       for (const t of sorted) {
-        const key = (t.time_anchor as string) || 'anytime';
-        grouped[key as keyof typeof grouped].push({ id: t.id, title: t.title, order_hint: t.order_hint ?? null });
+        const key = (t.time_anchor as string) || "anytime";
+        grouped[key as keyof typeof grouped].push({
+          id: t.id,
+          title: t.title,
+          order_hint: t.order_hint ?? null,
+        });
       }
 
       // defer routineFlow assembly until after metrics so we can include shadow hints once
@@ -139,23 +195,25 @@ export async function GET() {
       // Build EP map per task (default 1 if missing)
       const epValueMap = new Map<string, number>();
       for (const t of sorted) {
-        const val = typeof (t as any)?.ep_value === 'number' && !Number.isNaN((t as any).ep_value)
-          ? Number((t as any).ep_value)
-          : 1;
+        const val =
+          typeof (t as any)?.ep_value === "number" &&
+          !Number.isNaN((t as any).ep_value)
+            ? Number((t as any).ep_value)
+            : 1;
         epValueMap.set(String(t.id), val);
       }
 
       // Fetch today's user completions for timestamps (use admin client to bypass RLS edge cases for service ops)
       const admin = createAdminClient();
       let { data: completions } = await admin
-        .from('task_completions')
-        .select('task_id, completed_at, completed_on, ep_awarded')
-        .eq('user_id', user.id)
-        .eq('completed_on', dayStr);
+        .from("task_completions")
+        .select("task_id, completed_at, completed_on, ep_awarded")
+        .eq("user_id", user.id)
+        .eq("completed_on", dayStr);
 
-      await logDryRun(user.id, 'state_snapshot', {
+      await logDryRun(user.id, "state_snapshot", {
         debug: true,
-        phase: 'task_completions_primary',
+        phase: "task_completions_primary",
         tz,
         dayStr,
         userId: user.id,
@@ -167,14 +225,17 @@ export async function GET() {
       const completedAtMap = new Map<string, string>();
       const completedTimes: Date[] = [];
       let user_ep_today_sum = 0;
-      for (const r of (completions || [])) {
+      for (const r of completions || []) {
         if (r.task_id && (r as any).completed_at) {
-          completedAtMap.set(String(r.task_id), String((r as any).completed_at));
+          completedAtMap.set(
+            String(r.task_id),
+            String((r as any).completed_at)
+          );
           completedTimes.push(new Date(String((r as any).completed_at)));
         }
         // Default to 1 EP per completion if ep_awarded is null/undefined
         const epVal = (r as any)?.ep_awarded;
-        if (typeof epVal === 'number' && !Number.isNaN(epVal)) {
+        if (typeof epVal === "number" && !Number.isNaN(epVal)) {
           user_ep_today_sum += epVal;
         } else {
           user_ep_today_sum += 1;
@@ -185,9 +246,14 @@ export async function GET() {
       const schedMinutes = new Map<string, number>();
       // Build override map from events: use due_end minute when available for today
       const minuteOf = (iso: string, tzStr: string) => {
-        const parts = new Intl.DateTimeFormat('en-GB', { timeZone: tzStr, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(iso));
-        const h = Number(parts.find(p => p.type === 'hour')?.value || '0');
-        const m = Number(parts.find(p => p.type === 'minute')?.value || '0');
+        const parts = new Intl.DateTimeFormat("en-GB", {
+          timeZone: tzStr,
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }).formatToParts(new Date(iso));
+        const h = Number(parts.find((p) => p.type === "hour")?.value || "0");
+        const m = Number(parts.find((p) => p.type === "minute")?.value || "0");
         return h * 60 + m;
       };
       const eventOverride = new Map<string, number>();
@@ -201,10 +267,21 @@ export async function GET() {
       // Helpers for schedule matching
       const weekdayIndexFor = (ymd: string, tzStr: string): number => {
         try {
-          const base = new Date(ymd + 'T12:00:00Z');
-          const fmt = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: tzStr });
+          const base = new Date(ymd + "T12:00:00Z");
+          const fmt = new Intl.DateTimeFormat("en-US", {
+            weekday: "short",
+            timeZone: tzStr,
+          });
           const wk = fmt.format(base);
-          const map: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+          const map: Record<string, number> = {
+            Sun: 0,
+            Mon: 1,
+            Tue: 2,
+            Wed: 3,
+            Thu: 4,
+            Fri: 5,
+            Sat: 6,
+          };
           return map[wk] ?? new Date(ymd).getDay();
         } catch {
           return new Date(ymd).getDay();
@@ -212,9 +289,9 @@ export async function GET() {
       };
       const dow = weekdayIndexFor(dayStr, tz);
       const parseAtTimeToMinute = (at: string): number | null => {
-        const s = String(at || '').slice(0, 5);
+        const s = String(at || "").slice(0, 5);
         if (!/^\d{2}:\d{2}$/.test(s)) return null;
-        const [h, m] = s.split(':').map((x) => parseInt(x, 10));
+        const [h, m] = s.split(":").map((x) => parseInt(x, 10));
         return (h * 60 + m) % 1440;
       };
 
@@ -229,12 +306,12 @@ export async function GET() {
             const endOk = !s.end_date || dayStr <= s.end_date;
             if (!startOk || !endOk) continue;
             // Frequency
-            if (s.frequency === 'weekly') {
+            if (s.frequency === "weekly") {
               const by = Array.isArray(s.byweekday) ? s.byweekday : [];
               if (!by.includes(dow)) continue;
-            } else if (s.frequency === 'once') {
+            } else if (s.frequency === "once") {
               if (!s.start_date || s.start_date !== dayStr) continue;
-            } else if (s.frequency !== 'daily') {
+            } else if (s.frequency !== "daily") {
               continue;
             }
             const atMin = parseAtTimeToMinute(s.at_time);
@@ -242,13 +319,14 @@ export async function GET() {
             // Interpret at_time in sTz, but we compare minutes-of-day in user's tz.
             // For simplicity and cross-zone consistency, we treat minutes-of-day the same (common practice in this codebase).
             // If stricter conversion is needed, we can map at_time in sTz to user's tz, but most schedules use user's tz.
-            chosen = typeof chosen === 'number' ? Math.min(chosen, atMin) : atMin; // earliest wins
+            chosen =
+              typeof chosen === "number" ? Math.min(chosen, atMin) : atMin; // earliest wins
           }
         }
         const override = eventOverride.get(tId);
-        if (typeof override === 'number') {
+        if (typeof override === "number") {
           schedMinutes.set(tId, override);
-        } else if (typeof chosen === 'number') {
+        } else if (typeof chosen === "number") {
           schedMinutes.set(tId, chosen);
         }
         // If neither override nor schedule exists for today, we will assign virtual times below
@@ -267,11 +345,11 @@ export async function GET() {
       for (const t of sorted) {
         const tId = String(t.id);
         if (schedMinutes.has(tId)) continue; // already scheduled via event/schedule
-        const anchor = String(t.time_anchor || '').toLowerCase();
+        const anchor = String(t.time_anchor || "").toLowerCase();
         const dflt = anchorDefaults[anchor];
         // Always use the anchor default if present, regardless of whether it's in the past.
         // If it's in the past, shadow will be considered done for this task.
-        if (typeof dflt === 'number') {
+        if (typeof dflt === "number") {
           schedMinutes.set(tId, dflt);
         }
       }
@@ -298,14 +376,19 @@ export async function GET() {
       // Time saved: signed minutes (user earlier => positive; later => negative)
       let time_saved_minutes = 0;
       const minutesOfInTz = (ts: string, tzStr: string) => {
-        const parts = new Intl.DateTimeFormat('en-GB', { timeZone: tzStr, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(ts));
-        const h = Number(parts.find(p => p.type === 'hour')?.value || '0');
-        const m = Number(parts.find(p => p.type === 'minute')?.value || '0');
+        const parts = new Intl.DateTimeFormat("en-GB", {
+          timeZone: tzStr,
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }).formatToParts(new Date(ts));
+        const h = Number(parts.find((p) => p.type === "hour")?.value || "0");
+        const m = Number(parts.find((p) => p.type === "minute")?.value || "0");
         return h * 60 + m;
       };
       for (const [taskId, userTs] of completedAtMap.entries()) {
         const sMin = schedMinutes.get(taskId);
-        if (typeof sMin === 'number') {
+        if (typeof sMin === "number") {
           const uMin = minutesOfInTz(userTs, tz);
           const diffMin = sMin - uMin; // positive => user earlier than schedule; negative => user later
           time_saved_minutes += diffMin;
@@ -318,11 +401,16 @@ export async function GET() {
         completedTimes.sort((a, b) => a.getTime() - b.getTime());
         const intervals: number[] = [];
         for (let i = 1; i < completedTimes.length; i++) {
-          intervals.push((completedTimes[i].getTime() - completedTimes[i - 1].getTime()) / 60000);
+          intervals.push(
+            (completedTimes[i].getTime() - completedTimes[i - 1].getTime()) /
+              60000
+          );
         }
         const mean = intervals.reduce((s, v) => s + v, 0) / intervals.length;
         if (mean > 0) {
-          const variance = intervals.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / intervals.length;
+          const variance =
+            intervals.reduce((s, v) => s + Math.pow(v - mean, 2), 0) /
+            intervals.length;
           const std = Math.sqrt(variance);
           const cv = std / mean;
           pace_consistency = Math.max(0, 1 - cv);
@@ -346,23 +434,32 @@ export async function GET() {
       const user_speed_avg_today = user_done_now / elapsed_hours;
 
       // Target per-hour speed for shadow (from config)
-      const shadow_speed_target_per_hour = Number(cfg.shadow_speed_target ?? cfg.base_speed);
+      const shadow_speed_target_per_hour = Number(
+        cfg.shadow_speed_target ?? cfg.base_speed
+      );
 
       // Shadow expected done by target curve (linear), in addition to schedule-based shadow_done_now
-      const shadow_expected_done_by_target = Math.max(0, Math.floor(elapsed_hours * shadow_speed_target_per_hour));
+      const shadow_expected_done_by_target = Math.max(
+        0,
+        Math.floor(elapsed_hours * shadow_speed_target_per_hour)
+      );
 
       // Projections to end of day
       const total_tasks_today = sorted.length;
       const remaining_hours_today = Math.max(0, (24 * 60 - nowMin) / 60);
-      const projected_completed_user_today = user_done_now + user_speed_avg_today * remaining_hours_today;
-      const projected_delta_end = projected_completed_user_today - total_tasks_today;
+      const projected_completed_user_today =
+        user_done_now + user_speed_avg_today * remaining_hours_today;
+      const projected_delta_end =
+        projected_completed_user_today - total_tasks_today;
 
       // Day-level ETAs (minutes from now)
       let projected_user_finish_minutes: number | null = null;
       if (user_done_now > 0 && total_tasks_today > user_done_now) {
         const avg_gap_min = nowMin / Math.max(1, user_done_now);
         const tasks_remaining = total_tasks_today - user_done_now;
-        projected_user_finish_minutes = Math.round(avg_gap_min * tasks_remaining);
+        projected_user_finish_minutes = Math.round(
+          avg_gap_min * tasks_remaining
+        );
       }
       let planned_shadow_finish_minutes: number | null = null;
       if (schedMinutes.size > 0) {
@@ -376,27 +473,29 @@ export async function GET() {
       let user_speed_now = 0;
       if (completedTimes.length) {
         const oneHourAgo = Date.now() - 60 * 60000;
-        const recent = completedTimes.filter((d) => d.getTime() >= oneHourAgo).length;
+        const recent = completedTimes.filter(
+          (d) => d.getTime() >= oneHourAgo
+        ).length;
         user_speed_now = recent; // per hour, since window is 60m
       }
       const shadow_speed_now = Math.max(0, shadow_done_in_60 - shadow_done_now);
 
       // Build routineFlow with shadow hints
       const routineFlow = [
-        { anchor: 'morning', items: grouped.morning },
-        { anchor: 'midday', items: grouped.midday },
-        { anchor: 'evening', items: grouped.evening },
-        { anchor: 'night', items: grouped.night },
-        { anchor: 'anytime', items: grouped.anytime },
+        { anchor: "morning", items: grouped.morning },
+        { anchor: "midday", items: grouped.midday },
+        { anchor: "evening", items: grouped.evening },
+        { anchor: "night", items: grouped.night },
+        { anchor: "anytime", items: grouped.anytime },
       ];
 
       const fmtMinuteLabel = (min: number | null) => {
-        if (typeof min !== 'number') return null;
+        if (typeof min !== "number") return null;
         const h = Math.floor(min / 60);
         const m = min % 60;
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        const h12 = h % 12 === 0 ? 12 : (h % 12);
-        const mm = String(m).padStart(2, '0');
+        const ampm = h >= 12 ? "PM" : "AM";
+        const h12 = h % 12 === 0 ? 12 : h % 12;
+        const mm = String(m).padStart(2, "0");
         return `${h12}:${mm} ${ampm}`;
       };
 
@@ -404,19 +503,26 @@ export async function GET() {
         const schedMin = schedMinutes.get(t.id);
         const userCompletedAt = completedAtMap.get(t.id) || null;
         // Shadow passes strictly when deadline (schedMin) has passed. If no schedule today, it does not pass.
-        const is_shadow_done = typeof schedMin === 'number' ? (schedMin <= nowMin) : false;
-        const etaMin = typeof schedMin === 'number' ? Math.max(0, schedMin - nowMin) : null;
-        const userCompletedMinute = userCompletedAt ? minutesOfInTz(userCompletedAt, tz) : null;
+        const is_shadow_done =
+          typeof schedMin === "number" ? schedMin <= nowMin : false;
+        const etaMin =
+          typeof schedMin === "number" ? Math.max(0, schedMin - nowMin) : null;
+        const userCompletedMinute = userCompletedAt
+          ? minutesOfInTz(userCompletedAt, tz)
+          : null;
         return {
           id: t.id,
           title: t.title,
-          time_anchor: t.time_anchor || 'anytime',
+          time_anchor: t.time_anchor || "anytime",
           user_completed_at: userCompletedAt,
           user_completed_minute: userCompletedMinute,
           user_time_label: fmtMinuteLabel(userCompletedMinute),
           shadow_scheduled_at: null, // minute-based; omit ISO to avoid tz confusion
-          shadow_scheduled_minute: typeof schedMin === 'number' ? schedMin : null,
-          shadow_time_label: fmtMinuteLabel(typeof schedMin === 'number' ? schedMin : null),
+          shadow_scheduled_minute:
+            typeof schedMin === "number" ? schedMin : null,
+          shadow_time_label: fmtMinuteLabel(
+            typeof schedMin === "number" ? schedMin : null
+          ),
           shadow_eta_minutes: etaMin,
           is_user_done: !!userCompletedAt,
           is_shadow_done,
@@ -427,11 +533,18 @@ export async function GET() {
       // - User EP: sum of ep_awarded from completions (fallback 1 if missing)
       // - Shadow EP: sum of ep_value for tasks expected done by now (based on schedule)
       // - Shadow total: sum of ep_value for all tasks planned today
-      const shadow_ep_today_sum = Array.from(schedMinutes.entries()).reduce((acc, [taskId, schedMin]) => {
-        if (schedMin <= nowMin) return acc + (epValueMap.get(String(taskId)) ?? 1);
-        return acc;
-      }, 0);
-      const shadow_total_ep = sorted.reduce((acc: number, t: any) => acc + (epValueMap.get(String(t.id)) ?? 1), 0);
+      const shadow_ep_today_sum = Array.from(schedMinutes.entries()).reduce(
+        (acc, [taskId, schedMin]) => {
+          if (schedMin <= nowMin)
+            return acc + (epValueMap.get(String(taskId)) ?? 1);
+          return acc;
+        },
+        0
+      );
+      const shadow_total_ep = sorted.reduce(
+        (acc: number, t: any) => acc + (epValueMap.get(String(t.id)) ?? 1),
+        0
+      );
       const ep_today = {
         user: user_ep_today_sum, // sum of EP earned today
         shadow: shadow_ep_today_sum, // sum of ep_value for tasks shadow has passed by now
@@ -439,11 +552,14 @@ export async function GET() {
       } as const;
 
       // Log dry-run for visibility
-      await logDryRun(user.id, 'state_snapshot', { routineFlowCount: sorted.length, anchors: anchorOrder });
+      await logDryRun(user.id, "state_snapshot", {
+        routineFlowCount: sorted.length,
+        anchors: anchorOrder,
+      });
 
       // Helpers
       const fmtMinutes = (mins: number) => {
-        const sign = mins < 0 ? '-' : '+';
+        const sign = mins < 0 ? "-" : "+";
         const mAbs = Math.abs(Math.round(mins));
         const h = Math.floor(mAbs / 60);
         const mm = mAbs % 60;
@@ -504,8 +620,11 @@ export async function GET() {
 
     return NextResponse.json(state);
   } catch (e: any) {
-    const msg = e?.name === 'AuthenticationError' ? 'Unauthorized' : (e?.message || 'Unknown error');
-    const status = e?.name === 'AuthenticationError' ? 401 : 500;
+    const msg =
+      e?.name === "AuthenticationError"
+        ? "Unauthorized"
+        : e?.message || "Unknown error";
+    const status = e?.name === "AuthenticationError" ? 401 : 500;
     return NextResponse.json({ error: msg }, { status });
   }
 }

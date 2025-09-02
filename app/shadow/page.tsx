@@ -464,7 +464,7 @@ export default function ShadowPage() {
           ) : (
             <span className="w-4 h-4 inline-block rounded-full border border-gray-300 dark:border-gray-700" />
           )}
-          <div className="truncate">
+          <div className="min-w-0">
             <div
               className={`text-sm font-medium truncate ${t.is_user_done ? "text-foreground/80" : ""}`}
             >
@@ -475,7 +475,7 @@ export default function ShadowPage() {
                 </span>
               )}
             </div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-muted-foreground flex items-center gap-2 min-w-0">
               {(() => {
                 const userLabel = t.user_time_label as string | undefined;
                 const shadowLabel = t.shadow_time_label as string | undefined;
@@ -484,27 +484,53 @@ export default function ShadowPage() {
                     ? t.shadow_eta_minutes
                     : null;
 
-                // Compose user part
-                const youPart = userLabel ? `You ${userLabel}` : "You -";
+                const fmtEta = (m: number) => {
+                  const mm = Math.max(0, Math.round(m));
+                  if (mm < 60) return `${mm}m`;
+                  const h = Math.floor(mm / 60);
+                  const rem = mm % 60;
+                  return rem ? `${h}h ${rem}m` : `${h}h`;
+                };
 
-                // Compose shadow part with ETA semantics
-                let shadowPart: string;
-                if (eta != null && eta > 0) {
-                  // Shadow not yet done
-                  shadowPart = `Shadow ETA ${shadowLabel || `${eta}m`}`;
-                } else if (eta === 0 && !t.is_shadow_done) {
-                  // edge: eta 0 but not passed yet
-                  shadowPart = `Shadow ETA 0m`;
+                const You = (
+                  <span className="truncate">
+                    <span className="text-foreground/70">You</span>{" "}
+                    <span className="tabular-nums">{userLabel || "—"}</span>
+                  </span>
+                );
+
+                let Shadow: React.ReactNode;
+                if (eta != null && eta >= 0 && !t.is_shadow_done) {
+                  // Show ETA countdown if shadow hasn't passed yet
+                  Shadow = (
+                    <span className="truncate">
+                      <span className="text-foreground/70">Shadow ETA</span>{" "}
+                      <span className="tabular-nums">{fmtEta(eta)}</span>
+                    </span>
+                  );
                 } else if (t.is_shadow_done) {
-                  shadowPart = `Shadow ${shadowLabel || "—"}`;
-                } else if (shadowLabel) {
-                  // scheduled later today but eta unknown
-                  shadowPart = `Shadow ${shadowLabel}`;
+                  Shadow = (
+                    <span className="truncate">
+                      <span className="text-foreground/70">Shadow</span>{" "}
+                      <span className="tabular-nums">{shadowLabel || "—"}</span>
+                    </span>
+                  );
                 } else {
-                  shadowPart = `Shadow —`;
+                  Shadow = (
+                    <span className="truncate">
+                      <span className="text-foreground/70">Shadow</span>{" "}
+                      <span className="tabular-nums">{shadowLabel || "—"}</span>
+                    </span>
+                  );
                 }
 
-                return `${youPart} • ${shadowPart}`;
+                return (
+                  <>
+                    {You}
+                    <span className="opacity-50">•</span>
+                    {Shadow}
+                  </>
+                );
               })()}
             </div>
           </div>
