@@ -554,13 +554,13 @@ export default function ShadowPage() {
               Shadow EP (today)
             </span>
             <span className="text-purple-300 font-medium">{todayShadowEP}</span>
-            <button
+            {/* <button
               className="ml-2 inline-flex items-center justify-center w-7 h-7 rounded-md border border-gray-700/60 hover:bg-gray-800 text-gray-300"
               title={showDev ? "Hide developer tools" : "Show developer tools"}
               onClick={() => setShowDev((v) => !v)}
             >
               <Settings className="w-4 h-4" />
-            </button>
+            </button> */}
           </div>
         </div>
         <div className="h-3 w-full bg-gray-800 rounded-full overflow-hidden border border-gray-700 relative">
@@ -613,7 +613,7 @@ export default function ShadowPage() {
       </section>
 
       {/* Developer Tools: trigger backend phases (hidden behind settings) */}
-      {showDev && (
+      {/* {showDev && (
       <section className="rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950 p-4 mb-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-200">
@@ -682,133 +682,199 @@ export default function ShadowPage() {
           >9: Fetch history</button>
         </div>
       </section>
-      )}
+      )} */}
 
       {/* Race Dashboard (dark panel) */}
-      <section className="rounded-2xl border border-gray-800 bg-slate-900 md:bg-gradient-to-br md:from-slate-900 md:to-black p-3 md:p-4 mb-4">
+      <section className="rounded-2xl border border-purple-900/30 bg-slate-900 md:bg-gradient-to-br md:from-slate-900 md:to-black p-3 md:p-4 mb-4 shadow-[0_8px_32px_rgba(124,58,237,0.15)]">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Gauge className="w-4 h-4 text-purple-600" /> Live Pace
+          <div className="flex items-center gap-2 text-[12px] md:text-[13px] font-semibold text-gray-200">
+            {(() => {
+              const leadVal = typeof shadowState?.lead === 'number' ? shadowState.lead : (todayUserEP - todayShadowEP);
+              const ahead = leadVal > 0; const tight = Math.abs(leadVal) < 0.5;
+              const chip = tight ? 'bg-slate-700/60 border-slate-600' : ahead ? 'bg-blue-600/20 border-blue-500/40' : 'bg-purple-600/20 border-purple-500/40';
+              const icon = tight ? 'text-slate-300' : ahead ? 'text-blue-300' : 'text-purple-300';
+              return (
+                <span className={`inline-flex items-center justify-center w-4.5 h-4.5 rounded-full border ${chip}`}>
+                  <Gauge className={`w-3 h-3 ${icon}`} />
+                </span>
+              );
+            })()}
+            Live Pace
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-[10px] md:text-[11px] text-gray-500">
             {stateLoading ? "Refreshing…" : "Live"}
           </div>
         </div>
-        {/* KPIs */}
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          <div className="rounded-lg p-3 bg-white/5 dark:bg-white/5 md:border md:border-gray-900/50">
-            <div className="text-gray-500">Delta now</div>
-            <div className="text-lg font-semibold">
-              {deltaAnim ?? shadowState?.metrics?.progress_delta_now ?? "—"}
+
+        {/* Narrative KPIs */}
+        <div className="mt-2.5 grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-2.5 text-[12px] md:text-[13px]">
+          {/* Lead Status */}
+          <div className={(() => {
+            const leadVal = typeof shadowState?.lead === 'number' ? shadowState.lead : (todayUserEP - todayShadowEP);
+            const ahead = leadVal > 0;
+            const tight = Math.abs(leadVal) < 0.5;
+            const accent = tight ? 'border-slate-700' : ahead ? 'border-blue-500/30 ring-1 ring-blue-500/10' : 'border-purple-500/30 ring-1 ring-purple-500/10';
+            return `rounded-xl p-2.5 md:p-3 bg-gradient-to-br from-slate-800/60 to-slate-900/60 border ${accent} backdrop-blur-sm transition-colors`;
+          })()}>
+            <div className="flex items-center justify-between">
+              <div className="text-[10px] md:text-[11px] text-gray-400 inline-flex items-center gap-1">
+                <span>🏁</span> Lead
+              </div>
+              {(() => {
+                const leadVal = typeof shadowState?.lead === 'number' ? shadowState.lead : (todayUserEP - todayShadowEP);
+                const tight = Math.abs(leadVal) < 0.5;
+                const ahead = leadVal > 0;
+                const label = tight ? 'Tight' : ahead ? 'You' : 'Shadow';
+                const pill = tight ? 'bg-slate-700/60 text-slate-200' : ahead ? 'bg-blue-600/20 text-blue-200 border border-blue-400/30' : 'bg-purple-600/20 text-purple-200 border border-purple-400/30';
+                const pulse = tight ? '' : 'animate-pulse';
+                return <span className={`px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px] ${pill} ${pulse}`}>{label}</span>;
+              })()}
+            </div>
+            <div className="mt-0.5 text-[12px] md:text-[14px] font-medium text-gray-100 leading-snug">
+              {(() => {
+                const leadVal = typeof shadowState?.lead === 'number' ? shadowState.lead : (todayUserEP - todayShadowEP);
+                const tight = Math.abs(leadVal) < 0.5;
+                if (tight) return 'Neck and neck with Shadow';
+                return leadVal > 0 ? 'You\'ve pulled ahead!' : 'Shadow is 1 step ahead';
+              })()}
+            </div>
+            {/* Inline mini tug-of-war bar for quick glance */}
+            <div className="mt-1.5 h-1 w-full bg-slate-800/80 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${userPct}%` }} />
+              <div className="-mt-1 h-1 bg-purple-600/80 transition-all duration-500 float-right" style={{ width: `${shadowPct}%` }} />
             </div>
           </div>
-          <div className="rounded-lg p-3 bg-white/5 dark:bg-white/5 md:border md:border-gray-900/50">
-            <div className="text-gray-500">Projected (1h)</div>
-            <div className="text-lg font-semibold">
-              {shadowState?.metrics?.progress_delta_projected ?? "—"}
+
+          {/* Projection */}
+          <div className="rounded-xl p-2 md:p-2.5 bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-gray-900/50 backdrop-blur-sm">
+            <div className="text-[10px] md:text-[11px] text-gray-400 inline-flex items-center gap-1">
+              <span>📅</span> Today's projection
+            </div>
+            <div className="mt-0.5 text-[12px] md:text-[14px] font-medium space-y-0.5 text-gray-100 leading-snug">
+              {(() => {
+                const tasks = (shadowState?.tasks || []) as any[];
+                const userDone = tasks.filter((t: any) => t.is_user_done).length;
+                const shadowDone = tasks.filter((t: any) => t.is_shadow_done).length;
+                const us = typeof shadowState?.metrics?.user_speed_now === 'number' ? shadowState.metrics.user_speed_now : 0;
+                const ss = typeof shadowState?.metrics?.shadow_speed_now === 'number' ? shadowState.metrics.shadow_speed_now : 0;
+                const end = new Date(); end.setHours(23,59,59,999);
+                const remainingH = Math.max(0, (end.getTime() - Date.now()) / 3600000);
+                const projUser = Math.max(userDone, Math.round(userDone + us * remainingH));
+                const projShadow = Math.max(shadowDone, Math.round(shadowDone + ss * remainingH));
+                return (
+                  <>
+                    <div>At this pace: {projUser} tasks done today</div>
+                    <div className="text-[11px] md:text-[12px] text-gray-400">Shadow predicts: {projShadow} tasks by end of day</div>
+                  </>
+                );
+              })()}
             </div>
           </div>
-          <div className="rounded-lg p-3 bg-white/5 dark:bg-white/5 md:border md:border-gray-900/50">
-            <div className="text-gray-500">Time saved</div>
-            {(() => {
-              const ts = typeof shadowState?.metrics?.time_saved_minutes === "number" ? shadowState.metrics.time_saved_minutes : 0;
-              const sign = ts > 0 ? "+" : ts < 0 ? "-" : "";
-              const abs = Math.abs(ts);
-              const tone = ts > 0 ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : ts < 0 ? "bg-rose-500/15 text-rose-300 border-rose-500/30" : "bg-gray-500/10 text-gray-300 border-gray-500/20";
-              return (
-                <div className={`inline-flex items-center px-2 py-0.5 rounded-md border text-sm font-medium ${tone}`}>
-                  {sign}{abs}m
-                </div>
-              );
-            })()}
-          </div>
-          <div className="rounded-lg p-3 bg-white/5 dark:bg-white/5 md:border md:border-gray-900/50">
-            <div className="text-gray-500 mb-1">Pace consistency</div>
-            {(() => {
-              const pc = typeof shadowState?.metrics?.pace_consistency === "number" ? shadowState.metrics.pace_consistency : null;
-              if (pc == null) return <div className="text-sm">—</div>;
-              const pct = Math.max(0, Math.min(100, Math.round(pc * 100)));
-              return (
-                <div>
-                  <div className="h-2 w-full bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 transition-all" style={{ width: `${pct}%` }} />
-                  </div>
-                  <div className="mt-1 text-[11px] text-gray-500">{pct}% consistent</div>
-                </div>
-              );
-            })()}
-          </div>
-          <div className="rounded-lg p-3 bg-white/5 dark:bg-white/5 md:border md:border-gray-900/50">
-            <div className="text-gray-500">Your speed</div>
-            <div className="text-lg font-semibold">
-              {typeof shadowState?.metrics?.user_speed_now === "number"
-                ? `${shadowState.metrics.user_speed_now}/h`
-                : "—"}
-            </div>
-          </div>
-          <div className="rounded-lg p-3 bg-white/5 dark:bg-white/5 md:border md:border-gray-900/50">
-            <div className="text-gray-500">Shadow speed</div>
-            <div className="text-lg font-semibold">
-              {typeof shadowState?.metrics?.shadow_speed_now === "number"
-                ? `${shadowState.metrics.shadow_speed_now}/h`
-                : "—"}
-            </div>
-          </div>
-        </div>
-        {/* Lead bar */}
-        <div className="mt-3">
-          <div className="text-xs text-gray-500 mb-1">Lead</div>
-          <div className="h-2 w-full bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-500 ease-out ${(shadowState?.lead ?? 0) >= 0 ? "bg-blue-500" : "bg-purple-500"}`}
-              style={{
-                width: `${Math.min(100, Math.abs(shadowState?.lead ?? 0) * 10)}%`,
-              }}
-            />
-          </div>
-        </div>
-        {/* Speed meter */}
-        <div className="mt-3">
+
+          {/* Time Saved (hide when 0) */}
           {(() => {
-            const us =
-              typeof shadowState?.metrics?.user_speed_now === "number"
-                ? shadowState.metrics.user_speed_now
-                : null;
-            const ss =
-              typeof shadowState?.metrics?.shadow_speed_now === "number"
-                ? shadowState.metrics.shadow_speed_now
-                : null;
-            if (us == null || ss == null) return null;
-            const max = Math.max(1, us, ss);
-            const userW = Math.round((us / max) * 100);
-            const shadowW = Math.round((ss / max) * 100);
-            const diff = us - ss;
+            const ts = typeof shadowState?.metrics?.time_saved_minutes === 'number' ? shadowState.metrics.time_saved_minutes : 0;
+            if (!ts || ts <= 0) return null;
             return (
-              <div>
-                <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                  <div>Speed meter</div>
-                  <div className="font-medium text-gray-600 dark:text-gray-300">
-                    {diff > 0 ? "▲" : diff < 0 ? "▼" : "→"} Δ {diff > 0 ? "+" : ""}
-                    {diff.toFixed(0)}/h
-                  </div>
+              <div className="rounded-xl p-2 md:p-2.5 bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-emerald-500/30 ring-1 ring-emerald-500/10 backdrop-blur-sm">
+                <div className="text-[10px] md:text-[11px] text-gray-300 inline-flex items-center gap-1">
+                  <span>⏳</span> Time saved
                 </div>
-                <div className="h-3 w-full bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden relative">
-                  <div
-                    className="absolute left-0 top-0 h-full bg-blue-600"
-                    style={{ width: `${userW}%` }}
-                  />
-                  <div
-                    className="absolute right-0 top-0 h-full bg-purple-600/80"
-                    style={{ width: `${shadowW}%` }}
-                  />
-                </div>
-                <div className="mt-1 text-[10px] text-gray-500">
-                  You {us}/h • Shadow {ss}/h
+                <div className="mt-0.5 text-[12px] md:text-[14px] font-medium text-emerald-200">
+                  {`You\'ve saved ${Math.round(ts)}m so far`}
                 </div>
               </div>
             );
           })()}
+
+          {/* Pace Consistency */}
+          <div className="rounded-xl p-2 md:p-2.5 bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-gray-900/50 backdrop-blur-sm">
+            <div className="text-[10px] md:text-[11px] text-gray-400 inline-flex items-center gap-1">
+              <span>📊</span> Consistency
+            </div>
+            <div className="mt-0.5 text-[12px] md:text-[14px] font-medium text-gray-100 flex items-center gap-2">
+              {(() => {
+                const pc = typeof shadowState?.metrics?.pace_consistency === 'number' ? shadowState.metrics.pace_consistency : null;
+                const tasks = (shadowState?.tasks || []) as any[];
+                const anyStarted = tasks.some((t: any) => t.is_user_done || t.is_shadow_done);
+                if (!pc || !anyStarted) return 'Not started yet';
+                if (pc >= 0.8) return <><span className="text-amber-300">🔥</span> Steady pace <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-200 border border-amber-400/20">On a streak</span></>;
+                if (pc >= 0.5) return <>Strong start</>;
+                return <>Wobbly pace</>;
+              })()}
+            </div>
+          </div>
+
+          {/* Speed comparison */}
+          <div className={(() => {
+            const us = typeof shadowState?.metrics?.user_speed_now === 'number' ? shadowState.metrics.user_speed_now : 0;
+            const ss = typeof shadowState?.metrics?.shadow_speed_now === 'number' ? shadowState.metrics.shadow_speed_now : 0;
+            const ratio = ss > 0 ? us / ss : 1;
+            const ahead = (us > ss);
+            const state = (us === 0 && ss === 0) ? 'idle' : (ahead ? 'ahead' : (us === 0 ? 'shadow-moving' : (ss === 0 ? 'you-moving' : 'even')));
+            const accent = state === 'ahead' ? 'border-emerald-500/30 ring-1 ring-emerald-500/10' : state === 'idle' ? 'border-slate-700' : 'border-amber-500/30 ring-1 ring-amber-500/10';
+            return `rounded-xl p-2 md:p-2.5 bg-gradient-to-br from-slate-800/60 to-slate-900/60 border ${accent} backdrop-blur-sm md:col-span-2`;
+          })()}>
+            <div className="flex items-center justify-between">
+              <div className="text-[10px] md:text-[11px] text-gray-400 inline-flex items-center gap-1">
+                <span>⚡</span> Pace
+              </div>
+              {(() => {
+                const us = typeof shadowState?.metrics?.user_speed_now === 'number' ? shadowState.metrics.user_speed_now : 0;
+                const ss = typeof shadowState?.metrics?.shadow_speed_now === 'number' ? shadowState.metrics.shadow_speed_now : 0;
+                const ratio = ss > 0 ? us / ss : 1;
+                let badge = 'Keeping pace';
+                let cls = 'bg-slate-700/60 text-slate-200';
+                if (ratio >= 1.8) { badge = 'Blazing'; cls = 'bg-emerald-600/20 text-emerald-200 border border-emerald-400/30'; }
+                else if (ratio <= 0.55) { badge = 'Falling behind'; cls = 'bg-amber-600/20 text-amber-200 border border-amber-400/30'; }
+                const pulse = (badge === 'Blazing' || badge === 'Falling behind') ? 'animate-pulse' : '';
+                return <span className={`px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px] ${cls} ${pulse}`}>{badge}</span>;
+              })()}
+            </div>
+            <div className="mt-0.5 text-[12px] md:text-[14px] font-medium text-gray-100">
+              {(() => {
+                const us = typeof shadowState?.metrics?.user_speed_now === 'number' ? shadowState.metrics.user_speed_now : 0;
+                const ss = typeof shadowState?.metrics?.shadow_speed_now === 'number' ? shadowState.metrics.shadow_speed_now : 0;
+                if (us === 0 && ss === 0) return 'Shadow waits while you idle';
+                if (us === 0 && ss > 0) return 'Shadow is moving while you idle';
+                if (ss === 0 && us > 0) return 'Shadow waits while you move';
+                const ratio = ss > 0 ? us / ss : 1;
+                if (ratio >= 1.8) return 'You\'re moving twice as fast';
+                if (ratio <= 0.55) return 'Shadow is moving twice as fast';
+                return 'You\'re keeping pace';
+              })()}
+            </div>
+            {(() => {
+              const us = typeof shadowState?.metrics?.user_speed_now === 'number' ? shadowState.metrics.user_speed_now : 0;
+              const ss = typeof shadowState?.metrics?.shadow_speed_now === 'number' ? shadowState.metrics.shadow_speed_now : 0;
+              const ratio = ss > 0 ? us / ss : 1;
+              if (ratio <= 0.55 || (us === 0 && ss > 0)) {
+                return <div className="mt-1 text-[11px] text-amber-300/90">Tip: try a 5‑min sprint to catch up ⚡</div>;
+              }
+              return null;
+            })()}
+            {/* Tiny avatars for sides */}
+            <div className="mt-1.5 flex items-center gap-3 text-[10px] md:text-[11px] text-gray-400">
+              <div className="inline-flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-blue-500" /> You</div>
+              <div className="inline-flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-purple-500" /> Shadow</div>
+            </div>
+          </div>
         </div>
+
+        {/* Tug-of-war Lead Meter */}
+        {/* <div className="mt-3 md:mt-4">
+          <div className="text-[11px] md:text-xs text-gray-500 mb-1">Lead meter</div>
+          <div className="h-2.5 md:h-3 w-full bg-gray-800 rounded-full overflow-hidden relative border border-gray-700">
+            <div
+              className="absolute left-0 top-0 h-full bg-blue-600 transition-all duration-500 ease-out shadow-[0_0_12px_rgba(59,130,246,0.35)]"
+              style={{ width: `${userPct}%` }}
+            />
+            <div
+              className="absolute right-0 top-0 h-full bg-purple-600/90 transition-all duration-500 ease-out shadow-[0_0_12px_rgba(147,51,234,0.35)]"
+              style={{ width: `${shadowPct}%` }}
+            />
+          </div>
+        </div> */}
       </section>
 
       {/* Challenges (highlighted) */}
