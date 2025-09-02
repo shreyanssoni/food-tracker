@@ -6,6 +6,7 @@ import { createAdminClient } from '@/utils/supabase/admin';
 import type { NextAuthConfig } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import { OAuth2Client } from 'google-auth-library';
+import { randomUUID } from 'crypto';
 
 const config: NextAuthConfig = {
   providers: [
@@ -71,8 +72,10 @@ const config: NextAuthConfig = {
           return false;
         }
 
-        const normalizedId = existingByEmail?.id || user.id!; // reuse existing id if found
-        // Mutate the user object so NextAuth uses our normalized id
+        // Ensure app_users.id is a UUID for new users. If a user row already exists for this email,
+        // reuse its id. Otherwise, generate a fresh UUID instead of using Google's numeric sub.
+        const normalizedId = existingByEmail?.id || (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : randomUUID());
+        // Mutate the user object so NextAuth uses our normalized id for token.sub and session.user.id
         user.id = normalizedId;
 
         // 2) Upsert with normalized id
