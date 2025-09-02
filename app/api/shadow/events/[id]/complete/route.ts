@@ -9,6 +9,13 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
     const supabase = createClient();
     const id = params.id;
 
+    // Validate UUID to avoid Postgres error: invalid input syntax for type uuid
+    const isUuid = (v: string) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+    if (!isUuid(id)) {
+      return NextResponse.json({ error: 'Invalid id format' }, { status: 400 });
+    }
+
     // Load instance joined to shadow_task -> shadow_profile to enforce ownership
     const { data: inst, error: instErr } = await supabase
       .from('shadow_task_instances')
