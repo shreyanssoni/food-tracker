@@ -1758,7 +1758,7 @@ export default function ShadowPage() {
           <div className="text-sm mb-2">{todayShadow.challenge_text}</div>
           <div className="flex items-center justify-between text-sm">
             <div>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-surface2 text-amber-200">
+              <span className="outline dark:outline-none inline-flex items-center px-2 py-0.5 rounded-full bg-surface2 dark:text-amber-200 text-purple-600">
                 EP at stake: +{epAtStake}
               </span>
             </div>
