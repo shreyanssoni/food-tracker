@@ -1093,13 +1093,6 @@ export default function DashboardPage() {
                                     {t.goal.title}
                                   </span>
                                 )} */}
-                                <span
-                                  className={`ml-1 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${rc.badge}`}
-                                >
-                                  <span className="font-semibold">
-                                    +{t.ep_value} EP
-                                  </span>
-                                </span>
                               </div>
                               {t.description && (
                                 <div className="text-[11px] sm:text-xs text-slate-600 mt-1">
@@ -1107,70 +1100,76 @@ export default function DashboardPage() {
                                 </div>
                               )}
                             </div>
-                            <button
-                              disabled={!!busy || t.completedToday}
-                              onClick={() => completeTask(t.id, t.ep_value)}
-                              className={`rounded-full text-[11px] sm:text-xs font-medium disabled:opacity-60 flex items-center justify-center ${t.completedToday ? "bg-slate-300 text-slate-600" : "bg-blue-600 text-white"} h-9 w-9 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5`}
-                              aria-label={`$${t.completedToday ? "Completed" : busy === t.id ? "Completing" : "Complete"} ${t.title}`}
-                            >
-                              <span className="hidden sm:inline">
-                                {t.completedToday
-                                  ? "Completed"
-                                  : busy === t.id
-                                    ? "Completing…"
-                                    : "Complete"}
-                              </span>
-                              <span className="sm:hidden inline-flex items-center justify-center">
-                                {t.completedToday ? (
-                                  <svg
-                                    viewBox="0 0 24 24"
-                                    className="h-5 w-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="3"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden
-                                  >
-                                    <path d="M20 6L9 17l-5-5" />
-                                  </svg>
-                                ) : busy === t.id ? (
-                                  <svg
-                                    className="h-5 w-5 animate-spin"
-                                    viewBox="0 0 24 24"
-                                    aria-hidden
-                                  >
-                                    <circle
-                                      className="opacity-25"
-                                      cx="12"
-                                      cy="12"
-                                      r="10"
-                                      stroke="currentColor"
-                                      strokeWidth="4"
+                            <div className="flex flex-col items-end gap-2 min-w-[92px] sm:min-w-[120px]">
+                              <button
+                                disabled={!!busy || t.completedToday}
+                                onClick={() => completeTask(t.id, t.ep_value)}
+                                className={`rounded-full text-[11px] sm:text-xs font-semibold disabled:opacity-60 flex items-center justify-center ${t.completedToday ? "bg-slate-300 text-slate-600" : "bg-blue-600 text-white"} h-9 px-3`}
+                                aria-label={`$${t.completedToday ? "Completed" : busy === t.id ? "Completing" : "Complete"} ${t.title}`}
+                              >
+                                <span className="hidden sm:inline">
+                                  {t.completedToday
+                                    ? "Completed"
+                                    : busy === t.id
+                                      ? "Completing…"
+                                      : "Complete"}
+                                </span>
+                                <span className="sm:hidden inline-flex items-center justify-center">
+                                  {t.completedToday ? (
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      className="h-5 w-5"
                                       fill="none"
-                                    ></circle>
-                                    <path
-                                      className="opacity-75"
-                                      fill="currentColor"
-                                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                                    ></path>
-                                  </svg>
-                                ) : (
-                                  <svg
-                                    viewBox="0 0 24 24"
-                                    className="h-5 w-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="3"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden
-                                  >
-                                    <path d="M20 6L9 17l-5-5" />
-                                  </svg>
-                                )}
+                                      stroke="currentColor"
+                                      strokeWidth="3"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      aria-hidden
+                                    >
+                                      <path d="M20 6L9 17l-5-5" />
+                                    </svg>
+                                  ) : busy === t.id ? (
+                                    <svg
+                                      className="h-5 w-5 animate-spin"
+                                      viewBox="0 0 24 24"
+                                      aria-hidden
+                                    >
+                                      <circle
+                                        className="opacity-25"
+                                        cx="12"
+                                        cy="12"
+                                        r="10"
+                                        stroke="currentColor"
+                                        strokeWidth="4"
+                                        fill="none"
+                                      ></circle>
+                                      <path
+                                        className="opacity-75"
+                                        fill="currentColor"
+                                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                                      ></path>
+                                    </svg>
+                                  ) : (
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      className="h-5 w-5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="3"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      aria-hidden
+                                    >
+                                      <path d="M20 6L9 17l-5-5" />
+                                    </svg>
+                                  )}
+                                </span>
+                              </button>
+                              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 px-2.5 py-1 text-[11px] font-semibold">
+                                <span className="tabular-nums">+{t.ep_value}</span>
+                                <span className="opacity-80">EP</span>
                               </span>
-                            </button>
+                            </div>
                           </div>
                         );
                       })}
@@ -1200,13 +1199,6 @@ export default function DashboardPage() {
                             <div className="min-w-0">
                               <div className="text-sm font-semibold truncate flex items-center gap-2">
                                 {t.title}
-                                <span
-                                  className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${rc.badge}`}
-                                >
-                                  <span className="font-semibold">
-                                    +{t.ep_value} EP
-                                  </span>
-                                </span>
                               </div>
                               <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
                                 {meta.when && (
@@ -1232,70 +1224,55 @@ export default function DashboardPage() {
                                 )}
                               </div>
                             </div>
-                            <button
-                              disabled={!!busy || t.completedToday}
-                              onClick={() => completeTask(t.id, t.ep_value)}
-                              className={`rounded-full text-[11px] sm:text-xs font-medium disabled:opacity-60 flex items-center justify-center ${t.completedToday ? "bg-slate-300 text-slate-600" : "bg-blue-600 text-white"} h-9 w-9 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5`}
-                              aria-label={`$${t.completedToday ? "Completed" : busy === t.id ? "Completing" : "Complete"} ${t.title}`}
-                            >
-                              <span className="hidden sm:inline">
-                                {t.completedToday
-                                  ? "Done"
-                                  : busy === t.id
-                                    ? "…"
-                                    : "Complete"}
-                              </span>
-                              <span className="sm:hidden inline-flex items-center justify-center">
-                                {t.completedToday ? (
-                                  <svg
-                                    viewBox="0 0 24 24"
-                                    className="h-5 w-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="3"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden
-                                  >
-                                    <path d="M20 6L9 17l-5-5" />
-                                  </svg>
-                                ) : busy === t.id ? (
-                                  <svg
-                                    className="h-5 w-5 animate-spin"
-                                    viewBox="0 0 24 24"
-                                    aria-hidden
-                                  >
-                                    <circle
-                                      className="opacity-25"
-                                      cx="12"
-                                      cy="12"
-                                      r="10"
-                                      stroke="currentColor"
-                                      strokeWidth="4"
+                            <div className="flex flex-col items-end gap-2 min-w-[92px] sm:min-w-[120px]">
+                              <button
+                                disabled={!!busy || t.completedToday}
+                                onClick={() => completeTask(t.id, t.ep_value)}
+                                className={`rounded-full text-[11px] sm:text-xs font-semibold disabled:opacity-60 flex items-center justify-center ${t.completedToday ? "bg-slate-300 text-slate-600" : "bg-blue-600 text-white"} h-9 px-3`}
+                                aria-label={`$${t.completedToday ? "Completed" : busy === t.id ? "Completing" : "Complete"} ${t.title}`}
+                              >
+                                <span className="hidden sm:inline">
+                                  {t.completedToday
+                                    ? "Done"
+                                    : busy === t.id
+                                      ? "…"
+                                      : "Complete"}
+                                </span>
+                                <span className="sm:hidden inline-flex items-center justify-center">
+                                  {t.completedToday ? (
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      className="h-5 w-5"
                                       fill="none"
-                                    ></circle>
-                                    <path
-                                      className="opacity-75"
-                                      fill="currentColor"
-                                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                                    ></path>
-                                  </svg>
-                                ) : (
-                                  <svg
-                                    viewBox="0 0 24 24"
-                                    className="h-5 w-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="3"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden
-                                  >
-                                    <path d="M20 6L9 17l-5-5" />
-                                  </svg>
-                                )}
+                                      stroke="currentColor"
+                                      strokeWidth="3"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      aria-hidden
+                                    >
+                                      <path d="M20 6L9 17l-5-5" />
+                                    </svg>
+                                  ) : (
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      className="h-5 w-5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="3"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      aria-hidden
+                                    >
+                                      <path d="M20 6L9 17l-5-5" />
+                                    </svg>
+                                  )}
+                                </span>
+                              </button>
+                              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 px-2.5 py-1 text-[11px] font-semibold">
+                                <span className="tabular-nums">+{t.ep_value}</span>
+                                <span className="opacity-80">EP</span>
                               </span>
-                            </button>
+                            </div>
                           </div>
                         );
                       })}
