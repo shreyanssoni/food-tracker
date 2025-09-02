@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -14,13 +16,44 @@ export default function DashboardPage() {
   const { enabled: pushEnabled } = useNotifications();
   // Minute tick to re-evaluate date-sensitive UI (e.g., after midnight)
   const [clockTick, setClockTick] = useState(0);
+  // Types
+  type Task = {
+    id: string;
+    title: string;
+    ep_value: number;
+    completedToday?: boolean;
+    week_quota?: number | null;
+    week_count?: number | null;
+    description?: string | null;
+  };
+  type Schedule = {
+    task_id: string;
+    timezone?: string | null;
+    at_time?: string | null;
+    frequency?: string | null;
+    byweekday?: number[] | null;
+    start_date?: string | null;
+    end_date?: string | null;
+  };
+  type ProgressState = {
+    level: number;
+    ep_in_level: number;
+    ep_required: number;
+    total_ep: number;
+    diamonds: number;
+  } | null;
+  type GoalSummary = Record<
+    string,
+    { totalWeeks: number; successWeeks: number }
+  >;
+  type WeekProgress = Record<string, { count: number; quota: number }>;
   const [targets, setTargets] = useState<{
     calories: number;
     protein_g: number;
     carbs_g: number;
     fat_g: number;
   } | null>(null);
-  const [summary, setSummary] = useState<any>(null);
+  const [_summary, setSummary] = useState<unknown>(null);
   const [todayTotals, setTodayTotals] = useState({
     calories: 0,
     protein_g: 0,
@@ -29,18 +62,12 @@ export default function DashboardPage() {
   });
   const [clearing, setClearing] = useState(false);
   // Gamification state
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [schedules, setSchedules] = useState<Record<string, any>>({});
-  const [progress, setProgress] = useState<{
-    level: number;
-    ep_in_level: number;
-    ep_required: number;
-    total_ep: number;
-    diamonds: number;
-  } | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [schedules, setSchedules] = useState<Record<string, Schedule>>({});
+  const [progress, setProgress] = useState<ProgressState>(null);
   const [busy, setBusy] = useState<string | null>(null);
   // Streaks summary
-  const [streakMax, setStreakMax] = useState<{
+  const [_streakMax, setStreakMax] = useState<{
     current: number;
     longest: number;
   } | null>(null);
@@ -57,18 +84,18 @@ export default function DashboardPage() {
     weekly?: { consecutive: number; longest: number; currentWeekDays?: number };
   } | null>(null);
   // Goals overview
-  const [goals, setGoals] = useState<any[]>([]);
-  const [goalSummaries, setGoalSummaries] = useState<
-    Record<string, { totalWeeks: number; successWeeks: number }>
-  >({});
+  const [goals, setGoals] = useState<Array<{ id: string }>>([]);
+  const [_goalSummaries, setGoalSummaries] = useState<GoalSummary>({});
   // map of goalId -> { count, quota } for current week
-  const [goalWeekProgress, setGoalWeekProgress] = useState<Record<string, { count: number; quota: number }>>({});
+  const [_goalWeekProgress, setGoalWeekProgress] = useState<WeekProgress>({});
   const [reviving, setReviving] = useState(false);
   const [tasksLoading, setTasksLoading] = useState(true);
-  const [nextUp, setNextUp] = useState<null | { task: any; when: Date | null }>(
-    null
-  );
+  const [nextUp, setNextUp] = useState<null | {
+    task: Task;
+    when: Date | null;
+  }>(null);
   const nudgeSentRef = useRef<string | null>(null);
+  const rtDebounce = useRef<number | null>(null);
   // Server-calculated set of tasks due today
   const [todayTaskIds, setTodayTaskIds] = useState<Set<string>>(new Set());
   const { data: session } = useSession();
@@ -77,14 +104,14 @@ export default function DashboardPage() {
     delta: number;
     target_today: number;
     completed_today: number;
-    decision_kind: 'boost' | 'slowdown' | 'nudge' | 'noop';
+    decision_kind: "boost" | "slowdown" | "nudge" | "noop";
   }>(null);
   // Shadow Messages Inbox (latest non-expired)
-  const [shadowMessage, setShadowMessage] = useState<
-    | null
-    | { id: string; type: 'taunt' | 'encouragement' | 'neutral'; text: string }
-  >(null);
-
+  const [shadowMessage, setShadowMessage] = useState<null | {
+    id: string;
+    type: "taunt" | "encouragement" | "neutral";
+    text: string;
+  }>(null);
 
   useEffect(() => {
     // Ensure user has an avatar; if unauthorized, redirect to sign-in
@@ -132,10 +159,10 @@ export default function DashboardPage() {
           lsRes.json(),
         ]);
         if (!tData.error) {
-          setTasks(tData.tasks || []);
-          const schedMap: Record<string, any> = {};
-          (tData.schedules || []).forEach((s: any) => {
-            schedMap[s.task_id] = s;
+          setTasks((tData.tasks || []) as Task[]);
+          const schedMap: Record<string, Schedule> = {};
+          (tData.schedules || []).forEach((s: Partial<Schedule>) => {
+            if (s && s.task_id) schedMap[s.task_id] = s as Schedule;
           });
           setSchedules(schedMap);
         }
@@ -147,19 +174,23 @@ export default function DashboardPage() {
         }
         // Compute max daily streak across goals
         if (!gData.error) {
-          const goals: any[] = gData.goals || [];
+          const goals: Array<{ id: string }> = (gData.goals || []).map(
+            (g: any) => ({ id: String(g.id) })
+          );
           setGoals(goals);
           setGoalSummaries(gData.summaries || {});
-          const ids = goals.map((g: any) => g.id).filter(Boolean);
+          const ids = goals.map((g) => g.id).filter(Boolean);
           if (ids.length) {
-            const qs = encodeURIComponent(ids.join(','));
-            const bulk = await fetch(`/api/goals/streaks?ids=${qs}`).then((r) => r.json()).catch(() => null);
+            const qs = encodeURIComponent(ids.join(","));
+            const bulk = await fetch(`/api/goals/streaks?ids=${qs}`)
+              .then((r) => r.json())
+              .catch(() => null);
             if (bulk && !bulk.error) {
               const maxCur = Number(bulk?.max?.dailyCurrent || 0);
               const maxLong = Number(bulk?.max?.dailyLongest || 0);
               setStreakMax({ current: maxCur, longest: maxLong });
-              const map: Record<string, { count: number; quota: number }> = {};
-              for (const it of (bulk.items || [])) {
+              const map: WeekProgress = {};
+              for (const it of bulk.items || []) {
                 map[String(it.id)] = {
                   count: Number(it.currentWeekCount || 0),
                   quota: Number(it.currentWeekQuota || 0),
@@ -215,14 +246,16 @@ export default function DashboardPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/shadow/progress/commit', { cache: 'no-store' });
+        const res = await fetch("/api/shadow/progress/commit", {
+          cache: "no-store",
+        });
         const j = await res.json().catch(() => ({}));
         if (res.ok && j?.commit) {
           setShadowCommit({
             delta: Number(j.commit.delta || 0),
             target_today: Number(j.commit.target_today || 0),
             completed_today: Number(j.commit.completed_today || 0),
-            decision_kind: j.commit.decision_kind || 'noop',
+            decision_kind: j.commit.decision_kind || "noop",
           });
         } else {
           setShadowCommit(null);
@@ -243,19 +276,25 @@ export default function DashboardPage() {
         if (!uid) return;
         const nowIso = new Date().toISOString();
         const { data, error } = await supabase
-          .from('shadow_messages')
-          .select('id,type,text,expiry')
-          .eq('user_id', uid)
-          .gt('expiry', nowIso)
-          .order('expiry', { ascending: true })
+          .from("shadow_messages")
+          .select("id,type,text,expiry,created_at")
+          .eq("user_id", uid)
+          .gt("expiry", nowIso)
+          .order("created_at", { ascending: false })
           .limit(1);
         if (!error && Array.isArray(data) && data.length > 0) {
           const m: any = data[0];
           const t =
-            m?.type === 'taunt' || m?.type === 'encouragement' || m?.type === 'neutral'
-              ? (m.type as 'taunt' | 'encouragement' | 'neutral')
-              : 'neutral';
-          setShadowMessage({ id: String(m.id), type: t, text: String(m.text || '') });
+            m?.type === "taunt" ||
+            m?.type === "encouragement" ||
+            m?.type === "neutral"
+              ? (m.type as "taunt" | "encouragement" | "neutral")
+              : "neutral";
+          setShadowMessage({
+            id: String(m.id),
+            type: t,
+            text: String(m.text || ""),
+          });
         } else {
           setShadowMessage(null);
         }
@@ -264,6 +303,59 @@ export default function DashboardPage() {
       }
     })();
   }, [session?.user?.id, clockTick, supabase]);
+
+  // Realtime: subscribe to shadow_messages changes for instant inbox refresh
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    const ch = supabase.channel("rt-shadow-messages");
+    const refresh = async () => {
+      try {
+        const nowIso = new Date().toISOString();
+        const { data, error } = await supabase
+          .from("shadow_messages")
+          .select("id,type,text,expiry,created_at")
+          .eq("user_id", uid)
+          .gt("expiry", nowIso)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const m: any = data[0];
+          const t =
+            m?.type === "taunt" ||
+            m?.type === "encouragement" ||
+            m?.type === "neutral"
+              ? (m.type as "taunt" | "encouragement" | "neutral")
+              : "neutral";
+          setShadowMessage({
+            id: String(m.id),
+            type: t,
+            text: String(m.text || ""),
+          });
+        } else {
+          setShadowMessage(null);
+        }
+      } catch {
+        setShadowMessage(null);
+      }
+    };
+    ch.on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "shadow_messages",
+        filter: `user_id=eq.${uid}`,
+      },
+      () => refresh()
+    );
+    ch.subscribe();
+    return () => {
+      try {
+        supabase.removeChannel(ch);
+      } catch {}
+    };
+  }, [session?.user?.id, supabase]);
 
   useEffect(() => {
     const load = async () => {
@@ -286,7 +378,20 @@ export default function DashboardPage() {
         .eq("user_id", session?.user?.id);
       if (data) {
         const totals = data.reduce(
-          (acc: any, l: any) => {
+          (
+            acc: {
+              calories: number;
+              protein_g: number;
+              carbs_g: number;
+              fat_g: number;
+            },
+            l: {
+              calories: number;
+              protein_g: number;
+              carbs_g: number;
+              fat_g: number;
+            }
+          ) => {
             acc.calories += Number(l.calories) || 0;
             acc.protein_g += Number(l.protein_g) || 0;
             acc.carbs_g += Number(l.carbs_g) || 0;
@@ -336,8 +441,10 @@ export default function DashboardPage() {
           const goals: any[] = gData.goals || [];
           const ids = goals.map((g: any) => g.id).filter(Boolean);
           if (ids.length) {
-            const qs = encodeURIComponent(ids.join(','));
-            const bulk = await fetch(`/api/goals/streaks?ids=${qs}`).then((r) => r.json()).catch(() => null);
+            const qs = encodeURIComponent(ids.join(","));
+            const bulk = await fetch(`/api/goals/streaks?ids=${qs}`)
+              .then((r) => r.json())
+              .catch(() => null);
             if (bulk && !bulk.error) {
               const maxCur = Number(bulk?.max?.dailyCurrent || 0);
               const maxLong = Number(bulk?.max?.dailyLongest || 0);
@@ -358,8 +465,8 @@ export default function DashboardPage() {
   useEffect(() => {
     const ch = supabase.channel("rt-dashboard");
     const trigger = () => {
-      if ((trigger as any)._t) clearTimeout((trigger as any)._t);
-      (trigger as any)._t = setTimeout(async () => {
+      if (rtDebounce.current) window.clearTimeout(rtDebounce.current);
+      rtDebounce.current = window.setTimeout(async () => {
         try {
           const [tRes, pRes, gRes, lsRes] = await Promise.all([
             fetch("/api/tasks"),
@@ -374,10 +481,10 @@ export default function DashboardPage() {
             lsRes.json(),
           ]);
           if (!tData.error) {
-            setTasks(tData.tasks || []);
-            const schedMap: Record<string, any> = {};
-            (tData.schedules || []).forEach((s: any) => {
-              schedMap[s.task_id] = s;
+            setTasks((tData.tasks || []) as Task[]);
+            const schedMap: Record<string, Schedule> = {};
+            (tData.schedules || []).forEach((s: Partial<Schedule>) => {
+              if (s && s.task_id) schedMap[s.task_id] = s as Schedule;
             });
             setSchedules(schedMap);
           }
@@ -385,19 +492,23 @@ export default function DashboardPage() {
           if (!lsData?.error && lsData?.lifeStreak)
             setLifeStreak(lsData.lifeStreak);
           if (!gData.error) {
-            const goals: any[] = gData.goals || [];
+            const goals: Array<{ id: string }> = (gData.goals || []).map(
+              (g: any) => ({ id: String(g.id) })
+            );
             setGoals(goals);
             setGoalSummaries(gData.summaries || {});
-            const ids = goals.map((g: any) => g.id).filter(Boolean);
+            const ids = goals.map((g) => g.id).filter(Boolean);
             if (ids.length) {
-              const qs = encodeURIComponent(ids.join(','));
-              const bulk = await fetch(`/api/goals/streaks?ids=${qs}`).then((r) => r.json()).catch(() => null);
+              const qs = encodeURIComponent(ids.join(","));
+              const bulk = await fetch(`/api/goals/streaks?ids=${qs}`)
+                .then((r) => r.json())
+                .catch(() => null);
               if (bulk && !bulk.error) {
                 const maxCur = Number(bulk?.max?.dailyCurrent || 0);
                 const maxLong = Number(bulk?.max?.dailyLongest || 0);
                 setStreakMax({ current: maxCur, longest: maxLong });
-                const map: Record<string, { count: number; quota: number }> = {};
-                for (const it of (bulk.items || [])) {
+                const map: WeekProgress = {};
+                for (const it of bulk.items || []) {
                   map[String(it.id)] = {
                     count: Number(it.currentWeekCount || 0),
                     quota: Number(it.currentWeekQuota || 0),
@@ -520,14 +631,16 @@ export default function DashboardPage() {
         setGoalSummaries(gData.summaries || {});
         const ids = goals.map((g: any) => g.id).filter(Boolean);
         if (ids.length) {
-          const qs = encodeURIComponent(ids.join(','));
-          const bulk = await fetch(`/api/goals/streaks?ids=${qs}`).then((r) => r.json()).catch(() => null);
+          const qs = encodeURIComponent(ids.join(","));
+          const bulk = await fetch(`/api/goals/streaks?ids=${qs}`)
+            .then((r) => r.json())
+            .catch(() => null);
           if (bulk && !bulk.error) {
             const maxCur = Number(bulk?.max?.dailyCurrent || 0);
             const maxLong = Number(bulk?.max?.dailyLongest || 0);
             setStreakMax({ current: maxCur, longest: maxLong });
             const map: Record<string, { count: number; quota: number }> = {};
-            for (const it of (bulk.items || [])) {
+            for (const it of bulk.items || []) {
               map[String(it.id)] = {
                 count: Number(it.currentWeekCount || 0),
                 quota: Number(it.currentWeekQuota || 0),
@@ -582,11 +695,11 @@ export default function DashboardPage() {
   };
 
   // Helpers to evaluate time-of-day based due-ness with timezone awareness
-  const normalizeTz = (tz?: string) => {
+  const normalizeTz = (tz?: string | null) => {
     // Many older schedules may have 'UTC' persisted; for client-side "today" checks we prefer local time over UTC.
     return tz && tz !== "UTC" ? tz : undefined;
   };
-  const nowInTZ = (tz?: string) => {
+  const nowInTZ = (tz?: string | null) => {
     try {
       const t = normalizeTz(tz);
       return t
@@ -598,7 +711,7 @@ export default function DashboardPage() {
   };
 
   // Format YYYY-MM-DD for a given timezone without converting to UTC
-  const dateStrInTZ = (tz?: string, d?: Date) => {
+  const dateStrInTZ = (tz?: string | null, d?: Date) => {
     const fmt = new Intl.DateTimeFormat("en-CA", {
       timeZone: normalizeTz(tz),
       year: "numeric",
@@ -609,7 +722,7 @@ export default function DashboardPage() {
   };
 
   const todayAtInTZ = (
-    tz: string | undefined,
+    tz: string | null | undefined,
     atTime: string | null | undefined
   ) => {
     if (!atTime) return null;
@@ -628,11 +741,12 @@ export default function DashboardPage() {
   };
 
   // Determine if a task is due now (time reached) or later today (time in future)
-  const classifyToday = (task: any) => {
+  const classifyToday = (task: Task) => {
     const s = schedules[task.id];
     // If the server marked it due today but there's no schedule (e.g., goal-based weekly quota), show as due now.
     if (!s) {
-      if (todayTaskIds.has(task.id)) return { dueNow: true, later: false, when: null as Date | null };
+      if (todayTaskIds.has(task.id))
+        return { dueNow: true, later: false, when: null as Date | null };
       return { dueNow: false, later: false, when: null as Date | null };
     }
     if (!todayTaskIds.has(task.id))
@@ -649,6 +763,22 @@ export default function DashboardPage() {
     return { dueNow: false, later: true, when };
   };
 
+  // Comparator: sort by time, placing items with no specific time first.
+  // Works for both "due now" (nulls first) and "later today" (all times ascending).
+  const sortByWhen = (
+    a: { meta: { when: Date | null } },
+    b: { meta: { when: Date | null } }
+  ) => {
+    const at = a.meta.when?.getTime?.();
+    const bt = b.meta.when?.getTime?.();
+    const aHas = typeof at === "number";
+    const bHas = typeof bt === "number";
+    if (!aHas && !bHas) return 0;
+    if (!aHas) return -1; // a without time comes first
+    if (!bHas) return 1; // b without time comes first
+    return (at as number) - (bt as number);
+  };
+
   // Compute Next Up whenever tasks/schedules change
   useEffect(() => {
     const dueToday = tasks.filter(
@@ -659,7 +789,7 @@ export default function DashboardPage() {
       .filter((x) => x.meta.dueNow || x.meta.later);
     const later = withMeta.filter((x) => x.meta.later);
     later.sort(
-      (a: any, b: any) =>
+      (a, b) =>
         (a.meta.when?.getTime?.() ?? 0) - (b.meta.when?.getTime?.() ?? 0)
     );
     if (later.length > 0)
@@ -704,7 +834,14 @@ export default function DashboardPage() {
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
               >
-                <circle cx="24" cy="24" r="23" className="fill-surface2" stroke="currentColor" strokeWidth="1" />
+                <circle
+                  cx="24"
+                  cy="24"
+                  r="23"
+                  className="fill-surface2"
+                  stroke="currentColor"
+                  strokeWidth="1"
+                />
                 <path
                   d="M16 28c0-6.627 4.03-12 9-12s9 5.373 9 12v6l-3-2-3 2-3-2-3 2-3-2-3 2v-6z"
                   className="fill-foreground/10"
@@ -720,15 +857,17 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2">
                 <span
                   className={(() => {
-                    const base = 'text-[11px] font-semibold';
-                    if (shadowMessage.type === 'taunt') return `${base} text-rose-300`;
-                    if (shadowMessage.type === 'encouragement') return `${base} text-emerald-300`;
+                    const base = "text-[11px] font-semibold";
+                    if (shadowMessage.type === "taunt")
+                      return `${base} text-rose-300`;
+                    if (shadowMessage.type === "encouragement")
+                      return `${base} text-emerald-300`;
                     return `${base} text-muted`;
                   })()}
                 >
-                  {shadowMessage.type === 'taunt' && 'Taunt'}
-                  {shadowMessage.type === 'encouragement' && 'Encouragement'}
-                  {shadowMessage.type === 'neutral' && 'Update'}
+                  {shadowMessage.type === "taunt" && "Taunt"}
+                  {shadowMessage.type === "encouragement" && "Encouragement"}
+                  {shadowMessage.type === "neutral" && "Update"}
                 </span>
               </div>
               <div className="mt-0.5 text-[13px] sm:text-sm text-foreground">
@@ -827,37 +966,46 @@ export default function DashboardPage() {
               </div>
             )}
 
-      {/* Shadow Pace (Phase 10) */}
-      <section className="rounded-2xl bg-surface p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-md font-semibold text-foreground">Shadow Pace</h2>
-            {shadowCommit ? (
-              <div className="mt-1 text-[12px] sm:text-[13px] text-muted">
-                <span className="font-semibold">Delta:</span> {shadowCommit.delta >= 0 ? '+' : ''}{shadowCommit.delta}
-                <span className="mx-2 opacity-60">•</span>
-                <span className="font-semibold">Target:</span> {shadowCommit.target_today}
-                <span className="mx-2 opacity-60">•</span>
-                <span className="font-semibold">Done:</span> {shadowCommit.completed_today}
+            {/* Shadow Pace (Phase 10) */}
+            <section className="rounded-2xl bg-surface p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-md font-semibold text-foreground">
+                    Shadow Pace
+                  </h2>
+                  {shadowCommit ? (
+                    <div className="mt-1 text-[12px] sm:text-[13px] text-muted">
+                      <span className="font-semibold">Delta:</span>{" "}
+                      {shadowCommit.delta >= 0 ? "+" : ""}
+                      {shadowCommit.delta}
+                      <span className="mx-2 opacity-60">•</span>
+                      <span className="font-semibold">Target:</span>{" "}
+                      {shadowCommit.target_today}
+                      <span className="mx-2 opacity-60">•</span>
+                      <span className="font-semibold">Done:</span>{" "}
+                      {shadowCommit.completed_today}
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-[12px] text-muted">
+                      No pace decision yet today.
+                    </div>
+                  )}
+                </div>
+                {shadowCommit && (
+                  <span
+                    className="self-start inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                    style={{
+                      background: "rgb(var(--color-accent) / 0.10)",
+                    }}
+                  >
+                    {shadowCommit.decision_kind === "boost" && "🚀 Boost"}
+                    {shadowCommit.decision_kind === "slowdown" && "🧘 Slowdown"}
+                    {shadowCommit.decision_kind === "nudge" && "👉 Nudge"}
+                    {shadowCommit.decision_kind === "noop" && "• Noop"}
+                  </span>
+                )}
               </div>
-            ) : (
-              <div className="mt-1 text-[12px] text-muted">No pace decision yet today.</div>
-            )}
-          </div>
-          {shadowCommit && (
-            <span className="self-start inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
-              style={{
-                background: 'rgb(var(--color-accent) / 0.10)'
-              }}
-            >
-              {shadowCommit.decision_kind === 'boost' && '🚀 Boost'}
-              {shadowCommit.decision_kind === 'slowdown' && '🧘 Slowdown'}
-              {shadowCommit.decision_kind === 'nudge' && '👉 Nudge'}
-              {shadowCommit.decision_kind === 'noop' && '• Noop'}
-            </span>
-          )}
-        </div>
-      </section>
+            </section>
           </div>
           <button
             className="px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-medium bg-accent text-accent-foreground"
@@ -880,7 +1028,7 @@ export default function DashboardPage() {
           id="today-tasks-heading"
           className="text-md font-semibold text-slate-900 dark:text-slate-100"
         >
-          Today's Tasks
+          Today&lsquo;s Tasks
         </h2>
         {tasksLoading ? (
           <div
@@ -902,11 +1050,6 @@ export default function DashboardPage() {
             const dueNow = withMeta.filter((x) => x.meta.dueNow);
             const later = withMeta.filter((x) => x.meta.later);
             // Sort: dueNow without time first, then by time; later strictly by time
-            const sortByWhen = (a: any, b: any) => {
-              const wa = a.meta.when?.getTime?.() ?? 0;
-              const wb = b.meta.when?.getTime?.() ?? 0;
-              return wa - wb;
-            };
             dueNow.sort(sortByWhen);
             later.sort(sortByWhen);
 
@@ -919,7 +1062,7 @@ export default function DashboardPage() {
                   <div className="mt-3">
                     <Link
                       href="/tasks"
-                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-accent text-accent-foreground bg-blue-600"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-accent text-white text-accent-foreground bg-blue-600"
                       onClick={() => {
                         try {
                           track("quick_action_use", {
@@ -943,7 +1086,7 @@ export default function DashboardPage() {
                       Due now
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                      {dueNow.map(({ t, meta }) => {
+                      {dueNow.map(({ t }) => {
                         const rc = rarityClasses(t.ep_value);
                         return (
                           <div
@@ -1274,8 +1417,12 @@ export default function DashboardPage() {
               const start = new Date(g.start_date);
               const deadline = new Date(g.deadline);
               const totalMs = Math.max(0, deadline.getTime() - start.getTime());
-              const elapsedMs = Math.max(0, Math.min(totalMs, now.getTime() - start.getTime()));
-              const timePct = totalMs > 0 ? Math.round((elapsedMs / totalMs) * 100) : 0;
+              const elapsedMs = Math.max(
+                0,
+                Math.min(totalMs, now.getTime() - start.getTime())
+              );
+              const timePct =
+                totalMs > 0 ? Math.round((elapsedMs / totalMs) * 100) : 0;
               const daysLeft = Math.max(
                 0,
                 Math.ceil(
@@ -1318,7 +1465,9 @@ export default function DashboardPage() {
                     <div className="mt-1.5 h-2.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
                       <div
                         className="h-2.5 rounded-full bg-gradient-to-r from-blue-600 to-emerald-500"
-                        style={{ width: `${Math.max(5, Math.min(100, timePct))}%` }}
+                        style={{
+                          width: `${Math.max(5, Math.min(100, timePct))}%`,
+                        }}
                       />
                     </div>
                   </div>
