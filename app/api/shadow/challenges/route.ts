@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await admin
       .from('challenges')
-      .select('id, user_id, shadow_profile_id, state, created_at, due_time, linked_user_task_id, linked_shadow_task_id, task_template')
+      .select('id, user_id, shadow_profile_id, state, created_at, due_time, linked_user_task_id, linked_shadow_task_id, task_template, updated_at, created_at')
       .eq('user_id', me.id)
       .in('state', states)
       .order('created_at', { ascending: false })

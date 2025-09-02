@@ -16,12 +16,14 @@ import {
 } from "lucide-react";
 import { createClient as createSupabaseClient } from "@/utils/supabase/client";
 import ShadowFigure from "../../components/ShadowFigure";
-import ChallengeActions from './challenges/[id]/parts/ChallengeActions';
+import ChallengeActions from "./challenges/[id]/parts/ChallengeActions";
 
 type ChallengeItem = {
   id: string;
   state: string;
   created_at: string;
+  updated_at?: string | null;
+  completed_at?: string | null;
   due_time: string | null;
   linked_user_task_id: string | null;
   linked_shadow_task_id: string | null;
@@ -52,6 +54,11 @@ export default function ShadowPage() {
   // Shadow character pops
   const [ghostPop, setGhostPop] = useState<boolean>(false);
   const [confettiBurst, setConfettiBurst] = useState<boolean>(false);
+  const confettiRef = useRef<HTMLDivElement | null>(null);
+  // Track day changes in local timezone to reset history view
+  const [todayKey, setTodayKey] = useState<string>(() =>
+    new Date().toLocaleDateString()
+  );
   // 7-day race history for compact panel
   const [raceHistory, setRaceHistory] = useState<any>(null);
   const shadowDoneCountRef = useRef<number>(0);
@@ -117,6 +124,74 @@ export default function ShadowPage() {
       if (deltaRafRef.current) cancelAnimationFrame(deltaRafRef.current as any);
     };
   }, [deltaNow]);
+
+  // Tick local date key so memoed history re-evaluates across day boundaries
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTodayKey(new Date().toLocaleDateString());
+    }, 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const filteredHistory = useMemo(() => {
+    const todayStr = new Date().toLocaleDateString();
+    return (history || []).filter((c: any) => {
+      // Prefer completion or last update; fall back to due_time then created_at
+      const raw = c.completed_at || c.updated_at || c.created_at || null;
+      const d = raw ? new Date(raw) : null;
+      return d ? d.toLocaleDateString() === todayStr : false;
+    });
+  }, [history, todayKey]);
+
+  // Lightweight confetti when confettiBurst toggles on
+  useEffect(() => {
+    if (!confettiBurst) return;
+    const container = confettiRef.current;
+    if (!container) return;
+    const pieces: HTMLElement[] = [];
+    const colors = ["#22c55e", "#3b82f6", "#a855f7", "#f59e0b", "#ef4444"];
+    for (let i = 0; i < 28; i++) {
+      const el = document.createElement("span");
+      el.style.position = "absolute";
+      el.style.left = "50%";
+      el.style.top = "15%";
+      el.style.width = "6px";
+      el.style.height = "10px";
+      el.style.background = colors[i % colors.length];
+      el.style.borderRadius = "1px";
+      el.style.transform = `translate(-50%, -50%) rotate(${Math.random() * 360}deg)`;
+      container.appendChild(el);
+      pieces.push(el);
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 180 + Math.random() * 180;
+      const x = Math.cos(angle) * distance;
+      const y = Math.sin(angle) * distance + 240; // fall
+      el.animate(
+        [
+          {
+            transform: `translate(-50%, -50%) translate(0px,0px) rotate(0deg)`,
+            opacity: 1,
+          },
+          {
+            transform: `translate(-50%, -50%) translate(${x}px,${y}px) rotate(${720 + Math.random() * 360}deg)`,
+            opacity: 0,
+          },
+        ],
+        {
+          duration: 1100 + Math.random() * 600,
+          easing: "cubic-bezier(.2,.8,.2,1)",
+          fill: "forwards",
+        }
+      );
+    }
+    const t = setTimeout(() => {
+      pieces.forEach((p) => p.remove());
+    }, 2200);
+    return () => {
+      clearTimeout(t);
+      pieces.forEach((p) => p.remove());
+    };
+  }, [confettiBurst]);
 
   useEffect(() => {
     let cancelled = false;
@@ -184,11 +259,15 @@ export default function ShadowPage() {
 
   // Pop shadow explanation if coming from tasks onboarding intro
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     try {
-      const pending = window.sessionStorage.getItem('nourish:shadowExplainPending');
-      const already = window.sessionStorage.getItem('nourish:onboardingComplete');
-      if (pending === '1' && !already) {
+      const pending = window.sessionStorage.getItem(
+        "nourish:shadowExplainPending"
+      );
+      const already = window.sessionStorage.getItem(
+        "nourish:onboardingComplete"
+      );
+      if (pending === "1" && !already) {
         // small delay to let page settle
         const id = setTimeout(() => setShowShadowExplain(true), 400);
         return () => clearTimeout(id);
@@ -203,14 +282,19 @@ export default function ShadowPage() {
     let timer: any;
     const loadTaunt = async () => {
       try {
-        const r = await fetch("/api/shadow/taunts?limit=1", { cache: "no-store" });
+        const r = await fetch("/api/shadow/taunts?limit=1", {
+          cache: "no-store",
+        });
         if (!r.ok) return;
         const j = await r.json();
         const item = (j?.items || [])[0];
         if (item && item.id && item.id !== lastId) {
           lastId = item.id;
           if (!stop) {
-            setToast({ title: "Shadow taunt", body: String(item.message || "") });
+            setToast({
+              title: "Shadow taunt",
+              body: String(item.message || ""),
+            });
             setTimeout(() => setToast(null), 3000);
           }
         }
@@ -267,7 +351,11 @@ export default function ShadowPage() {
           .catch(() => {});
       }, 250);
     };
-    const tables = ["task_completions", "shadow_progress_commits", "shadow_passes"];
+    const tables = [
+      "task_completions",
+      "shadow_progress_commits",
+      "shadow_passes",
+    ];
     for (const tbl of tables) {
       ch.on(
         "postgres_changes",
@@ -288,13 +376,17 @@ export default function ShadowPage() {
     let stopped = false;
     (async () => {
       try {
-        const r = await fetch('/api/shadow/history?days=7', { cache: 'no-store' });
+        const r = await fetch("/api/shadow/history?days=7", {
+          cache: "no-store",
+        });
         if (!r.ok) return;
         const j = await r.json();
         if (!stopped) setRaceHistory(j || null);
       } catch {}
     })();
-    return () => { stopped = true; };
+    return () => {
+      stopped = true;
+    };
   }, []);
 
   // Per-item row with ghost glide-in on shadow completion
@@ -318,30 +410,47 @@ export default function ShadowPage() {
         const id = setTimeout(() => setEntering(false), 16); // next frame
         const sid = setTimeout(() => setShimmer(false), 600);
         wasShadowDone.current = true;
-        return () => { clearTimeout(id); clearTimeout(sid); };
+        return () => {
+          clearTimeout(id);
+          clearTimeout(sid);
+        };
       }
     }, [t.is_shadow_done]);
     // Winner glow: green if user first, purple if shadow first
-    const userMin = typeof t.user_completed_minute === 'number' ? t.user_completed_minute : null;
-    const shadowMin = typeof t.shadow_scheduled_minute === 'number' ? t.shadow_scheduled_minute : null;
-    let winnerGlow = '';
+    const userMin =
+      typeof t.user_completed_minute === "number"
+        ? t.user_completed_minute
+        : null;
+    const shadowMin =
+      typeof t.shadow_scheduled_minute === "number"
+        ? t.shadow_scheduled_minute
+        : null;
+    let winnerGlow = "";
     if (t.is_user_done || t.is_shadow_done) {
       let userFirst = false;
       if (t.is_user_done && !t.is_shadow_done) userFirst = true;
       else if (!t.is_user_done && t.is_shadow_done) userFirst = false;
-      else if (t.is_user_done && t.is_shadow_done && userMin != null && shadowMin != null) userFirst = userMin <= shadowMin;
+      else if (
+        t.is_user_done &&
+        t.is_shadow_done &&
+        userMin != null &&
+        shadowMin != null
+      )
+        userFirst = userMin <= shadowMin;
       winnerGlow = userFirst
-        ? 'ring-1 ring-emerald-500/25 shadow-[0_0_10px_rgba(16,185,129,0.20)]'
-        : 'ring-1 ring-purple-500/25 shadow-[0_0_10px_rgba(168,85,247,0.20)]';
+        ? "ring-1 ring-emerald-500/25 shadow-[0_0_10px_rgba(16,185,129,0.20)]"
+        : "ring-1 ring-purple-500/25 shadow-[0_0_10px_rgba(168,85,247,0.20)]";
     }
     return (
       <li
         className={`px-3 py-2 flex items-center justify-between gap-3 rounded-xl border transition-all duration-200 shadow-sm
-        ${t.is_user_done
-          ? 'bg-surface/70 border-blue-500/15'
-          : 'bg-surface2 border-transparent hover:border-purple-500/20 hover:bg-surface/80 hover:shadow'}
+        ${
+          t.is_user_done
+            ? "bg-surface/70 border-blue-500/15"
+            : "bg-surface2 border-transparent hover:border-purple-500/20 hover:bg-surface/80 hover:shadow"
+        }
         ${winnerGlow}
-        ${shimmer ? ' bg-purple-500/10' : ''}`}
+        ${shimmer ? " bg-purple-500/10" : ""}`}
       >
         <div className="flex items-center gap-2 min-w-0">
           {t.is_user_done ? (
@@ -356,20 +465,27 @@ export default function ShadowPage() {
             <span className="w-4 h-4 inline-block rounded-full border border-gray-300 dark:border-gray-700" />
           )}
           <div className="truncate">
-            <div className={`text-sm font-medium truncate ${t.is_user_done ? 'text-foreground/80' : ''}`}>
+            <div
+              className={`text-sm font-medium truncate ${t.is_user_done ? "text-foreground/80" : ""}`}
+            >
               {t.title || "Task"}
               {t.is_user_done && (
-                <span className="ml-2 inline-flex items-center px-1.5 py-0.5 text-[10px] rounded-md bg-blue-600/15 text-blue-300 align-middle">Completed</span>
+                <span className="ml-2 inline-flex items-center px-1.5 py-0.5 text-[10px] rounded-md bg-blue-600/15 text-blue-300 align-middle">
+                  Completed
+                </span>
               )}
             </div>
             <div className="text-xs text-gray-500">
               {(() => {
                 const userLabel = t.user_time_label as string | undefined;
                 const shadowLabel = t.shadow_time_label as string | undefined;
-                const eta = typeof t.shadow_eta_minutes === 'number' ? t.shadow_eta_minutes : null;
+                const eta =
+                  typeof t.shadow_eta_minutes === "number"
+                    ? t.shadow_eta_minutes
+                    : null;
 
                 // Compose user part
-                const youPart = userLabel ? `You ${userLabel}` : 'You -';
+                const youPart = userLabel ? `You ${userLabel}` : "You -";
 
                 // Compose shadow part with ETA semantics
                 let shadowPart: string;
@@ -380,7 +496,7 @@ export default function ShadowPage() {
                   // edge: eta 0 but not passed yet
                   shadowPart = `Shadow ETA 0m`;
                 } else if (t.is_shadow_done) {
-                  shadowPart = `Shadow ${shadowLabel || '—'}`;
+                  shadowPart = `Shadow ${shadowLabel || "—"}`;
                 } else if (shadowLabel) {
                   // scheduled later today but eta unknown
                   shadowPart = `Shadow ${shadowLabel}`;
@@ -395,11 +511,11 @@ export default function ShadowPage() {
         </div>
         {!t.is_user_done && (
           <button
-            className={`shrink-0 px-3 py-1.5 text-xs rounded-lg text-white bg-gradient-to-r from-blue-600 to-purple-600 shadow hover:opacity-95 active:opacity-90 disabled:opacity-50 transition-all ${completingId ? 'pointer-events-none' : ''}`}
-            disabled={!!completingId}
+            className={`shrink-0 px-3 py-1.5 text-xs rounded-lg text-white bg-gradient-to-r from-blue-600 to-purple-600 shadow hover:opacity-95 active:opacity-90 disabled:opacity-50 transition-all ${completingId === t.id ? "pointer-events-none" : ""}`}
+            disabled={completingId === t.id}
             onClick={() => onComplete(t.id)}
           >
-            {completingId === t.id ? 'Saving…' : 'Complete'}
+            {completingId === t.id ? "Saving…" : "Complete"}
           </button>
         )}
       </li>
@@ -464,13 +580,22 @@ export default function ShadowPage() {
   }, [shadowState]);
 
   const completeTask = async (taskId: string) => {
+    let watchdog: ReturnType<typeof setTimeout> | null = null;
     try {
       setCompletingId(taskId);
+      // Safety: auto-clear disabled state if something hangs
+      watchdog = setTimeout(() => {
+        setCompletingId((cur) => (cur === taskId ? null : cur));
+      }, 8000);
       const hadShadowPassed = (() => {
         try {
-          const t = (shadowState?.tasks || []).find((x: any) => x.id === taskId);
+          const t = (shadowState?.tasks || []).find(
+            (x: any) => x.id === taskId
+          );
           return !!t?.is_shadow_done && !t?.is_user_done;
-        } catch { return false; }
+        } catch {
+          return false;
+        }
       })();
       const res = await fetch(`/api/tasks/${taskId}/complete`, {
         method: "POST",
@@ -514,61 +639,126 @@ export default function ShadowPage() {
         };
         return { ...prev, tasks, ep_today, metrics };
       });
+      // Clear disabled state immediately so other rows remain clickable
+      setCompletingId(null);
       // Lightweight toast
       try {
         const ep = j?.completion?.ep_awarded;
         const catchUp = hadShadowPassed;
         setToast({
           title: catchUp ? "Caught up!" : "Completed",
-          body: catchUp ? "You matched the Shadow" : (typeof ep === "number" ? `+${ep} EP` : undefined),
+          body: catchUp
+            ? "You matched the Shadow"
+            : typeof ep === "number"
+              ? `+${ep} EP`
+              : undefined,
         });
+        const shouldConfetti = typeof ep === "number" && ep > 0;
         if (catchUp) {
           setGhostPop(true);
+        }
+        if (shouldConfetti) {
           setConfettiBurst(true);
-          setTimeout(() => { setGhostPop(false); setConfettiBurst(false); }, 1200);
+          setTimeout(() => {
+            if (catchUp) setGhostPop(false);
+            setConfettiBurst(false);
+          }, 1200);
+        } else if (catchUp) {
+          // If for some reason EP is 0 but we caught up, still clear the pop
+          setTimeout(() => {
+            setGhostPop(false);
+          }, 1200);
         }
         setTimeout(() => setToast(null), 2200);
       } catch {}
-      // Inform race engine to recompute pacing nudges (best-effort)
+      // Inform race engine (fire-and-forget)
       try {
-        await fetch("/api/shadow/progress/run-today", { method: "POST" });
+        fetch("/api/shadow/progress/run-today", { method: "POST" }).catch(
+          () => {}
+        );
       } catch {}
-      // Hard refresh state so EP and pacing update immediately
+      // Refresh state (fire-and-forget) so EP and pacing update
       try {
-        const sRes = await fetch("/api/shadow/state/today", {
-          cache: "no-store",
-        });
-        if (sRes.ok) {
-          const s = await sRes.json();
-          setShadowState(s || null);
-          if (s?.ep_today) {
-            setHero((prev) => ({
-              userEP: s.ep_today.user ?? (prev?.userEP || 0),
-              shadowEP: s.ep_today.shadow ?? (prev?.shadowEP || 0),
-            }));
-          }
-        }
+        fetch("/api/shadow/state/today", { cache: "no-store" })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((s) => {
+            if (!s) return;
+            setShadowState(s || null);
+            if (s?.ep_today) {
+              setHero((prev) => ({
+                userEP: s.ep_today.user ?? (prev?.userEP || 0),
+                shadowEP: s.ep_today.shadow ?? (prev?.shadowEP || 0),
+              }));
+            }
+          })
+          .catch(() => {});
       } catch {}
     } catch (e) {
       console.error(e);
+      try {
+        const msg = e instanceof Error ? e.message : "Failed to complete";
+        setToast({ title: "Error", body: msg });
+        setTimeout(() => setToast(null), 2200);
+      } catch {}
     } finally {
+      // already cleared above; ensure not stuck
+      // Clear watchdog if still pending
+      try {
+        if (watchdog) clearTimeout(watchdog as any);
+      } catch {}
       setCompletingId(null);
     }
   };
 
+  // Gamified loader component
+  const GamifiedLoader = ({
+    label,
+    icon,
+  }: {
+    label: string;
+    icon?: React.ReactNode;
+  }) => (
+    <div className="relative rounded-xl border border-white/5 bg-surface p-3">
+      <div className="flex items-center gap-2 text-sm text-muted">
+        {icon ? (
+          <span className="inline-grid place-items-center h-6 w-6 rounded-lg bg-surface2/80 text-foreground/80 ring-1 ring-white/10">
+            {icon}
+          </span>
+        ) : (
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-foreground/70" />
+        )}
+        <span className="font-medium">Loading {label}…</span>
+      </div>
+      <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-surface2">
+        <div className="h-full w-1/4 rounded-full bg-gradient-to-r from-foreground/30 to-foreground/10 animate-[pulse_1.6s_ease-in-out_infinite]" />
+      </div>
+    </div>
+  );
+
   return (
     <div className="max-w-3xl mx-auto p-4">
+      {/* Confetti overlay */}
+      <div
+        ref={confettiRef}
+        className="pointer-events-none fixed inset-0 z-[200]"
+      />
       {/* Shadow Explanation Walkthrough */}
       {showShadowExplain && (
         <div className="fixed inset-0 z-[210] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" onClick={() => setShowShadowExplain(false)} aria-hidden />
+          <div
+            className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
+            onClick={() => setShowShadowExplain(false)}
+            aria-hidden
+          />
           <div className="relative w-[92%] max-w-md rounded-2xl border border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl shadow-2xl p-5">
             {/* Header */}
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-grid place-items-center h-8 w-8 rounded-xl bg-gradient-to-br from-purple-600 to-fuchsia-600 text-white">
                 <Ghost className="w-4 h-4" />
               </span>
-              <div className="text-[15px] sm:text-[16px] font-semibold leading-tight">The Shadow Rivalry</div>
+              <div className="text-[15px] sm:text-[16px] font-semibold leading-tight">
+                The Shadow Rivalry
+              </div>
             </div>
             {/* Slides */}
             <div className="text-[13px] leading-relaxed text-gray-700 dark:text-gray-300">
@@ -577,11 +767,30 @@ export default function ShadowPage() {
                   return (
                     <div>
                       <div className="my-3 h-px bg-gradient-to-r from-transparent via-gray-200/60 dark:via-gray-700/60 to-transparent" />
-                      <div className="text-[14px] font-medium mb-1">Meet Your Shadow</div>
+                      <div className="text-[14px] font-medium mb-1">
+                        Meet Your Shadow
+                      </div>
                       <ul className="space-y-1.5">
-                        <li className="flex items-start gap-2"><Swords className="mt-0.5 w-4 h-4 text-rose-500" /><span>The moment you set your first goal, a rival is born: your Shadow.</span></li>
-                        <li className="flex items-start gap-2"><Eye className="mt-0.5 w-4 h-4 text-indigo-500" /><span>It’s your mirror — fast, relentless, and always chasing you.</span></li>
-                        <li className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 w-4 h-4 text-emerald-500" /><span>Every task you take on, your Shadow takes on too.</span></li>
+                        <li className="flex items-start gap-2">
+                          <Swords className="mt-0.5 w-4 h-4 text-rose-500" />
+                          <span>
+                            The moment you set your first goal, a rival is born:
+                            your Shadow.
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Eye className="mt-0.5 w-4 h-4 text-indigo-500" />
+                          <span>
+                            It’s your mirror — fast, relentless, and always
+                            chasing you.
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="mt-0.5 w-4 h-4 text-emerald-500" />
+                          <span>
+                            Every task you take on, your Shadow takes on too.
+                          </span>
+                        </li>
                       </ul>
                     </div>
                   );
@@ -590,12 +799,35 @@ export default function ShadowPage() {
                   return (
                     <div>
                       <div className="my-3 h-px bg-gradient-to-r from-transparent via-gray-200/60 dark:via-gray-700/60 to-transparent" />
-                      <div className="text-[14px] font-medium mb-1">The Daily Race</div>
+                      <div className="text-[14px] font-medium mb-1">
+                        The Daily Race
+                      </div>
                       <ul className="space-y-1.5">
-                        <li className="flex items-start gap-2"><Timer className="mt-0.5 w-4 h-4 text-blue-500" /><span>Every day is a race.</span></li>
-                        <li className="flex items-start gap-2"><Gauge className="mt-0.5 w-4 h-4 text-violet-500" /><span>If your Shadow finishes a task before you, it takes the lead.</span></li>
-                        <li className="flex items-start gap-2"><Crown className="mt-0.5 w-4 h-4 text-amber-500" /><span>Stay consistent and keep pace — and you’ll stay ahead.</span></li>
-                        <li className="flex items-start gap-2"><Trophy className="mt-0.5 w-4 h-4 text-emerald-500" /><span>The more momentum you build, the harder it becomes for your Shadow to catch you.</span></li>
+                        <li className="flex items-start gap-2">
+                          <Timer className="mt-0.5 w-4 h-4 text-blue-500" />
+                          <span>Every day is a race.</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Gauge className="mt-0.5 w-4 h-4 text-violet-500" />
+                          <span>
+                            If your Shadow finishes a task before you, it takes
+                            the lead.
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Crown className="mt-0.5 w-4 h-4 text-amber-500" />
+                          <span>
+                            Stay consistent and keep pace — and you’ll stay
+                            ahead.
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Trophy className="mt-0.5 w-4 h-4 text-emerald-500" />
+                          <span>
+                            The more momentum you build, the harder it becomes
+                            for your Shadow to catch you.
+                          </span>
+                        </li>
                       </ul>
                     </div>
                   );
@@ -604,14 +836,37 @@ export default function ShadowPage() {
                   return (
                     <div>
                       <div className="my-3 h-px bg-gradient-to-r from-transparent via-gray-200/60 dark:via-gray-700/60 to-transparent" />
-                      <div className="text-[14px] font-medium mb-1">The Bigger Battles: Challenges</div>
-                      <p className="mb-2">But the daily race is only the beginning. Your Shadow will throw Challenges your way:</p>
+                      <div className="text-[14px] font-medium mb-1">
+                        The Bigger Battles: Challenges
+                      </div>
+                      <p className="mb-2">
+                        But the daily race is only the beginning. Your Shadow
+                        will throw Challenges your way:
+                      </p>
                       <ul className="space-y-1.5">
-                        <li className="flex items-start gap-2"><Crown className="mt-0.5 w-4 h-4 text-amber-500" /><span>Streak challenges (stay on fire for days in a row)</span></li>
-                        <li className="flex items-start gap-2"><Timer className="mt-0.5 w-4 h-4 text-blue-500" /><span>Speed challenges (finish faster than your Shadow)</span></li>
-                        <li className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 w-4 h-4 text-emerald-500" /><span>Consistency challenges (show up no matter what)</span></li>
+                        <li className="flex items-start gap-2">
+                          <Crown className="mt-0.5 w-4 h-4 text-amber-500" />
+                          <span>
+                            Streak challenges (stay on fire for days in a row)
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Timer className="mt-0.5 w-4 h-4 text-blue-500" />
+                          <span>
+                            Speed challenges (finish faster than your Shadow)
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="mt-0.5 w-4 h-4 text-emerald-500" />
+                          <span>
+                            Consistency challenges (show up no matter what)
+                          </span>
+                        </li>
                       </ul>
-                      <p className="mt-2">These battles test not just your speed — but your discipline, endurance, and grit.</p>
+                      <p className="mt-2">
+                        These battles test not just your speed — but your
+                        discipline, endurance, and grit.
+                      </p>
                     </div>
                   );
                 }
@@ -619,11 +874,28 @@ export default function ShadowPage() {
                   return (
                     <div>
                       <div className="my-3 h-px bg-gradient-to-r from-transparent via-gray-200/60 dark:via-gray-700/60 to-transparent" />
-                      <div className="text-[14px] font-medium mb-1">Why It Matters</div>
+                      <div className="text-[14px] font-medium mb-1">
+                        Why It Matters
+                      </div>
                       <ul className="space-y-1.5">
-                        <li className="flex items-start gap-2"><Eye className="mt-0.5 w-4 h-4 text-indigo-500" /><span>This isn’t just a productivity app. It’s you versus the version of yourself that never stops grinding.</span></li>
-                        <li className="flex items-start gap-2"><Trophy className="mt-0.5 w-4 h-4 text-emerald-500" /><span>Beat the Shadow → earn rewards, streaks, and momentum.</span></li>
-                        <li className="flex items-start gap-2"><Gauge className="mt-0.5 w-4 h-4 text-violet-500" /><span>Fall behind → your Shadow grows stronger.</span></li>
+                        <li className="flex items-start gap-2">
+                          <Eye className="mt-0.5 w-4 h-4 text-indigo-500" />
+                          <span>
+                            This isn’t just a productivity app. It’s you versus
+                            the version of yourself that never stops grinding.
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Trophy className="mt-0.5 w-4 h-4 text-emerald-500" />
+                          <span>
+                            Beat the Shadow → earn rewards, streaks, and
+                            momentum.
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Gauge className="mt-0.5 w-4 h-4 text-violet-500" />
+                          <span>Fall behind → your Shadow grows stronger.</span>
+                        </li>
                       </ul>
                     </div>
                   );
@@ -632,8 +904,14 @@ export default function ShadowPage() {
                 return (
                   <div>
                     <div className="my-3 h-px bg-gradient-to-r from-transparent via-gray-200/60 dark:via-gray-700/60 to-transparent" />
-                    <div className="text-[14px] font-medium mb-1">The Choice</div>
-                    <p className="mb-2">The Shadow has already started running. The question is — will you rise, stay consistent, and stay ahead? Or will your Shadow outrun you?</p>
+                    <div className="text-[14px] font-medium mb-1">
+                      The Choice
+                    </div>
+                    <p className="mb-2">
+                      The Shadow has already started running. The question is —
+                      will you rise, stay consistent, and stay ahead? Or will
+                      your Shadow outrun you?
+                    </p>
                     <p>👉 The race begins now.</p>
                   </div>
                 );
@@ -642,22 +920,29 @@ export default function ShadowPage() {
             {/* Progress */}
             <div className="mt-4 flex items-center justify-center gap-1.5">
               {Array.from({ length: 5 }).map((_, i) => (
-                <span key={i} className={`h-1.5 rounded-full transition-all ${explainSlide===i ? 'w-6 bg-purple-500' : 'w-2.5 bg-gray-300 dark:bg-gray-700'}`} />
+                <span
+                  key={i}
+                  className={`h-1.5 rounded-full transition-all ${explainSlide === i ? "w-6 bg-purple-500" : "w-2.5 bg-gray-300 dark:bg-gray-700"}`}
+                />
               ))}
             </div>
             {/* Controls */}
             <div className="mt-4 flex items-center justify-between gap-2">
               <button
-                onClick={() => setExplainSlide((s) => Math.max(0, s-1))}
-                disabled={explainSlide===0}
+                onClick={() => setExplainSlide((s) => Math.max(0, s - 1))}
+                disabled={explainSlide === 0}
                 className="text-[13px] px-3 py-1.5 rounded-lg border border-gray-200/70 dark:border-gray-800/70 hover:bg-gray-100/70 dark:hover:bg-white/5 disabled:opacity-50"
-              >Back</button>
+              >
+                Back
+              </button>
               {explainSlide < 4 ? (
                 <div className="flex-1 flex justify-end">
                   <button
-                    onClick={() => setExplainSlide((s) => Math.min(4, s+1))}
+                    onClick={() => setExplainSlide((s) => Math.min(4, s + 1))}
                     className="text-[13px] px-3 py-1.5 rounded-lg border border-transparent bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow hover:opacity-[0.98]"
-                  >Next</button>
+                  >
+                    Next
+                  </button>
                 </div>
               ) : (
                 <div className="flex-1 flex justify-end">
@@ -665,19 +950,28 @@ export default function ShadowPage() {
                     onClick={async () => {
                       setShowShadowExplain(false);
                       try {
-                        await fetch('/api/preferences', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
+                        await fetch("/api/preferences", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
                         });
                       } catch {}
                       try {
-                        window.sessionStorage.removeItem('nourish:shadowExplainPending');
-                        window.sessionStorage.removeItem('nourish:onboarding:suspended');
-                        window.sessionStorage.setItem('nourish:onboardingComplete','1');
+                        window.sessionStorage.removeItem(
+                          "nourish:shadowExplainPending"
+                        );
+                        window.sessionStorage.removeItem(
+                          "nourish:onboarding:suspended"
+                        );
+                        window.sessionStorage.setItem(
+                          "nourish:onboardingComplete",
+                          "1"
+                        );
                       } catch {}
                     }}
                     className="text-[13px] px-3 py-1.5 rounded-lg border border-transparent bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow hover:opacity-[0.98]"
-                  >🚀 Start the Race</button>
+                  >
+                    🚀 Start the Race
+                  </button>
                 </div>
               )}
             </div>
@@ -695,12 +989,16 @@ export default function ShadowPage() {
           <div className="flex items-end justify-between text-gray-200">
             <div>
               <div className="text-[11px] text-gray-400">You</div>
-              <div className="text-lg font-semibold text-blue-300">{todayUserEP}</div>
+              <div className="text-lg font-semibold text-blue-300">
+                {todayUserEP}
+              </div>
             </div>
             <div className="text-[11px] text-gray-500">vs</div>
             <div className="text-right">
               <div className="text-[11px] text-gray-400">Shadow</div>
-              <div className="text-lg font-semibold text-purple-300">{todayShadowEP}</div>
+              <div className="text-lg font-semibold text-purple-300">
+                {todayShadowEP}
+              </div>
             </div>
           </div>
         </div>
@@ -727,7 +1025,10 @@ export default function ShadowPage() {
           </div>
         </div>
         <div className="h-3 w-full bg-surface2 rounded-full overflow-hidden relative">
-          <div className="h-full bg-blue-600" style={{ width: `${userPct}%` }} />
+          <div
+            className="h-full bg-blue-600"
+            style={{ width: `${userPct}%` }}
+          />
           {/* Leader indicator */}
           {todayUserEP !== todayShadowEP && (
             <div className="hidden md:flex absolute -top-4 right-2 items-center gap-1 text-xs">
@@ -743,7 +1044,9 @@ export default function ShadowPage() {
             </div>
           )}
         </div>
-        <div className="mt-1 text-[10px] text-gray-500">You {userPct}% • Shadow {shadowPct}%</div>
+        <div className="mt-1 text-[10px] text-gray-500">
+          You {userPct}% • Shadow {shadowPct}%
+        </div>
         {/* Floating shadow avatar pop */}
         <div
           className={`pointer-events-none absolute -top-2 right-3 transition-all duration-500 hidden md:block ${
@@ -849,12 +1152,22 @@ export default function ShadowPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-[11px] md:text-[12px] font-semibold text-gray-200">
             {(() => {
-              const leadVal = typeof shadowState?.lead === 'number' ? shadowState.lead : (todayUserEP - todayShadowEP);
-              const ahead = leadVal > 0; const tight = Math.abs(leadVal) < 0.5;
-              const chip = 'bg-surface2';
-              const icon = tight ? 'text-slate-300' : ahead ? 'text-blue-300' : 'text-purple-300';
+              const leadVal =
+                typeof shadowState?.lead === "number"
+                  ? shadowState.lead
+                  : todayUserEP - todayShadowEP;
+              const ahead = leadVal > 0;
+              const tight = Math.abs(leadVal) < 0.5;
+              const chip = "bg-surface2";
+              const icon = tight
+                ? "text-slate-300"
+                : ahead
+                  ? "text-blue-300"
+                  : "text-purple-300";
               return (
-                <span className={`inline-flex items-center justify-center w-4.5 h-4.5 rounded-full ${chip}`}>
+                <span
+                  className={`inline-flex items-center justify-center w-4.5 h-4.5 rounded-full ${chip}`}
+                >
                   <Gauge className={`w-3 h-3 ${icon}`} />
                 </span>
               );
@@ -869,38 +1182,62 @@ export default function ShadowPage() {
         {/* Narrative KPIs */}
         <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-2.5 text-[11px] md:text-[12px]">
           {/* Lead Status */}
-          <div className={(() => {
-            const leadVal = typeof shadowState?.lead === 'number' ? shadowState.lead : (todayUserEP - todayShadowEP);
-            const ahead = leadVal > 0;
-            const tight = Math.abs(leadVal) < 0.5;
-            return `rounded-xl p-2 md:p-2.5 bg-surface2 transition-colors`;
-          })()}>
+          <div
+            className={(() => {
+              const leadVal =
+                typeof shadowState?.lead === "number"
+                  ? shadowState.lead
+                  : todayUserEP - todayShadowEP;
+              const ahead = leadVal > 0;
+              const tight = Math.abs(leadVal) < 0.5;
+              return `rounded-xl p-2 md:p-2.5 bg-surface2 transition-colors`;
+            })()}
+          >
             <div className="flex items-center justify-between">
               <div className="text-[10px] md:text-[11px] text-muted inline-flex items-center gap-1">
                 <span>🏁</span> Lead
               </div>
               {(() => {
-                const leadVal = typeof shadowState?.lead === 'number' ? shadowState.lead : (todayUserEP - todayShadowEP);
+                const leadVal =
+                  typeof shadowState?.lead === "number"
+                    ? shadowState.lead
+                    : todayUserEP - todayShadowEP;
                 const tight = Math.abs(leadVal) < 0.5;
                 const ahead = leadVal > 0;
-                const label = tight ? 'Tight' : ahead ? 'You' : 'Shadow';
-                const pill = 'bg-surface px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px]';
-                const tone = ahead ? 'text-blue-200' : tight ? 'text-slate-200' : 'text-purple-200';
+                const label = tight ? "Tight" : ahead ? "You" : "Shadow";
+                const pill =
+                  "bg-surface px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px]";
+                const tone = ahead
+                  ? "text-blue-200"
+                  : tight
+                    ? "text-slate-200"
+                    : "text-purple-200";
                 return <span className={`${pill} ${tone}`}>{label}</span>;
               })()}
             </div>
             <div className="mt-0.5 text-[12px] md:text-[13px] font-medium text-foreground leading-snug">
               {(() => {
-                const leadVal = typeof shadowState?.lead === 'number' ? shadowState.lead : (todayUserEP - todayShadowEP);
+                const leadVal =
+                  typeof shadowState?.lead === "number"
+                    ? shadowState.lead
+                    : todayUserEP - todayShadowEP;
                 const tight = Math.abs(leadVal) < 0.4;
-                if (tight) return 'Neck and neck with Shadow';
-                return leadVal > 0 ? 'You\'ve pulled ahead!' : 'Shadow is 1 step ahead';
+                if (tight) return "Neck and neck with Shadow";
+                return leadVal > 0
+                  ? "You've pulled ahead!"
+                  : "Shadow is 1 step ahead";
               })()}
             </div>
             {/* Inline mini tug-of-war bar for quick glance */}
             <div className="mt-1.5 h-1 w-full bg-surface rounded-full overflow-hidden">
-              <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${userPct}%` }} />
-              <div className="-mt-1 h-1 bg-purple-600 transition-all duration-500 float-right" style={{ width: `${shadowPct}%` }} />
+              <div
+                className="h-full bg-blue-500 transition-all duration-500"
+                style={{ width: `${userPct}%` }}
+              />
+              <div
+                className="-mt-1 h-1 bg-purple-600 transition-all duration-500 float-right"
+                style={{ width: `${shadowPct}%` }}
+              />
             </div>
           </div>
 
@@ -912,18 +1249,40 @@ export default function ShadowPage() {
             <div className="mt-0.5 text-[12px] md:text-[13px] font-medium space-y-0.5 text-foreground leading-snug">
               {(() => {
                 const tasks = (shadowState?.tasks || []) as any[];
-                const userDone = tasks.filter((t: any) => t.is_user_done).length;
-                const shadowDone = tasks.filter((t: any) => t.is_shadow_done).length;
-                const us = typeof shadowState?.metrics?.user_speed_now === 'number' ? shadowState.metrics.user_speed_now : 0;
-                const ss = typeof shadowState?.metrics?.shadow_speed_now === 'number' ? shadowState.metrics.shadow_speed_now : 0;
-                const end = new Date(); end.setHours(23,59,59,999);
-                const remainingH = Math.max(0, (end.getTime() - Date.now()) / 3600000);
-                const projUser = Math.max(userDone, Math.round(userDone + us * remainingH));
-                const projShadow = Math.max(shadowDone, Math.round(shadowDone + ss * remainingH));
+                const userDone = tasks.filter(
+                  (t: any) => t.is_user_done
+                ).length;
+                const shadowDone = tasks.filter(
+                  (t: any) => t.is_shadow_done
+                ).length;
+                const us =
+                  typeof shadowState?.metrics?.user_speed_now === "number"
+                    ? shadowState.metrics.user_speed_now
+                    : 0;
+                const ss =
+                  typeof shadowState?.metrics?.shadow_speed_now === "number"
+                    ? shadowState.metrics.shadow_speed_now
+                    : 0;
+                const end = new Date();
+                end.setHours(23, 59, 59, 999);
+                const remainingH = Math.max(
+                  0,
+                  (end.getTime() - Date.now()) / 3600000
+                );
+                const projUser = Math.max(
+                  userDone,
+                  Math.round(userDone + us * remainingH)
+                );
+                const projShadow = Math.max(
+                  shadowDone,
+                  Math.round(shadowDone + ss * remainingH)
+                );
                 return (
                   <>
                     <div>At this pace: {projUser} tasks done today</div>
-                    <div className="text-[11px] md:text-[12px] text-muted">Shadow predicts: {projShadow} tasks by end of day</div>
+                    <div className="text-[11px] md:text-[12px] text-muted">
+                      Shadow predicts: {projShadow} tasks by end of day
+                    </div>
                   </>
                 );
               })()}
@@ -932,7 +1291,10 @@ export default function ShadowPage() {
 
           {/* Time Saved (hide when 0) */}
           {(() => {
-            const ts = typeof shadowState?.metrics?.time_saved_minutes === 'number' ? shadowState.metrics.time_saved_minutes : 0;
+            const ts =
+              typeof shadowState?.metrics?.time_saved_minutes === "number"
+                ? shadowState.metrics.time_saved_minutes
+                : 0;
             if (!ts || ts <= 0) return null;
             return (
               <div className="rounded-xl p-2 md:p-2.5 bg-surface2">
@@ -948,70 +1310,134 @@ export default function ShadowPage() {
           {/* Momentum / Consistency */}
           <div className="rounded-xl p-2 md:p-2.5 bg-surface2">
             <div className="text-[10px] md:text-[11px] text-muted inline-flex items-center gap-1">
-              <span role="img" aria-label="fire">🔥</span> Momentum
+              <span role="img" aria-label="fire">
+                🔥
+              </span>{" "}
+              Momentum
             </div>
             <div className="mt-0.5 text-[12px] md:text-[13px] font-medium text-foreground flex items-center gap-2">
               {(() => {
-                const pc = typeof shadowState?.metrics?.pace_consistency === 'number' ? shadowState.metrics.pace_consistency : null;
+                const pc =
+                  typeof shadowState?.metrics?.pace_consistency === "number"
+                    ? shadowState.metrics.pace_consistency
+                    : null;
                 const tasks = (shadowState?.tasks || []) as any[];
-                const anyStarted = tasks.some((t: any) => t.is_user_done || t.is_shadow_done);
-                if (!pc || !anyStarted) return <span className="text-muted">Build momentum by starting tasks</span>;
-                if (pc >= 0.8) return <><span>Steady pace</span><span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-200 border border-amber-400/20">On a streak</span></>;
+                const anyStarted = tasks.some(
+                  (t: any) => t.is_user_done || t.is_shadow_done
+                );
+                if (!pc || !anyStarted)
+                  return (
+                    <span className="text-muted">
+                      Build momentum by starting tasks
+                    </span>
+                  );
+                if (pc >= 0.8)
+                  return (
+                    <>
+                      <span>Steady pace</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-200 border border-amber-400/20">
+                        On a streak
+                      </span>
+                    </>
+                  );
                 if (pc >= 0.5) return <>Strong start</>;
                 return <>Wobbly pace</>;
               })()}
             </div>
           </div>
-            
-          
 
           {/* Speed comparison */}
-          <div className={(() => {
-            // Solid card with theme tokens
-            return `rounded-xl p-2 md:p-2.5 bg-surface2 md:col-span-2`;
-          })()}>
+          <div
+            className={(() => {
+              // Solid card with theme tokens
+              return `rounded-xl p-2 md:p-2.5 bg-surface2 md:col-span-2`;
+            })()}
+          >
             <div className="flex items-center justify-between">
               <div className="text-[10px] md:text-[11px] text-muted inline-flex items-center gap-1">
                 <span>⚡</span> Pace
               </div>
               {(() => {
-                const us = typeof shadowState?.metrics?.user_speed_now === 'number' ? shadowState.metrics.user_speed_now : 0;
-                const ss = typeof shadowState?.metrics?.shadow_speed_now === 'number' ? shadowState.metrics.shadow_speed_now : 0;
+                const us =
+                  typeof shadowState?.metrics?.user_speed_now === "number"
+                    ? shadowState.metrics.user_speed_now
+                    : 0;
+                const ss =
+                  typeof shadowState?.metrics?.shadow_speed_now === "number"
+                    ? shadowState.metrics.shadow_speed_now
+                    : 0;
                 const ratio = ss > 0 ? us / ss : 1;
-                let badge = 'Keeping pace';
-                let cls = 'bg-surface text-foreground';
-                if (ratio >= 1.8) { badge = 'Blazing'; cls = 'bg-surface text-emerald-200'; }
-                else if (ratio <= 0.55) { badge = 'Falling behind'; cls = 'bg-surface text-amber-200'; }
-                const pulse = (badge === 'Blazing' || badge === 'Falling behind') ? 'animate-pulse' : '';
-                return <span className={`px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px] ${cls} ${pulse}`}>{badge}</span>;
+                let badge = "Keeping pace";
+                let cls = "bg-surface text-foreground";
+                if (ratio >= 1.8) {
+                  badge = "Blazing";
+                  cls = "bg-surface text-emerald-200";
+                } else if (ratio <= 0.55) {
+                  badge = "Falling behind";
+                  cls = "bg-surface text-amber-200";
+                }
+                const pulse =
+                  badge === "Blazing" || badge === "Falling behind"
+                    ? "animate-pulse"
+                    : "";
+                return (
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px] ${cls} ${pulse}`}
+                  >
+                    {badge}
+                  </span>
+                );
               })()}
             </div>
             <div className="mt-0.5 text-[12px] md:text-[14px] font-medium text-foreground">
               {(() => {
-                const us = typeof shadowState?.metrics?.user_speed_now === 'number' ? shadowState.metrics.user_speed_now : 0;
-                const ss = typeof shadowState?.metrics?.shadow_speed_now === 'number' ? shadowState.metrics.shadow_speed_now : 0;
-                if (us === 0 && ss === 0) return 'Shadow waits while you idle';
-                if (us === 0 && ss > 0) return 'Shadow is moving while you idle';
-                if (ss === 0 && us > 0) return 'Shadow waits while you move';
+                const us =
+                  typeof shadowState?.metrics?.user_speed_now === "number"
+                    ? shadowState.metrics.user_speed_now
+                    : 0;
+                const ss =
+                  typeof shadowState?.metrics?.shadow_speed_now === "number"
+                    ? shadowState.metrics.shadow_speed_now
+                    : 0;
+                if (us === 0 && ss === 0) return "Shadow waits while you idle";
+                if (us === 0 && ss > 0)
+                  return "Shadow is moving while you idle";
+                if (ss === 0 && us > 0) return "Shadow waits while you move";
                 const ratio = ss > 0 ? us / ss : 1;
-                if (ratio >= 1.8) return 'You\'re moving twice as fast';
-                if (ratio <= 0.55) return 'Shadow is moving twice as fast';
-                return 'You\'re keeping pace';
+                if (ratio >= 1.8) return "You're moving twice as fast";
+                if (ratio <= 0.55) return "Shadow is moving twice as fast";
+                return "You're keeping pace";
               })()}
             </div>
             {(() => {
-              const us = typeof shadowState?.metrics?.user_speed_now === 'number' ? shadowState.metrics.user_speed_now : 0;
-              const ss = typeof shadowState?.metrics?.shadow_speed_now === 'number' ? shadowState.metrics.shadow_speed_now : 0;
+              const us =
+                typeof shadowState?.metrics?.user_speed_now === "number"
+                  ? shadowState.metrics.user_speed_now
+                  : 0;
+              const ss =
+                typeof shadowState?.metrics?.shadow_speed_now === "number"
+                  ? shadowState.metrics.shadow_speed_now
+                  : 0;
               const ratio = ss > 0 ? us / ss : 1;
               if (ratio <= 0.55 || (us === 0 && ss > 0)) {
-                return <div className="mt-1 text-[11px] text-amber-300">Tip: try a 5‑min sprint to catch up ⚡</div>;
+                return (
+                  <div className="mt-1 text-[11px] text-amber-300">
+                    Tip: try a 5‑min sprint to catch up ⚡
+                  </div>
+                );
               }
               return null;
             })()}
             {/* Tiny avatars for sides */}
             <div className="mt-1.5 flex items-center gap-3 text-[10px] md:text-[11px] text-muted">
-              <div className="inline-flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-blue-500" /> You</div>
-              <div className="inline-flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-purple-500" /> Shadow</div>
+              <div className="inline-flex items-center gap-1">
+                <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />{" "}
+                You
+              </div>
+              <div className="inline-flex items-center gap-1">
+                <span className="inline-block w-2 h-2 rounded-full bg-purple-500" />{" "}
+                Shadow
+              </div>
             </div>
           </div>
         </div>
@@ -1046,22 +1472,36 @@ export default function ShadowPage() {
         {active.length === 0 ? (
           <div className="mt-2 rounded-xl border border-dashed border-surface2 p-4 text-center text-sm text-muted">
             <div className="mb-1">No active challenges</div>
-            <div className="text-[12px]">Mini‑races will appear here as you progress.</div>
+            <div className="text-[12px]">
+              Mini‑races will appear here as you progress.
+            </div>
           </div>
         ) : (
           <ul className="mt-2 space-y-2">
             {active.slice(0, 3).map((c) => (
-              <li key={c.id} className="px-3 py-2 rounded-xl bg-surface2 flex items-center justify-between text-sm border border-transparent hover:border-amber-500/25 transition-colors">
+              <li
+                key={c.id}
+                className="px-3 py-2 rounded-xl bg-surface2 flex items-center justify-between text-sm border border-transparent hover:border-amber-500/25 transition-colors"
+              >
                 <div className="min-w-0">
-                  <div className="font-medium truncate text-foreground">{c.task_template?.title || 'Mini‑race'}</div>
-                  <div className="text-xs text-muted">Due {c.due_time ? new Date(c.due_time).toLocaleString() : 'soon'}</div>
+                  <div className="font-medium truncate text-foreground">
+                    {c.task_template?.title || "Mini‑race"}
+                  </div>
+                  <div className="text-xs text-muted">
+                    Due{" "}
+                    {c.due_time
+                      ? new Date(c.due_time).toLocaleString()
+                      : "soon"}
+                  </div>
                 </div>
-                {c.state === 'offered' ? (
+                {c.state === "offered" ? (
                   <div className="shrink-0">
                     <ChallengeActions challengeId={c.id} />
                   </div>
                 ) : (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface text-muted uppercase">{c.state}</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface text-muted uppercase">
+                    {c.state}
+                  </span>
                 )}
               </li>
             ))}
@@ -1075,8 +1515,11 @@ export default function ShadowPage() {
           <Timer className="w-4 h-4" /> Today
         </div>
         {!initialLoaded && stateLoading && (
-          <div className="text-sm text-muted flex items-center gap-2">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…
+          <div aria-live="polite">
+            <GamifiedLoader
+              label="Tasks"
+              icon={<Timer className="w-3.5 h-3.5" />}
+            />
           </div>
         )}
         {!stateLoading && (!groupedFlow || groupedFlow.length === 0) && (
@@ -1104,41 +1547,53 @@ export default function ShadowPage() {
       </section>
 
       {/* Compact History (7 days) */}
-      {raceHistory?.daily && Array.isArray(raceHistory.daily) && raceHistory.daily.length > 0 && (
-        <section className="rounded-2xl bg-surface p-4 mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2 font-semibold">
-              <History className="w-4 h-4" /> History (7d)
+      {raceHistory?.daily &&
+        Array.isArray(raceHistory.daily) &&
+        raceHistory.daily.length > 0 && (
+          <section className="rounded-2xl bg-surface p-4 mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2 font-semibold">
+                <History className="w-4 h-4" /> History (7d)
+              </div>
+              <div className="text-xs text-muted">Lead by day</div>
             </div>
-            <div className="text-xs text-muted">Lead by day</div>
-          </div>
-          <ul className="divide-y divide-surface2">
-            {raceHistory.daily.slice(-7).map((d: any) => {
-              const lead = Number(d.lead ?? 0);
-              const userD = Number(d.user_distance ?? 0);
-              const shadowD = Number(d.shadow_distance ?? 0);
-              const total = Math.max(1, userD + shadowD);
-              const userW = Math.round((userD / total) * 100);
-              const shadowW = 100 - userW;
-              return (
-                <li key={d.date} className="py-2">
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <div className="text-muted">{d.date}</div>
-                    <div className={`inline-flex items-center px-2 py-0.5 rounded-md ${lead >= 0 ? 'bg-surface2 text-blue-300' : 'bg-surface2 text-purple-300'}`}>
-                      {lead >= 0 ? 'You' : 'Shadow'} {Math.abs(lead)}
+            <ul className="divide-y divide-surface2">
+              {raceHistory.daily.slice(-7).map((d: any) => {
+                const lead = Number(d.lead ?? 0);
+                const userD = Number(d.user_distance ?? 0);
+                const shadowD = Number(d.shadow_distance ?? 0);
+                const total = Math.max(1, userD + shadowD);
+                const userW = Math.round((userD / total) * 100);
+                const shadowW = 100 - userW;
+                return (
+                  <li key={d.date} className="py-2">
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <div className="text-muted">{d.date}</div>
+                      <div
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md ${lead >= 0 ? "bg-surface2 text-blue-300" : "bg-surface2 text-purple-300"}`}
+                      >
+                        {lead >= 0 ? "You" : "Shadow"} {Math.abs(lead)}
+                      </div>
                     </div>
-                  </div>
-                  <div className="h-2 w-full bg-surface2 rounded-full overflow-hidden relative">
-                    <div className="absolute left-0 top-0 h-full bg-blue-500/80" style={{ width: `${userW}%` }} />
-                    <div className="absolute right-0 top-0 h-full bg-purple-500/70" style={{ width: `${shadowW}%` }} />
-                  </div>
-                  <div className="mt-1 text-[10px] text-muted">You {userD} • Shadow {shadowD}</div>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
+                    <div className="h-2 w-full bg-surface2 rounded-full overflow-hidden relative">
+                      <div
+                        className="absolute left-0 top-0 h-full bg-blue-500/80"
+                        style={{ width: `${userW}%` }}
+                      />
+                      <div
+                        className="absolute right-0 top-0 h-full bg-purple-500/70"
+                        style={{ width: `${shadowW}%` }}
+                      />
+                    </div>
+                    <div className="mt-1 text-[10px] text-muted">
+                      You {userD} • Shadow {shadowD}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
       {/* First-time Setup Modal */}
       {showSetupModal && (
@@ -1251,12 +1706,15 @@ export default function ShadowPage() {
                           body: JSON.stringify({ preferences: prefs }),
                         });
                         const j = await res.json().catch(() => ({}));
-                        if (!res.ok) throw new Error(j?.error || "Failed to setup");
+                        if (!res.ok)
+                          throw new Error(j?.error || "Failed to setup");
                         setActivated(true);
                         setShowSetupModal(false);
                         // Confirm and refresh hero EPs
                         try {
-                          const setupRes = await fetch("/api/shadow/setup", { cache: "no-store" });
+                          const setupRes = await fetch("/api/shadow/setup", {
+                            cache: "no-store",
+                          });
                           if (setupRes.ok) {
                             const setup = await setupRes.json();
                             setHero({
@@ -1269,7 +1727,10 @@ export default function ShadowPage() {
                         setTimeout(() => setToast(null), 2000);
                       } catch (e: any) {
                         console.error(e);
-                        setToast({ title: "Activation failed", body: e?.message || "" });
+                        setToast({
+                          title: "Activation failed",
+                          body: e?.message || "",
+                        });
                         setTimeout(() => setToast(null), 2500);
                       } finally {
                         setActivating(false);
@@ -1289,7 +1750,7 @@ export default function ShadowPage() {
       {todayShadow && (
         <section className="rounded-2xl bg-surface p-4 mb-4">
           <div className="flex items-center justify-between mb-2">
-            <div className="font-semibold">Today's Shadow Challenge</div>
+            <div className="font-semibold">Today&apos;s Shadow Challenge</div>
             <div className="text-xs text-muted">
               Deadline: {new Date(todayShadow.deadline).toLocaleTimeString()}
             </div>
@@ -1301,9 +1762,7 @@ export default function ShadowPage() {
                 EP at stake: +{epAtStake}
               </span>
             </div>
-            <div className="font-mono text-foreground">
-              {fmt(timeLeft)}
-            </div>
+            <div className="font-mono text-foreground">{fmt(timeLeft)}</div>
           </div>
           <div className="mt-3 flex items-center justify-end">
             <button
@@ -1317,6 +1776,37 @@ export default function ShadowPage() {
                   );
                   const j = await res.json().catch(() => ({}));
                   if (!res.ok) throw new Error(j.error || "Failed to settle");
+                  // Celebrate
+                  setConfettiBurst(true);
+                  setTimeout(() => setConfettiBurst(false), 1200);
+                  // Optimistically hide today's box
+                  setTodayShadow(null);
+                  // Optimistically append to history so it's visible under today's history
+                  try {
+                    setHistory((prev: any[]) => [
+                      {
+                        id: `shadow-${todayShadow.id}`,
+                        state: "completed_win",
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                        completed_at: new Date().toISOString(),
+                        due_time: todayShadow.deadline,
+                        task_template: { title: "Today's Shadow Challenge" },
+                      },
+                      ...(Array.isArray(prev) ? prev : []),
+                    ]);
+                  } catch {}
+                  // Update toast
+                  try {
+                    setToast({
+                      title: "Completed",
+                      body:
+                        typeof j?.ep_awarded === "number"
+                          ? `+${j.ep_awarded} EP`
+                          : undefined,
+                    });
+                    setTimeout(() => setToast(null), 2200);
+                  } catch {}
                   // refresh EP and today shadow challenge
                   try {
                     const setupRes = await fetch("/api/shadow/setup", {
@@ -1339,6 +1829,29 @@ export default function ShadowPage() {
                       setTodayShadow(t.challenge || null);
                     }
                   } catch {}
+                  // Refresh active/history lists so the item moves to history
+                  try {
+                    const [actRes2, histRes2] = await Promise.all([
+                      fetch("/api/shadow/challenges?view=active", {
+                        cache: "no-store",
+                      }),
+                      fetch("/api/shadow/challenges?view=history", {
+                        cache: "no-store",
+                      }),
+                    ]);
+                    if (actRes2.ok) {
+                      const a = await actRes2.json();
+                      setActive(
+                        Array.isArray(a?.challenges) ? a.challenges : []
+                      );
+                    }
+                    if (histRes2.ok) {
+                      const h = await histRes2.json();
+                      setHistory(
+                        Array.isArray(h?.challenges) ? h.challenges : []
+                      );
+                    }
+                  } catch {}
                 } catch (e) {
                   console.error(e);
                 }
@@ -1356,7 +1869,9 @@ export default function ShadowPage() {
           <Trophy className="w-4 h-4" /> Active Challenges
         </div>
         {loading ? (
-          <div className="px-4 pb-4 text-sm text-gray-500">Loading…</div>
+          <div aria-live="polite">
+            <GamifiedLoader label="Active Challenges" icon={<Trophy className="w-3.5 h-3.5" />} />
+          </div>
         ) : (
           <ul className="divide-y divide-gray-100 dark:divide-gray-900">
             {active.map((c) => (
@@ -1390,33 +1905,47 @@ export default function ShadowPage() {
         )}
       </section> */}
 
-      {/* History */}
+      {/* Today's History (local timezone) */}
       <section className="rounded-2xl bg-surface p-4 mb-4">
         <div className="flex items-center gap-2 font-semibold mb-1">
           <span className="inline-grid place-items-center h-6 w-6 rounded-lg bg-gradient-to-br from-sky-500 to-violet-500 text-white">
             <History className="w-3.5 h-3.5" />
           </span>
-          <span>History</span>
+          <span>Today's History</span>
         </div>
         {loading ? (
-          <div className="text-sm text-muted">Loading…</div>
+          <div aria-live="polite">
+            <GamifiedLoader
+              label="Today's History"
+              icon={<History className="w-3.5 h-3.5" />}
+            />
+          </div>
         ) : (
           <ul className="mt-2 space-y-2">
-            {history.map((c) => (
+            {filteredHistory.map((c) => (
               <li
                 key={c.id}
                 className="px-3 py-2 rounded-xl bg-surface2 text-sm flex items-center justify-between border border-transparent hover:border-sky-500/25 transition-colors"
               >
                 <div className="min-w-0">
                   <div className="font-medium truncate">
-                    {c.task_template?.title || 'Challenge'}
+                    {c.task_template?.title || "Challenge"}
                   </div>
-                  <div className="text-xs text-muted">Ended: {c.due_time ? new Date(c.due_time).toLocaleString() : '—'}</div>
+                  <div className="text-xs text-muted">
+                    Ended:{" "}
+                    {c.updated_at
+                      ? new Date(c.updated_at).toLocaleString()
+                      : c.due_time
+                        ? new Date(c.due_time).toLocaleString()
+                        : "—"}
+                  </div>
                 </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface text-muted uppercase">{c.state}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface text-muted uppercase">
+                  {c.state}
+                </span>
               </li>
             ))}
-            {!history.length && (
+            {!filteredHistory.length && (
               <li className="px-3 py-3 rounded-xl bg-surface2 text-sm text-muted text-center">
                 No past challenges
               </li>
@@ -1443,9 +1972,7 @@ export default function ShadowPage() {
       {toast && (
         <div className="fixed bottom-4 right-4 z-50 px-3 py-2 rounded-lg shadow-lg bg-surface text-sm">
           <div className="font-medium">{toast.title}</div>
-          {toast.body && (
-            <div className="text-muted">{toast.body}</div>
-          )}
+          {toast.body && <div className="text-muted">{toast.body}</div>}
         </div>
       )}
     </div>

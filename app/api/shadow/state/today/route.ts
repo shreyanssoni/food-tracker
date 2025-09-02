@@ -256,6 +256,8 @@ export async function GET() {
 
       // Anchor-based default times for unscheduled tasks (today, user's TZ)
       // morning -> 09:00, midday -> 13:00, evening -> 18:00, night -> 21:00
+      // IMPORTANT: Do not depend on current time for assignment.
+      // We freeze today's virtual schedule so shadow times don't roll forward as now changes.
       const anchorDefaults: Record<string, number> = {
         morning: 9 * 60,
         midday: 13 * 60,
@@ -267,20 +269,19 @@ export async function GET() {
         if (schedMinutes.has(tId)) continue; // already scheduled via event/schedule
         const anchor = String(t.time_anchor || '').toLowerCase();
         const dflt = anchorDefaults[anchor];
-        // Use default only if it is still in the future today
-        if (typeof dflt === 'number' && dflt >= nowMin) {
+        // Always use the anchor default if present, regardless of whether it's in the past.
+        // If it's in the past, shadow will be considered done for this task.
+        if (typeof dflt === 'number') {
           schedMinutes.set(tId, dflt);
         }
       }
 
-      // Hourly spread for any remaining unscheduled tasks (including anchors in the past and 'anytime')
-      // Start from next full hour, one task per hour, capped to end-of-day (23:59)
+      // Deterministic hourly spread for any remaining unscheduled tasks (e.g., 'anytime')
+      // Start from a fixed time today (e.g., 10:00) to avoid rolling-forward ETAs
+      // One task per hour, capped to end-of-day (23:59)
       const endOfDayMin = 23 * 60 + 59;
-      const nextHour = Math.min(
-        endOfDayMin,
-        Math.ceil(Math.max(nowMin, 0) / 60) * 60
-      );
-      let slot = nextHour;
+      const fixedStart = 10 * 60; // 10:00 local time
+      let slot = fixedStart;
       for (const t of sorted) {
         const tId = String(t.id);
         if (schedMinutes.has(tId)) continue;
