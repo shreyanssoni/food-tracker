@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import CircularStat from "@/components/CircularStat";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
@@ -25,6 +25,9 @@ export default function DashboardPage() {
     week_quota?: number | null;
     week_count?: number | null;
     description?: string | null;
+    // optional fields present in tasks API used for filtering
+    owner_type?: string | null;
+    active?: boolean;
   };
   type Schedule = {
     task_id: string;
@@ -113,39 +116,12 @@ export default function DashboardPage() {
     text: string;
   }>(null);
 
-  useEffect(() => {
-    // Ensure user has an avatar; if unauthorized, redirect to sign-in
-    (async () => {
+  // Unified gamification loader
+  const loadGamification = useCallback(
+    async (opts?: { showSpinner?: boolean }) => {
+      const showSpinner = opts?.showSpinner ?? false;
       try {
-        const res = await fetch("/api/avatar", { cache: "no-store" });
-        if (res.status === 401) {
-          window.location.href = "/auth/signin";
-          return;
-        }
-        const j = await res.json().catch(() => ({}));
-        if (res.ok && !j?.avatar) {
-          window.location.href = "/onboarding/avatar";
-        }
-      } catch {
-        // On hard failure, log out to be safe
-        window.location.href = "/auth/signin";
-      }
-    })();
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/preferences")
-      .then((r) => r.json())
-      .then((d) => setTargets(d?.targets || null));
-    fetch("/api/ai/summary", { method: "POST" })
-      .then((r) => r.json())
-      .then(setSummary);
-  }, []);
-
-  useEffect(() => {
-    const loadGamification = async () => {
-      try {
-        setTasksLoading(true);
+        if (showSpinner) setTasksLoading(true);
         const [tRes, pRes, gRes, lsRes] = await Promise.all([
           fetch("/api/tasks"),
           fetch("/api/progress"),
@@ -172,7 +148,6 @@ export default function DashboardPage() {
         if (!lsData?.error && lsData?.lifeStreak) {
           setLifeStreak(lsData.lifeStreak);
         }
-        // Compute max daily streak across goals
         if (!gData.error) {
           const goals: Array<{ id: string }> = (gData.goals || []).map(
             (g: any) => ({ id: String(g.id) })
@@ -207,12 +182,46 @@ export default function DashboardPage() {
           }
         }
       } catch {
+        // noop
       } finally {
-        setTasksLoading(false);
+        if (showSpinner) setTasksLoading(false);
       }
-    };
-    loadGamification();
+    },
+    []
+  );
+
+  useEffect(() => {
+    // Ensure user has an avatar; if unauthorized, redirect to sign-in
+    (async () => {
+      try {
+        const res = await fetch("/api/avatar", { cache: "no-store" });
+        if (res.status === 401) {
+          window.location.href = "/auth/signin";
+          return;
+        }
+        const j = await res.json().catch(() => ({}));
+        if (res.ok && !j?.avatar) {
+          window.location.href = "/onboarding/avatar";
+        }
+      } catch {
+        // On hard failure, log out to be safe
+        window.location.href = "/auth/signin";
+      }
+    })();
   }, []);
+
+  useEffect(() => {
+    fetch("/api/preferences")
+      .then((r) => r.json())
+      .then((d) => setTargets(d?.targets || null));
+    fetch("/api/ai/summary", { method: "POST" })
+      .then((r) => r.json())
+      .then(setSummary);
+  }, []);
+
+  useEffect(() => {
+    loadGamification({ showSpinner: true });
+  }, [loadGamification]);
 
   useEffect(() => {
     // update every 60s to naturally roll UI to a new day/time without manual refresh
@@ -395,125 +404,15 @@ export default function DashboardPage() {
     load();
   }, [supabase]);
 
-  // Load gamification data
-  useEffect(() => {
-    const loadGamification = async () => {
-      try {
-        const [tRes, pRes, gRes, lsRes] = await Promise.all([
-          fetch("/api/tasks"),
-          fetch("/api/progress"),
-          fetch("/api/goals"),
-          fetch("/api/life-streak"),
-        ]);
-        const [tData, pData, gData, lsData] = await Promise.all([
-          tRes.json(),
-          pRes.json(),
-          gRes.json(),
-          lsRes.json(),
-        ]);
-        if (!tData.error) {
-          setTasks(tData.tasks || []);
-          const schedMap: Record<string, any> = {};
-          (tData.schedules || []).forEach((s: any) => {
-            schedMap[s.task_id] = s;
-          });
-          setSchedules(schedMap);
-        }
-        if (!pData.error) {
-          setProgress(pData.progress);
-        }
-        if (!lsData?.error && lsData?.lifeStreak) {
-          setLifeStreak(lsData.lifeStreak);
-        }
-        // Compute max daily streak across goals
-        if (!gData.error) {
-          const goals: any[] = gData.goals || [];
-          const ids = goals.map((g: any) => g.id).filter(Boolean);
-          if (ids.length) {
-            const qs = encodeURIComponent(ids.join(","));
-            const bulk = await fetch(`/api/goals/streaks?ids=${qs}`)
-              .then((r) => r.json())
-              .catch(() => null);
-            if (bulk && !bulk.error) {
-              const maxCur = Number(bulk?.max?.dailyCurrent || 0);
-              const maxLong = Number(bulk?.max?.dailyLongest || 0);
-              setStreakMax({ current: maxCur, longest: maxLong });
-            } else {
-              setStreakMax({ current: 0, longest: 0 });
-            }
-          } else {
-            setStreakMax({ current: 0, longest: 0 });
-          }
-        }
-      } catch {}
-    };
-    loadGamification();
-  }, []);
+  // Removed duplicate gamification loader effect in favor of unified loadGamification
 
   // Realtime: subscribe and debounce refresh for tasks/progress
   useEffect(() => {
     const ch = supabase.channel("rt-dashboard");
     const trigger = () => {
       if (rtDebounce.current) window.clearTimeout(rtDebounce.current);
-      rtDebounce.current = window.setTimeout(async () => {
-        try {
-          const [tRes, pRes, gRes, lsRes] = await Promise.all([
-            fetch("/api/tasks"),
-            fetch("/api/progress"),
-            fetch("/api/goals"),
-            fetch("/api/life-streak"),
-          ]);
-          const [tData, pData, gData, lsData] = await Promise.all([
-            tRes.json(),
-            pRes.json(),
-            gRes.json(),
-            lsRes.json(),
-          ]);
-          if (!tData.error) {
-            setTasks((tData.tasks || []) as Task[]);
-            const schedMap: Record<string, Schedule> = {};
-            (tData.schedules || []).forEach((s: Partial<Schedule>) => {
-              if (s && s.task_id) schedMap[s.task_id] = s as Schedule;
-            });
-            setSchedules(schedMap);
-          }
-          if (!pData.error) setProgress(pData.progress);
-          if (!lsData?.error && lsData?.lifeStreak)
-            setLifeStreak(lsData.lifeStreak);
-          if (!gData.error) {
-            const goals: Array<{ id: string }> = (gData.goals || []).map(
-              (g: any) => ({ id: String(g.id) })
-            );
-            setGoals(goals);
-            setGoalSummaries(gData.summaries || {});
-            const ids = goals.map((g) => g.id).filter(Boolean);
-            if (ids.length) {
-              const qs = encodeURIComponent(ids.join(","));
-              const bulk = await fetch(`/api/goals/streaks?ids=${qs}`)
-                .then((r) => r.json())
-                .catch(() => null);
-              if (bulk && !bulk.error) {
-                const maxCur = Number(bulk?.max?.dailyCurrent || 0);
-                const maxLong = Number(bulk?.max?.dailyLongest || 0);
-                setStreakMax({ current: maxCur, longest: maxLong });
-                const map: WeekProgress = {};
-                for (const it of bulk.items || []) {
-                  map[String(it.id)] = {
-                    count: Number(it.currentWeekCount || 0),
-                    quota: Number(it.currentWeekQuota || 0),
-                  };
-                }
-                setGoalWeekProgress(map);
-              } else {
-                setStreakMax({ current: 0, longest: 0 });
-                setGoalWeekProgress({});
-              }
-            } else {
-              setStreakMax({ current: 0, longest: 0 });
-              setGoalWeekProgress({});
-            }
-          }
-        } catch {}
+      rtDebounce.current = window.setTimeout(() => {
+        loadGamification();
       }, 250);
     };
     const tables = [
@@ -590,61 +489,8 @@ export default function DashboardPage() {
           ep: data?.completion?.ep_awarded || epValue,
         });
       } catch {}
-      // refresh tasks + progress + life streak + goals (to sync Goals Overview immediately)
-      const [tRes, pRes, gRes, lsRes] = await Promise.all([
-        fetch("/api/tasks"),
-        fetch("/api/progress"),
-        fetch("/api/goals"),
-        fetch("/api/life-streak"),
-      ]);
-      const [tData, pData, gData, lsData] = await Promise.all([
-        tRes.json(),
-        pRes.json(),
-        gRes.json(),
-        lsRes.json(),
-      ]);
-      if (!tData.error) {
-        setTasks(tData.tasks || []);
-        const schedMap: Record<string, any> = {};
-        (tData.schedules || []).forEach((s: any) => {
-          schedMap[s.task_id] = s;
-        });
-        setSchedules(schedMap);
-      }
-      if (!pData.error) setProgress(pData.progress);
-      if (!lsData?.error && lsData?.lifeStreak)
-        setLifeStreak(lsData.lifeStreak);
-      if (!gData?.error) {
-        const goals: any[] = gData.goals || [];
-        setGoals(goals);
-        setGoalSummaries(gData.summaries || {});
-        const ids = goals.map((g: any) => g.id).filter(Boolean);
-        if (ids.length) {
-          const qs = encodeURIComponent(ids.join(","));
-          const bulk = await fetch(`/api/goals/streaks?ids=${qs}`)
-            .then((r) => r.json())
-            .catch(() => null);
-          if (bulk && !bulk.error) {
-            const maxCur = Number(bulk?.max?.dailyCurrent || 0);
-            const maxLong = Number(bulk?.max?.dailyLongest || 0);
-            setStreakMax({ current: maxCur, longest: maxLong });
-            const map: Record<string, { count: number; quota: number }> = {};
-            for (const it of bulk.items || []) {
-              map[String(it.id)] = {
-                count: Number(it.currentWeekCount || 0),
-                quota: Number(it.currentWeekQuota || 0),
-              };
-            }
-            setGoalWeekProgress(map);
-          } else {
-            setStreakMax({ current: 0, longest: 0 });
-            setGoalWeekProgress({});
-          }
-        } else {
-          setStreakMax({ current: 0, longest: 0 });
-          setGoalWeekProgress({});
-        }
-      }
+      // refresh via unified loader
+      await loadGamification();
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -770,9 +616,11 @@ export default function DashboardPage() {
 
   // Compute Next Up whenever tasks/schedules change
   useEffect(() => {
-    const dueToday = tasks.filter(
-      (t) => todayTaskIds.has(t.id) && !t.completedToday
-    );
+    const dueToday = tasks.filter((t) => {
+      if (t.owner_type === "shadow") return false; // hide shadow-owned tasks on dashboard
+      if (t.active === false) return false; // only active
+      return todayTaskIds.has(t.id) && !t.completedToday;
+    });
     const withMeta = dueToday
       .map((t) => ({ t, meta: classifyToday(t) }))
       .filter((x) => x.meta.dueNow || x.meta.later);
@@ -870,6 +718,44 @@ export default function DashboardPage() {
       <section className="rounded-2xl bg-surface p-4 sm:p-5">
         <AvatarPanel progress={progress} lifeStreak={lifeStreak} />
       </section>
+      {/* Shadow Pace (Phase 10) - standalone card */}
+      <section className="rounded-2xl bg-surface p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-md font-semibold text-foreground">Shadow Pace</h2>
+            {shadowCommit ? (
+              <div className="mt-1 text-[12px] sm:text-[13px] text-muted">
+                <span className="font-semibold">Delta:</span>{" "}
+                {shadowCommit.delta >= 0 ? "+" : ""}
+                {shadowCommit.delta}
+                <span className="mx-2 opacity-60">•</span>
+                <span className="font-semibold">Target:</span>{" "}
+                {shadowCommit.target_today}
+                <span className="mx-2 opacity-60">•</span>
+                <span className="font-semibold">Done:</span>{" "}
+                {shadowCommit.completed_today}
+              </div>
+            ) : (
+              <div className="mt-1 text-[12px] text-muted">
+                No pace decision yet today.
+              </div>
+            )}
+          </div>
+          {shadowCommit && (
+            <span
+              className="self-start inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+              style={{
+                background: "rgb(var(--color-accent) / 0.10)",
+              }}
+            >
+              {shadowCommit.decision_kind === "boost" && "🚀 Boost"}
+              {shadowCommit.decision_kind === "slowdown" && "🧘 Slowdown"}
+              {shadowCommit.decision_kind === "nudge" && "👉 Nudge"}
+              {shadowCommit.decision_kind === "noop" && "• Noop"}
+            </span>
+          )}
+        </div>
+      </section>
       {/* Player Card + Quick Actions */}
       <section className="rounded-2xl bg-gradient-to-br from-sky-600/15 via-indigo-600/10 to-emerald-500/10 dark:from-sky-900/25 dark:via-indigo-900/20 dark:to-emerald-900/20 p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3 mb-3">
@@ -955,46 +841,6 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Shadow Pace (Phase 10) */}
-            <section className="rounded-2xl bg-surface p-4 sm:p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-md font-semibold text-foreground">
-                    Shadow Pace
-                  </h2>
-                  {shadowCommit ? (
-                    <div className="mt-1 text-[12px] sm:text-[13px] text-muted">
-                      <span className="font-semibold">Delta:</span>{" "}
-                      {shadowCommit.delta >= 0 ? "+" : ""}
-                      {shadowCommit.delta}
-                      <span className="mx-2 opacity-60">•</span>
-                      <span className="font-semibold">Target:</span>{" "}
-                      {shadowCommit.target_today}
-                      <span className="mx-2 opacity-60">•</span>
-                      <span className="font-semibold">Done:</span>{" "}
-                      {shadowCommit.completed_today}
-                    </div>
-                  ) : (
-                    <div className="mt-1 text-[12px] text-muted">
-                      No pace decision yet today.
-                    </div>
-                  )}
-                </div>
-                {shadowCommit && (
-                  <span
-                    className="self-start inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                    style={{
-                      background: "rgb(var(--color-accent) / 0.10)",
-                    }}
-                  >
-                    {shadowCommit.decision_kind === "boost" && "🚀 Boost"}
-                    {shadowCommit.decision_kind === "slowdown" && "🧘 Slowdown"}
-                    {shadowCommit.decision_kind === "nudge" && "👉 Nudge"}
-                    {shadowCommit.decision_kind === "noop" && "• Noop"}
-                  </span>
-                )}
-              </div>
-            </section>
           </div>
           <button
             className="px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-medium bg-accent text-accent-foreground"
@@ -1030,9 +876,11 @@ export default function DashboardPage() {
           </div>
         ) : (
           (() => {
-            const dueToday = tasks.filter(
-              (t) => todayTaskIds.has(t.id) && !t.completedToday
-            );
+            const dueToday = tasks.filter((t) => {
+              if (t.owner_type === "shadow") return false; // hide shadow-owned tasks on dashboard
+              if (t.active === false) return false; // only active
+              return todayTaskIds.has(t.id) && !t.completedToday;
+            });
             const withMeta = dueToday
               .map((t) => ({ t, meta: classifyToday(t) }))
               .filter((x) => x.meta.dueNow || x.meta.later);
@@ -1105,7 +953,7 @@ export default function DashboardPage() {
                                 disabled={!!busy || t.completedToday}
                                 onClick={() => completeTask(t.id, t.ep_value)}
                                 className={`rounded-full text-[11px] sm:text-xs font-semibold disabled:opacity-60 flex items-center justify-center ${t.completedToday ? "bg-slate-300 text-slate-600" : "bg-blue-600 text-white"} h-9 px-3`}
-                                aria-label={`$${t.completedToday ? "Completed" : busy === t.id ? "Completing" : "Complete"} ${t.title}`}
+                                aria-label={`${t.completedToday ? "Completed" : busy === t.id ? "Completing" : "Complete"} ${t.title}`}
                               >
                                 <span className="hidden sm:inline">
                                   {t.completedToday
@@ -1229,7 +1077,7 @@ export default function DashboardPage() {
                                 disabled={!!busy || t.completedToday}
                                 onClick={() => completeTask(t.id, t.ep_value)}
                                 className={`rounded-full text-[11px] sm:text-xs font-semibold disabled:opacity-60 flex items-center justify-center ${t.completedToday ? "bg-slate-300 text-slate-600" : "bg-blue-600 text-white"} h-9 px-3`}
-                                aria-label={`$${t.completedToday ? "Completed" : busy === t.id ? "Completing" : "Complete"} ${t.title}`}
+                                aria-label={`${t.completedToday ? "Completed" : busy === t.id ? "Completing" : "Complete"} ${t.title}`}
                               >
                                 <span className="hidden sm:inline">
                                   {t.completedToday
