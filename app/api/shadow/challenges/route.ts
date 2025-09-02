@@ -13,8 +13,9 @@ export async function GET(req: NextRequest) {
     const view = (req.nextUrl.searchParams.get('view') || 'active').toLowerCase();
 
     // Map view to states (must match enum challenge_state defined in schema)
-    const activeStates = ['offered', 'accepted'];
-    const historyStates = ['completed_win', 'completed_loss', 'expired', 'declined'];
+    // Keep 'declined' in active so it remains visible until it expires
+    const activeStates = ['offered', 'accepted', 'declined'];
+    const historyStates = ['completed_win', 'completed_loss', 'expired'];
 
     const states = view === 'history' ? historyStates : activeStates;
 

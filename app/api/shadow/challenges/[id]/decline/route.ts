@@ -11,7 +11,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
     const { data: challenge, error: cErr } = await supabase
       .from('challenges')
-      .select('id, user_id, state')
+      .select('id, user_id, state, due_time')
       .eq('id', params.id)
       .single();
     if (cErr) throw cErr;
@@ -22,9 +22,14 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ error: 'Challenge not in offered state' }, { status: 400 });
     }
 
+    // Ensure it will expire in 24h if no due_time present
+    const patch: Record<string, any> = { state: 'declined' };
+    if (!challenge.due_time) {
+      patch.due_time = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    }
     const { error: uErr } = await supabase
       .from('challenges')
-      .update({ state: 'declined' })
+      .update(patch)
       .eq('id', challenge.id);
     if (uErr) throw uErr;
 

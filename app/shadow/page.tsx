@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { createClient as createSupabaseClient } from "@/utils/supabase/client";
 import ShadowFigure from "../../components/ShadowFigure";
+import ChallengeActions from './challenges/[id]/parts/ChallengeActions';
 
 type ChallengeItem = {
   id: string;
@@ -320,8 +321,28 @@ export default function ShadowPage() {
         return () => { clearTimeout(id); clearTimeout(sid); };
       }
     }, [t.is_shadow_done]);
+    // Winner glow: green if user first, purple if shadow first
+    const userMin = typeof t.user_completed_minute === 'number' ? t.user_completed_minute : null;
+    const shadowMin = typeof t.shadow_scheduled_minute === 'number' ? t.shadow_scheduled_minute : null;
+    let winnerGlow = '';
+    if (t.is_user_done || t.is_shadow_done) {
+      let userFirst = false;
+      if (t.is_user_done && !t.is_shadow_done) userFirst = true;
+      else if (!t.is_user_done && t.is_shadow_done) userFirst = false;
+      else if (t.is_user_done && t.is_shadow_done && userMin != null && shadowMin != null) userFirst = userMin <= shadowMin;
+      winnerGlow = userFirst
+        ? 'ring-1 ring-emerald-500/25 shadow-[0_0_10px_rgba(16,185,129,0.20)]'
+        : 'ring-1 ring-purple-500/25 shadow-[0_0_10px_rgba(168,85,247,0.20)]';
+    }
     return (
-      <li className={`py-2 flex items-center justify-between gap-3 transition-colors ${shimmer ? 'bg-purple-500/10' : ''}`}>
+      <li
+        className={`px-3 py-2 flex items-center justify-between gap-3 rounded-xl border transition-all duration-200 shadow-sm
+        ${t.is_user_done
+          ? 'bg-surface/70 border-blue-500/15'
+          : 'bg-surface2 border-transparent hover:border-purple-500/20 hover:bg-surface/80 hover:shadow'}
+        ${winnerGlow}
+        ${shimmer ? ' bg-purple-500/10' : ''}`}
+      >
         <div className="flex items-center gap-2 min-w-0">
           {t.is_user_done ? (
             <CheckCircle2 className="w-4 h-4 text-blue-600 transition-transform duration-300" />
@@ -335,32 +356,50 @@ export default function ShadowPage() {
             <span className="w-4 h-4 inline-block rounded-full border border-gray-300 dark:border-gray-700" />
           )}
           <div className="truncate">
-            <div className="text-sm font-medium truncate">
+            <div className={`text-sm font-medium truncate ${t.is_user_done ? 'text-foreground/80' : ''}`}>
               {t.title || "Task"}
+              {t.is_user_done && (
+                <span className="ml-2 inline-flex items-center px-1.5 py-0.5 text-[10px] rounded-md bg-blue-600/15 text-blue-300 align-middle">Completed</span>
+              )}
             </div>
             <div className="text-xs text-gray-500">
               {(() => {
-                if (t.is_user_done) return "You completed";
-                if (typeof t.shadow_eta_minutes === "number") {
-                  if (t.shadow_eta_minutes > 0)
-                    return `ETA ${t.shadow_eta_minutes}m`;
-                  // Only show "Shadow passed" when exactly due-or-past and API marks passed
-                  if (t.shadow_eta_minutes === 0 && t.is_shadow_done)
-                    return "Shadow passed";
-                  return "ETA 0m";
+                const userLabel = t.user_time_label as string | undefined;
+                const shadowLabel = t.shadow_time_label as string | undefined;
+                const eta = typeof t.shadow_eta_minutes === 'number' ? t.shadow_eta_minutes : null;
+
+                // Compose user part
+                const youPart = userLabel ? `You ${userLabel}` : 'You -';
+
+                // Compose shadow part with ETA semantics
+                let shadowPart: string;
+                if (eta != null && eta > 0) {
+                  // Shadow not yet done
+                  shadowPart = `Shadow ETA ${shadowLabel || `${eta}m`}`;
+                } else if (eta === 0 && !t.is_shadow_done) {
+                  // edge: eta 0 but not passed yet
+                  shadowPart = `Shadow ETA 0m`;
+                } else if (t.is_shadow_done) {
+                  shadowPart = `Shadow ${shadowLabel || '—'}`;
+                } else if (shadowLabel) {
+                  // scheduled later today but eta unknown
+                  shadowPart = `Shadow ${shadowLabel}`;
+                } else {
+                  shadowPart = `Shadow —`;
                 }
-                return "—";
+
+                return `${youPart} • ${shadowPart}`;
               })()}
             </div>
           </div>
         </div>
         {!t.is_user_done && (
           <button
-            className="shrink-0 px-2.5 py-1 text-xs rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 disabled:opacity-50 transition-colors"
+            className={`shrink-0 px-3 py-1.5 text-xs rounded-lg text-white bg-gradient-to-r from-blue-600 to-purple-600 shadow hover:opacity-95 active:opacity-90 disabled:opacity-50 transition-all ${completingId ? 'pointer-events-none' : ''}`}
             disabled={!!completingId}
             onClick={() => onComplete(t.id)}
           >
-            {completingId === t.id ? "Saving…" : "Complete"}
+            {completingId === t.id ? 'Saving…' : 'Complete'}
           </button>
         )}
       </li>
@@ -407,40 +446,20 @@ export default function ShadowPage() {
       (shadowState?.tasks || []).map((t: any) => [t.id, t])
     );
 
-    // Determine current local time anchor
-    const hour = new Date().getHours();
-    const toAnchor = (h: number) => {
-      if (h >= 5 && h < 11) return "MORNING";
-      if (h >= 11 && h < 15) return "MIDDAY";
-      if (h >= 15 && h < 20) return "EVENING";
-      if (h >= 20 || h < 5) return "NIGHT";
-      return "ANYTIME";
-    };
-    const currentAnchor = toAnchor(hour);
-    const order = ["MORNING", "MIDDAY", "EVENING", "NIGHT", "ANYTIME"];
-    const idx = (a: string) => {
-      const i = order.indexOf((a || "").toUpperCase());
-      return i === -1 ? order.length - 1 : i;
-    };
+    // Build groups including completed tasks and past anchors
+    const groups = rf.map((g: any) => ({
+      anchor: g.anchor,
+      items: (g.items || []).map(
+        (i: any) =>
+          tasksById[i.id] || {
+            id: i.id,
+            title: i.title,
+            time_anchor: g.anchor,
+          }
+      ),
+    }));
 
-    // Build groups, exclude past anchors and completed tasks
-    const groups = rf
-      .map((g: any) => ({
-        anchor: g.anchor,
-        items: (g.items || [])
-          .map(
-            (i: any) =>
-              tasksById[i.id] || {
-                id: i.id,
-                title: i.title,
-                time_anchor: g.anchor,
-              }
-          )
-          .filter((t: any) => !t.is_user_done),
-      }))
-      .filter((g: any) => idx(g.anchor) >= idx(currentAnchor));
-
-    // Also drop empty groups to avoid showing empty headers
+    // Drop empty groups only
     return groups.filter((g: any) => (g.items || []).length > 0);
   }, [shadowState]);
 
@@ -873,7 +892,7 @@ export default function ShadowPage() {
             <div className="mt-0.5 text-[12px] md:text-[13px] font-medium text-foreground leading-snug">
               {(() => {
                 const leadVal = typeof shadowState?.lead === 'number' ? shadowState.lead : (todayUserEP - todayShadowEP);
-                const tight = Math.abs(leadVal) < 0.5;
+                const tight = Math.abs(leadVal) < 0.4;
                 if (tight) return 'Neck and neck with Shadow';
                 return leadVal > 0 ? 'You\'ve pulled ahead!' : 'Shadow is 1 step ahead';
               })()}
@@ -1015,23 +1034,35 @@ export default function ShadowPage() {
 
       {/* Challenges */}
       <section className="rounded-2xl bg-surface p-4 mb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 font-semibold mb-1">
-            <Trophy className="w-4 h-4 text-foreground" /> Challenges
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2 font-semibold">
+            <span className="inline-grid place-items-center h-6 w-6 rounded-lg bg-gradient-to-br from-amber-500 to-pink-500 text-white">
+              <Trophy className="w-3.5 h-3.5" />
+            </span>
+            <span>Challenges</span>
           </div>
           <div className="text-xs text-muted">{active.length || 0} active</div>
         </div>
         {active.length === 0 ? (
-          <div className="text-sm text-muted">No active challenges. New mini-races will appear here.</div>
+          <div className="mt-2 rounded-xl border border-dashed border-surface2 p-4 text-center text-sm text-muted">
+            <div className="mb-1">No active challenges</div>
+            <div className="text-[12px]">Mini‑races will appear here as you progress.</div>
+          </div>
         ) : (
-          <ul className="mt-2 divide-y divide-surface2">
+          <ul className="mt-2 space-y-2">
             {active.slice(0, 3).map((c) => (
-              <li key={c.id} className="py-2 flex items-center justify-between text-sm">
+              <li key={c.id} className="px-3 py-2 rounded-xl bg-surface2 flex items-center justify-between text-sm border border-transparent hover:border-amber-500/25 transition-colors">
                 <div className="min-w-0">
-                  <div className="font-medium truncate text-foreground">{c.task_template?.title || "Mini-race"}</div>
-                  <div className="text-xs text-muted">Due {c.due_time ? new Date(c.due_time).toLocaleString() : "soon"}</div>
+                  <div className="font-medium truncate text-foreground">{c.task_template?.title || 'Mini‑race'}</div>
+                  <div className="text-xs text-muted">Due {c.due_time ? new Date(c.due_time).toLocaleString() : 'soon'}</div>
                 </div>
-                <span className="text-[11px] uppercase text-muted">{c.state}</span>
+                {c.state === 'offered' ? (
+                  <div className="shrink-0">
+                    <ChallengeActions challengeId={c.id} />
+                  </div>
+                ) : (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface text-muted uppercase">{c.state}</span>
+                )}
               </li>
             ))}
           </ul>
@@ -1057,7 +1088,7 @@ export default function ShadowPage() {
               <div className="text-xs uppercase tracking-wide text-muted mb-1">
                 {g.anchor}
               </div>
-              <ul className="divide-y divide-surface2">
+              <ul className="space-y-2">
                 {g.items.map((t: any) => (
                   <TaskRow
                     key={t.id}
@@ -1360,38 +1391,33 @@ export default function ShadowPage() {
       </section> */}
 
       {/* History */}
-      <section className="rounded-2xl bg-surface mb-4">
-        <div className="px-4 py-3 flex items-center gap-2 font-semibold">
-          <History className="w-4 h-4" /> History
+      <section className="rounded-2xl bg-surface p-4 mb-4">
+        <div className="flex items-center gap-2 font-semibold mb-1">
+          <span className="inline-grid place-items-center h-6 w-6 rounded-lg bg-gradient-to-br from-sky-500 to-violet-500 text-white">
+            <History className="w-3.5 h-3.5" />
+          </span>
+          <span>History</span>
         </div>
         {loading ? (
-          <div className="px-4 pb-4 text-sm text-muted">Loading…</div>
+          <div className="text-sm text-muted">Loading…</div>
         ) : (
-          <ul className="divide-y divide-surface2">
+          <ul className="mt-2 space-y-2">
             {history.map((c) => (
               <li
                 key={c.id}
-                className="px-4 py-3 text-sm flex items-center justify-between"
+                className="px-3 py-2 rounded-xl bg-surface2 text-sm flex items-center justify-between border border-transparent hover:border-sky-500/25 transition-colors"
               >
-                <div className="flex flex-col">
-                  <div className="font-medium">
-                    {c.task_template?.title || "Challenge"}
+                <div className="min-w-0">
+                  <div className="font-medium truncate">
+                    {c.task_template?.title || 'Challenge'}
                   </div>
-                  <div className="text-muted">
-                    {c.state}
-                  </div>
-                  <div className="text-muted">
-                    Ended:{" "}
-                    {c.due_time ? new Date(c.due_time).toLocaleString() : "—"}
-                  </div>
+                  <div className="text-xs text-muted">Ended: {c.due_time ? new Date(c.due_time).toLocaleString() : '—'}</div>
                 </div>
-                <div className="text-xs text-muted">
-                  {new Date(c.created_at).toLocaleString()}
-                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface text-muted uppercase">{c.state}</span>
               </li>
             ))}
             {!history.length && (
-              <li className="px-4 py-3 text-sm text-muted">
+              <li className="px-3 py-3 rounded-xl bg-surface2 text-sm text-muted text-center">
                 No past challenges
               </li>
             )}
@@ -1400,12 +1426,15 @@ export default function ShadowPage() {
       </section>
 
       {/* Transparency (optional) */}
-      <section className="rounded-2xl bg-surface">
-        <div className="px-4 py-3 flex items-center gap-2 font-semibold">
-          <Eye className="w-4 h-4" /> Transparency
+      <section className="rounded-2xl bg-surface p-4">
+        <div className="flex items-center gap-2 font-semibold mb-2">
+          <span className="inline-grid place-items-center h-6 w-6 rounded-lg bg-gradient-to-br from-fuchsia-500 to-purple-600 text-white">
+            <Eye className="w-3.5 h-3.5" />
+          </span>
+          <span>Transparency</span>
         </div>
-        <div className="px-4 pb-4 text-sm text-muted">
-          Shadow-only tasks will be shown here in a future iteration.
+        <div className="rounded-xl border border-dashed border-surface2 p-4 text-sm text-muted">
+          Shadow‑only tasks will be shown here in a future iteration.
         </div>
       </section>
 

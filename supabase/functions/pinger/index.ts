@@ -62,6 +62,12 @@ export const handler = async (req: Request): Promise<Response> => {
     'shadow-generate': { url: `${base}/api/shadow/cron/generate-daily-admin?secret=${encodeURIComponent(secret)}` },
     'shadow-close': { url: `${base}/api/shadow/cron/close-overdue-admin?secret=${encodeURIComponent(secret)}` },
     'shadow-notify': { url: `${base}/api/shadow/cron/notify-admin?secret=${encodeURIComponent(secret)}` },
+    // New: auto-offer challenges for users idle > 2 days with no active challenges
+    'shadow-offer': {
+      url: `${base}/api/shadow/challenges/cron/offer`,
+      method: 'POST',
+      headers: { 'x-cron-secret': secret },
+    },
     // New orchestrator cron route uses POST + x-cron-secret header
     'shadow-run-today': {
       url: `${base}/api/cron/shadow/run-today-all`,
@@ -130,6 +136,9 @@ export const handler = async (req: Request): Promise<Response> => {
     case 'shadow-notify':
       targets = [allTargets['shadow-notify']];
       break;
+    case 'shadow-offer':
+      targets = [allTargets['shadow-offer']];
+      break;
     case 'shadow-run-today':
       targets = [allTargets['shadow-run-today']];
       break;
@@ -163,6 +172,7 @@ export const handler = async (req: Request): Promise<Response> => {
         allTargets['shadow-close'],
         allTargets['shadow-notify'],
         allTargets['shadow-run-today'],
+        allTargets['shadow-offer'],
         allTargets['shadow-audit-fix-all'],
         allTargets['shadow-generate-events-today-all'],
         allTargets['shadow-taunt'],

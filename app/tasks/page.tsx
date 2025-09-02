@@ -941,7 +941,7 @@ export default function TasksPage() {
                                 )}
                                 {isChallenge(t) && (
                                   <span className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded border whitespace-nowrap ${isChallengeBlocked(t) ? 'bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-700' : 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'}`}>
-                                    Challenge{t.challenge?.state ? `: ${t.challenge.state}` : ''}{isChallengeBlocked(t) ? ' (blocked)' : ''}
+                                    Challenge{t.challenge?.state ? `: ${t.challenge.state}` : ''}{isChallengeBlocked(t) ? '' : ''}
                                   </span>
                                 )}
                               </div>

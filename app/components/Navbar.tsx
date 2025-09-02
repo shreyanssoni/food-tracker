@@ -57,20 +57,20 @@ interface AuthItem {
 // Primary nav (visible) and secondary nav (in "More") to avoid clutter
 const primaryNav: NavItem[] = [
   { path: "/dashboard", label: "Dashboard" },
-  { path: "/tasks", label: "Tasks" },
-  { path: "/rewards", label: "Rewards" },
   { path: "/goals", label: "Goals" },
+  { path: "/tasks", label: "Tasks" },
+  { path: "/shadow", label: "Shadow" },
   { path: "/collectibles/shop", label: "Shop" },
+  { path: "/rewards", label: "Rewards" },
 ];
 const moreNav: NavItem[] = [
   { path: "/motivation", label: "Motivation" },
   { path: "/food", label: "Food Log" },
+  { path: "/collectibles", label: "My Collectibles" },
   { path: "/groceries", label: "Groceries" },
   { path: "/workouts", label: "Workouts" },
   { path: "/suggestions", label: "Suggestions" },
-  { path: "/collectibles", label: "My Collectibles" },
   { path: "/chat", label: "Coach" },
-  { path: "/shadow", label: "Shadow" },
 ];
 
 // Dropdown items
@@ -344,6 +344,12 @@ export default function Navbar() {
       b.includes('[critical]') ||
       (u && (u.includes('modal=1') || u.includes('priority=high') || u.includes('priority=critical')))
     );
+  };
+
+  // Helper: remove leading [HIGH] / [CRITICAL] prefixes from titles to avoid duplication with the badge
+  const stripPriorityPrefix = (title: string): string => {
+    if (!title) return title;
+    return title.replace(/^\s*\[(?:high|critical)\]\s*/i, '');
   };
 
   // Helper: parse challenge id from a known set of url formats
@@ -1290,8 +1296,14 @@ export default function Navbar() {
             }}
           />
           <div className="relative z-[110] m-3 w-full max-w-md rounded-2xl border border-gray-200/70 dark:border-gray-800/70 bg-white dark:bg-gray-900 shadow-xl">
+            {/* Header */}
             <div className="px-4 py-3 border-b border-gray-200/70 dark:border-gray-800/70 flex items-center justify-between">
-              <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">Important</div>
+              <div className="flex items-center gap-2">
+                <div className="h-6 w-6 rounded-lg bg-gradient-to-br from-blue-600 to-emerald-500 text-white flex items-center justify-center" aria-hidden>
+                  !
+                </div>
+                <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">Important</div>
+              </div>
               <button
                 className="text-gray-600 dark:text-gray-300 text-sm hover:underline"
                 onClick={() => {
@@ -1302,14 +1314,25 @@ export default function Navbar() {
                 Close
               </button>
             </div>
+            {/* Body */}
             <div className="p-4">
-              <div className="text-base font-semibold text-gray-900 dark:text-gray-100">{modalMsg!.title}</div>
+              <div className="flex items-center gap-2">
+                <div className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate" title={stripPriorityPrefix(modalMsg!.title)}>
+                  {stripPriorityPrefix(modalMsg!.title)}
+                </div>
+                {/* Priority badge if title/body hints */}
+                {isHighPriority({ title: modalMsg!.title, body: modalMsg!.body, url: modalMsg!.url }) && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-orange-500/10 text-orange-700 dark:text-orange-300">
+                    HIGH
+                  </span>
+                )}
+              </div>
               <div className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{modalMsg!.body}</div>
               <div className="mt-3 flex items-center gap-2 flex-wrap">
                 {modalMsg!.url && (
                   <button
                     disabled={modalActionPending}
-                    className={`px-3 py-1.5 text-sm rounded-full border border-blue-600/40 text-blue-700 dark:text-blue-300 hover:bg-blue-50/50 ${modalActionPending ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    className={`px-3 py-1.5 text-sm rounded-full border border-blue-600 text-white bg-blue-600 hover:bg-blue-700 dark:border-blue-500 ${modalActionPending ? 'opacity-60 cursor-not-allowed' : ''}`}
                     onClick={async () => {
                       if (modalActionPending) return;
                       try {
@@ -1333,7 +1356,7 @@ export default function Navbar() {
                 )}
                 <button
                   disabled={modalActionPending}
-                  className={`px-3 py-1.5 text-sm rounded-full border border-gray-200/70 dark:border-gray-800/70 hover:bg-gray-100/70 dark:hover:bg-white/5 ${modalActionPending ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  className={`px-3 py-1.5 text-sm rounded-full border border-transparent text-gray-700 dark:text-gray-300 hover:bg-gray-100/70 dark:hover:bg-white/5 ${modalActionPending ? 'opacity-60 cursor-not-allowed' : ''}`}
                   onClick={async () => {
                     if (modalActionPending) return;
                     try {
@@ -1357,7 +1380,7 @@ export default function Navbar() {
                     <>
                       <button
                         disabled={modalActionPending}
-                        className={`px-3 py-1.5 text-sm rounded-full border border-emerald-600/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50/50 ${modalActionPending ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        className={`px-3 py-1.5 text-sm rounded-full border border-emerald-600 text-white bg-emerald-600 hover:bg-emerald-700 ${modalActionPending ? 'opacity-60 cursor-not-allowed' : ''}`}
                         onClick={async () => {
                           if (modalActionPending) return;
                           try {
@@ -1393,7 +1416,7 @@ export default function Navbar() {
                       </button>
                       <button
                         disabled={modalActionPending}
-                        className={`px-3 py-1.5 text-sm rounded-full border border-red-600/40 text-red-700 dark:text-red-300 hover:bg-red-50/50 ${modalActionPending ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        className={`px-3 py-1.5 text-sm rounded-full border border-red-600 text-red-700 dark:text-red-300 hover:bg-red-50/50 ${modalActionPending ? 'opacity-60 cursor-not-allowed' : ''}`}
                         onClick={async () => {
                           if (modalActionPending) return;
                           try {

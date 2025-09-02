@@ -41,6 +41,32 @@ function getClientIp(req: NextRequest) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Allow any API route through when a valid cron secret is provided.
+  // This covers cron calls from pinger and external schedulers without listing each path.
+  const providedSecret =
+    request.headers.get("x-cron-secret") ||
+    request.nextUrl.searchParams.get("secret") ||
+    "";
+  const cronSecret = process.env.CRON_SECRET || "";
+  const isAuthorizedCron = !!cronSecret && providedSecret === cronSecret;
+  const nonCronSchedulerPaths = [
+    "/api/push/run-scheduler",
+    "/api/streaks/pre-eod-reminder",
+    "/api/tasks/reminders/run",
+    "/api/life-streak/finalize",
+    "/api/notify",
+    "/api/shadow/messages/generate",
+  ];
+  if (isAuthorizedCron && pathname.startsWith("/api/")) {
+    const isCronPath = pathname.includes("/cron/");
+    const isWhitelistedNonCron = nonCronSchedulerPaths.some(
+      (p) => pathname === p
+    );
+    if (isCronPath || isWhitelistedNonCron) {
+      return NextResponse.next();
+    }
+  }
+
   // Redirect old /me route to /motivation (preserve subpaths and query)
   if (pathname === "/me" || pathname.startsWith("/me/")) {
     const target = pathname.replace(/^\/me(\/|$)/, "/motivation$1");

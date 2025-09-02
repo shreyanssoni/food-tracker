@@ -85,16 +85,7 @@ export async function GET() {
       };
       const dayStr = todayInTz(tz);
 
-      // Read persisted shadow pass markers for today (used only as fallback when no schedule is available)
-      let shadowPassSet = new Set<string>();
-      try {
-        const { data: sp } = await supabase
-          .from('shadow_passes')
-          .select('task_id')
-          .eq('user_id', user.id)
-          .eq('date', dayStr);
-        shadowPassSet = new Set((sp || []).map((r: any) => String(r.task_id)));
-      } catch {}
+      // Note: we no longer use persisted shadow passes; schedule rules drive deadlines.
 
       // Minute math helpers in user's timezone
       const partsNow = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
@@ -108,6 +99,21 @@ export async function GET() {
         .order('created_at', { ascending: true });
 
       const baseTasks = (tasks || []).filter((t: any) => (t.active ?? true) && (t.owner_type ?? 'user') === 'user');
+
+      // Load schedules for these tasks
+      const taskIds = baseTasks.map((t: any) => t.id);
+      const schedulesByTask: Record<string, any[]> = {};
+      if (taskIds.length) {
+        try {
+          const { data: scheds } = await supabase
+            .from('task_schedules')
+            .select('task_id, frequency, byweekday, at_time, start_date, end_date, timezone')
+            .in('task_id', taskIds as any);
+          for (const s of scheds || []) {
+            (schedulesByTask[s.task_id] = schedulesByTask[s.task_id] || []).push(s);
+          }
+        } catch {}
+      }
 
       const anchorOrder = ['morning', 'midday', 'evening', 'night', 'anytime'];
       const sorted = [...baseTasks].sort((a: any, b: any) => {
@@ -175,17 +181,7 @@ export async function GET() {
         }
       }
 
-      // Build shadow schedule estimates by anchor with simple base times and per-task spacing
-      const baseTimes: Record<string, [number, number]> = {
-        morning: [9, 0],    // 09:00
-        midday: [13, 0],    // 13:00
-        evening: [18, 0],   // 18:00
-        night: [21, 0],     // 21:00
-        anytime: [15, 0],   // 15:00 fallback
-      };
-      const spacingMinutes = 15; // between tasks in the same anchor
-
-      // schedule in minutes since midnight (user's tz)
+      // Build schedule in minutes since midnight based on task_schedules, with event overrides
       const schedMinutes = new Map<string, number>();
       // Build override map from events: use due_end minute when available for today
       const minuteOf = (iso: string, tzStr: string) => {
@@ -202,17 +198,99 @@ export async function GET() {
           eventOverride.set(taskId, minuteOf(when, tz));
         }
       }
-      for (const anchor of ['morning','midday','evening','night','anytime'] as const) {
-        const items = grouped[anchor];
-        const [h, m] = baseTimes[anchor];
-        const baseMin = h * 60 + m;
-        for (let i = 0; i < items.length; i++) {
-          const tId = String(items[i].id);
-          const fallback = baseMin + i * spacingMinutes;
-          const override = eventOverride.get(tId);
-          // If we have an event today, schedule at its due_end (or due_start) minute; otherwise fallback
-          schedMinutes.set(tId, typeof override === 'number' ? override : fallback);
+      // Helpers for schedule matching
+      const weekdayIndexFor = (ymd: string, tzStr: string): number => {
+        try {
+          const base = new Date(ymd + 'T12:00:00Z');
+          const fmt = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: tzStr });
+          const wk = fmt.format(base);
+          const map: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+          return map[wk] ?? new Date(ymd).getDay();
+        } catch {
+          return new Date(ymd).getDay();
         }
+      };
+      const dow = weekdayIndexFor(dayStr, tz);
+      const parseAtTimeToMinute = (at: string): number | null => {
+        const s = String(at || '').slice(0, 5);
+        if (!/^\d{2}:\d{2}$/.test(s)) return null;
+        const [h, m] = s.split(':').map((x) => parseInt(x, 10));
+        return (h * 60 + m) % 1440;
+      };
+
+      // For each task, decide today's scheduled minute if any
+      for (const t of sorted) {
+        const tId = String(t.id);
+        const arr = schedulesByTask[tId] || [];
+        let chosen: number | null = null;
+        if (arr.length) {
+          for (const s of arr) {
+            const startOk = !s.start_date || dayStr >= s.start_date;
+            const endOk = !s.end_date || dayStr <= s.end_date;
+            if (!startOk || !endOk) continue;
+            // Frequency
+            if (s.frequency === 'weekly') {
+              const by = Array.isArray(s.byweekday) ? s.byweekday : [];
+              if (!by.includes(dow)) continue;
+            } else if (s.frequency === 'once') {
+              if (!s.start_date || s.start_date !== dayStr) continue;
+            } else if (s.frequency !== 'daily') {
+              continue;
+            }
+            const atMin = parseAtTimeToMinute(s.at_time);
+            if (atMin == null) continue;
+            // Interpret at_time in sTz, but we compare minutes-of-day in user's tz.
+            // For simplicity and cross-zone consistency, we treat minutes-of-day the same (common practice in this codebase).
+            // If stricter conversion is needed, we can map at_time in sTz to user's tz, but most schedules use user's tz.
+            chosen = typeof chosen === 'number' ? Math.min(chosen, atMin) : atMin; // earliest wins
+          }
+        }
+        const override = eventOverride.get(tId);
+        if (typeof override === 'number') {
+          schedMinutes.set(tId, override);
+        } else if (typeof chosen === 'number') {
+          schedMinutes.set(tId, chosen);
+        }
+        // If neither override nor schedule exists for today, we will assign virtual times below
+      }
+
+      // Anchor-based default times for unscheduled tasks (today, user's TZ)
+      // morning -> 09:00, midday -> 13:00, evening -> 18:00, night -> 21:00
+      const anchorDefaults: Record<string, number> = {
+        morning: 9 * 60,
+        midday: 13 * 60,
+        evening: 18 * 60,
+        night: 21 * 60,
+      };
+      for (const t of sorted) {
+        const tId = String(t.id);
+        if (schedMinutes.has(tId)) continue; // already scheduled via event/schedule
+        const anchor = String(t.time_anchor || '').toLowerCase();
+        const dflt = anchorDefaults[anchor];
+        // Use default only if it is still in the future today
+        if (typeof dflt === 'number' && dflt >= nowMin) {
+          schedMinutes.set(tId, dflt);
+        }
+      }
+
+      // Hourly spread for any remaining unscheduled tasks (including anchors in the past and 'anytime')
+      // Start from next full hour, one task per hour, capped to end-of-day (23:59)
+      const endOfDayMin = 23 * 60 + 59;
+      const nextHour = Math.min(
+        endOfDayMin,
+        Math.ceil(Math.max(nowMin, 0) / 60) * 60
+      );
+      let slot = nextHour;
+      for (const t of sorted) {
+        const tId = String(t.id);
+        if (schedMinutes.has(tId)) continue;
+        if (slot > endOfDayMin) {
+          // If we ran out of day, place at 23:59 so it can still pass today
+          schedMinutes.set(tId, endOfDayMin);
+          continue;
+        }
+        schedMinutes.set(tId, slot);
+        slot += 60; // next hour
       }
 
       // Compute metrics
@@ -311,20 +389,33 @@ export async function GET() {
         { anchor: 'anytime', items: grouped.anytime },
       ];
 
+      const fmtMinuteLabel = (min: number | null) => {
+        if (typeof min !== 'number') return null;
+        const h = Math.floor(min / 60);
+        const m = min % 60;
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 === 0 ? 12 : (h % 12);
+        const mm = String(m).padStart(2, '0');
+        return `${h12}:${mm} ${ampm}`;
+      };
+
       const tasksWithShadow = sorted.map((t: any) => {
         const schedMin = schedMinutes.get(t.id);
         const userCompletedAt = completedAtMap.get(t.id) || null;
-        // Prefer schedule timing when available; fallback to persisted marker only if schedule is unknown
-        const is_shadow_done = typeof schedMin === 'number'
-          ? (schedMin <= nowMin)
-          : shadowPassSet.has(String(t.id));
+        // Shadow passes strictly when deadline (schedMin) has passed. If no schedule today, it does not pass.
+        const is_shadow_done = typeof schedMin === 'number' ? (schedMin <= nowMin) : false;
         const etaMin = typeof schedMin === 'number' ? Math.max(0, schedMin - nowMin) : null;
+        const userCompletedMinute = userCompletedAt ? minutesOfInTz(userCompletedAt, tz) : null;
         return {
           id: t.id,
           title: t.title,
           time_anchor: t.time_anchor || 'anytime',
           user_completed_at: userCompletedAt,
+          user_completed_minute: userCompletedMinute,
+          user_time_label: fmtMinuteLabel(userCompletedMinute),
           shadow_scheduled_at: null, // minute-based; omit ISO to avoid tz confusion
+          shadow_scheduled_minute: typeof schedMin === 'number' ? schedMin : null,
+          shadow_time_label: fmtMinuteLabel(typeof schedMin === 'number' ? schedMin : null),
           shadow_eta_minutes: etaMin,
           is_user_done: !!userCompletedAt,
           is_shadow_done,
