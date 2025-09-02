@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient as createBrowserClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
-import { CheckCircle2, Plus, Pencil, Trash2, Clock, CalendarDays, Search, ChevronDown, ChevronRight, Sun, Moon, Zap, Gem, Flame, MoreHorizontal } from 'lucide-react';
+import { CheckCircle2, Plus, Pencil, Trash2, Clock, CalendarDays, Search, ChevronDown, ChevronRight, Sun, Zap, Gem, Flame, MoreHorizontal } from 'lucide-react';
 import TimezoneMismatchPrompt from '@/app/components/TimezoneMismatchPrompt';
 
 interface Task {
@@ -37,6 +38,7 @@ interface Schedule {
 
 export default function TasksPage() {
   const supabase = createBrowserClient();
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [schedules, setSchedules] = useState<Record<string, Schedule>>({});
   // Minute tick to naturally re-evaluate date-sensitive UI like "Today" after midnight
@@ -75,6 +77,9 @@ export default function TasksPage() {
   const [freqFilter, setFreqFilter] = useState<'all'|'daily'|'weekly'|'custom'|'once'>('all');
   const [sectionsOpen, setSectionsOpen] = useState<{today:boolean; completed:boolean; inactive:boolean}>({ today: true, completed: true, inactive: false });
 
+  // Shadow intro modal after onboarding
+  const [showShadowIntro, setShowShadowIntro] = useState(false);
+
   useEffect(() => {
     let mounted = true;
     async function load() {
@@ -101,6 +106,29 @@ export default function TasksPage() {
     return () => {
       mounted = false;
     };
+  }, []);
+
+  // If redirected from onboarding, show Shadow intro after 2 seconds
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const flag = window.sessionStorage.getItem('nourish:showShadowIntroAfterTasks');
+      if (flag === '1') {
+        const id = setTimeout(() => {
+          try { window.sessionStorage.removeItem('nourish:showShadowIntroAfterTasks'); } catch {}
+          setShowShadowIntro(true);
+        }, 2000);
+        return () => clearTimeout(id);
+      }
+      // Fallback: onboarding was suspended and we haven't completed or moved to shadow yet
+      const suspended = window.sessionStorage.getItem('nourish:onboarding:suspended') === '1';
+      const explainPending = window.sessionStorage.getItem('nourish:shadowExplainPending') === '1';
+      const done = window.sessionStorage.getItem('nourish:onboardingComplete') === '1';
+      if (suspended && !explainPending && !done) {
+        const id = setTimeout(() => setShowShadowIntro(true), 1200);
+        return () => clearTimeout(id);
+      }
+    } catch {}
   }, []);
 
   // Keep UI fresh across midnight boundaries
@@ -436,6 +464,49 @@ export default function TasksPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
+      {/* Post-onboarding: Tasks Overview Slide */}
+      {showShadowIntro && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" onClick={() => setShowShadowIntro(false)} aria-hidden />
+          <div className="relative w-[92%] max-w-md rounded-2xl border border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl shadow-2xl p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="inline-grid place-items-center h-8 w-8 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white">
+                <Zap className="w-4 h-4" />
+              </span>
+              <div className="text-[15px] sm:text-[16px] font-semibold leading-tight">Tasks keep you moving</div>
+            </div>
+            <div className="text-[13px] leading-relaxed text-gray-700 dark:text-gray-300">
+              <p className="mb-2">You just created your first task. Tasks are the building blocks of your day.</p>
+              <div className="my-3 h-px bg-gradient-to-r from-transparent via-gray-200/60 dark:via-gray-700/60 to-transparent" />
+              <ul className="space-y-2">
+                <li className="flex items-start gap-2">
+                  <Gem className="mt-0.5 w-4 h-4 text-emerald-500" />
+                  <span>Complete tasks to earn EP and build momentum.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Flame className="mt-0.5 w-4 h-4 text-orange-500" />
+                  <span>Keep a steady streak to climb faster.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CalendarDays className="mt-0.5 w-4 h-4 text-blue-500" />
+                  <span>Set daily or weekly schedules. Adjust anytime to fit your routine.</span>
+                </li>
+              </ul>
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button onClick={() => setShowShadowIntro(false)} className="text-[13px] px-3 py-1.5 rounded-lg border border-gray-200/70 dark:border-gray-800/70 hover:bg-gray-100/70 dark:hover:bg-white/5">Later</button>
+              <button
+                onClick={() => {
+                  try { window.sessionStorage.setItem('nourish:shadowExplainPending','1'); } catch {}
+                  setShowShadowIntro(false);
+                  router.push('/shadow');
+                }}
+                className="text-[13px] px-3 py-1.5 rounded-lg border border-transparent bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow hover:opacity-[0.98]"
+              >Next: Meet Shadow</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Timezone mismatch modal */}
       <TimezoneMismatchPrompt />
       {/* Header / Toolbar */}

@@ -13,7 +13,6 @@ import {
   Loader2,
   Timer,
   Crown,
-  Settings,
 } from "lucide-react";
 import { createClient as createSupabaseClient } from "@/utils/supabase/client";
 import ShadowFigure from "../../components/ShadowFigure";
@@ -41,6 +40,8 @@ export default function ShadowPage() {
   const [stateLoading, setStateLoading] = useState<boolean>(true);
   const [shadowState, setShadowState] = useState<any>(null);
   const [completingId, setCompletingId] = useState<string | null>(null);
+  // Walkthrough state for Shadow story
+  const [explainSlide, setExplainSlide] = useState<number>(0);
   const [initialLoaded, setInitialLoaded] = useState<boolean>(false);
   const [toast, setToast] = useState<{ title: string; body?: string } | null>(
     null
@@ -74,6 +75,9 @@ export default function ShadowPage() {
   } | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const supabase = createSupabaseClient();
+
+  // Shadow explanation modal post-onboarding
+  const [showShadowExplain, setShowShadowExplain] = useState<boolean>(false);
 
   // Animated delta chip (counts up/down on change)
   const deltaNow: number | null =
@@ -175,6 +179,20 @@ export default function ShadowPage() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // Pop shadow explanation if coming from tasks onboarding intro
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const pending = window.sessionStorage.getItem('nourish:shadowExplainPending');
+      const already = window.sessionStorage.getItem('nourish:onboardingComplete');
+      if (pending === '1' && !already) {
+        // small delay to let page settle
+        const id = setTimeout(() => setShowShadowExplain(true), 400);
+        return () => clearTimeout(id);
+      }
+    } catch {}
   }, []);
 
   // Taunt feed: poll latest taunt and surface as toast
@@ -521,6 +539,132 @@ export default function ShadowPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-4">
+      {/* Shadow Explanation Walkthrough */}
+      {showShadowExplain && (
+        <div className="fixed inset-0 z-[210] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" onClick={() => setShowShadowExplain(false)} aria-hidden />
+          <div className="relative w-[92%] max-w-md rounded-2xl border border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl shadow-2xl p-5">
+            {/* Header */}
+            <div className="flex items-center gap-2 mb-2">
+              <span className="inline-grid place-items-center h-8 w-8 rounded-xl bg-gradient-to-br from-purple-600 to-fuchsia-600 text-white">
+                <Ghost className="w-4 h-4" />
+              </span>
+              <div className="text-[15px] sm:text-[16px] font-semibold leading-tight">The Shadow Rivalry</div>
+            </div>
+            {/* Slides */}
+            <div className="text-[13px] leading-relaxed text-gray-700 dark:text-gray-300">
+              {(() => {
+                if (explainSlide === 0) {
+                  return (
+                    <div>
+                      <div className="my-3 h-px bg-gradient-to-r from-transparent via-gray-200/60 dark:via-gray-700/60 to-transparent" />
+                      <div className="text-[14px] font-medium mb-1">Meet Your Shadow</div>
+                      <ul className="space-y-1.5">
+                        <li className="flex items-start gap-2"><Swords className="mt-0.5 w-4 h-4 text-rose-500" /><span>The moment you set your first goal, a rival is born: your Shadow.</span></li>
+                        <li className="flex items-start gap-2"><Eye className="mt-0.5 w-4 h-4 text-indigo-500" /><span>It’s your mirror — fast, relentless, and always chasing you.</span></li>
+                        <li className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 w-4 h-4 text-emerald-500" /><span>Every task you take on, your Shadow takes on too.</span></li>
+                      </ul>
+                    </div>
+                  );
+                }
+                if (explainSlide === 1) {
+                  return (
+                    <div>
+                      <div className="my-3 h-px bg-gradient-to-r from-transparent via-gray-200/60 dark:via-gray-700/60 to-transparent" />
+                      <div className="text-[14px] font-medium mb-1">The Daily Race</div>
+                      <ul className="space-y-1.5">
+                        <li className="flex items-start gap-2"><Timer className="mt-0.5 w-4 h-4 text-blue-500" /><span>Every day is a race.</span></li>
+                        <li className="flex items-start gap-2"><Gauge className="mt-0.5 w-4 h-4 text-violet-500" /><span>If your Shadow finishes a task before you, it takes the lead.</span></li>
+                        <li className="flex items-start gap-2"><Crown className="mt-0.5 w-4 h-4 text-amber-500" /><span>Stay consistent and keep pace — and you’ll stay ahead.</span></li>
+                        <li className="flex items-start gap-2"><Trophy className="mt-0.5 w-4 h-4 text-emerald-500" /><span>The more momentum you build, the harder it becomes for your Shadow to catch you.</span></li>
+                      </ul>
+                    </div>
+                  );
+                }
+                if (explainSlide === 2) {
+                  return (
+                    <div>
+                      <div className="my-3 h-px bg-gradient-to-r from-transparent via-gray-200/60 dark:via-gray-700/60 to-transparent" />
+                      <div className="text-[14px] font-medium mb-1">The Bigger Battles: Challenges</div>
+                      <p className="mb-2">But the daily race is only the beginning. Your Shadow will throw Challenges your way:</p>
+                      <ul className="space-y-1.5">
+                        <li className="flex items-start gap-2"><Crown className="mt-0.5 w-4 h-4 text-amber-500" /><span>Streak challenges (stay on fire for days in a row)</span></li>
+                        <li className="flex items-start gap-2"><Timer className="mt-0.5 w-4 h-4 text-blue-500" /><span>Speed challenges (finish faster than your Shadow)</span></li>
+                        <li className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 w-4 h-4 text-emerald-500" /><span>Consistency challenges (show up no matter what)</span></li>
+                      </ul>
+                      <p className="mt-2">These battles test not just your speed — but your discipline, endurance, and grit.</p>
+                    </div>
+                  );
+                }
+                if (explainSlide === 3) {
+                  return (
+                    <div>
+                      <div className="my-3 h-px bg-gradient-to-r from-transparent via-gray-200/60 dark:via-gray-700/60 to-transparent" />
+                      <div className="text-[14px] font-medium mb-1">Why It Matters</div>
+                      <ul className="space-y-1.5">
+                        <li className="flex items-start gap-2"><Eye className="mt-0.5 w-4 h-4 text-indigo-500" /><span>This isn’t just a productivity app. It’s you versus the version of yourself that never stops grinding.</span></li>
+                        <li className="flex items-start gap-2"><Trophy className="mt-0.5 w-4 h-4 text-emerald-500" /><span>Beat the Shadow → earn rewards, streaks, and momentum.</span></li>
+                        <li className="flex items-start gap-2"><Gauge className="mt-0.5 w-4 h-4 text-violet-500" /><span>Fall behind → your Shadow grows stronger.</span></li>
+                      </ul>
+                    </div>
+                  );
+                }
+                // slide 4
+                return (
+                  <div>
+                    <div className="my-3 h-px bg-gradient-to-r from-transparent via-gray-200/60 dark:via-gray-700/60 to-transparent" />
+                    <div className="text-[14px] font-medium mb-1">The Choice</div>
+                    <p className="mb-2">The Shadow has already started running. The question is — will you rise, stay consistent, and stay ahead? Or will your Shadow outrun you?</p>
+                    <p>👉 The race begins now.</p>
+                  </div>
+                );
+              })()}
+            </div>
+            {/* Progress */}
+            <div className="mt-4 flex items-center justify-center gap-1.5">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <span key={i} className={`h-1.5 rounded-full transition-all ${explainSlide===i ? 'w-6 bg-purple-500' : 'w-2.5 bg-gray-300 dark:bg-gray-700'}`} />
+              ))}
+            </div>
+            {/* Controls */}
+            <div className="mt-4 flex items-center justify-between gap-2">
+              <button
+                onClick={() => setExplainSlide((s) => Math.max(0, s-1))}
+                disabled={explainSlide===0}
+                className="text-[13px] px-3 py-1.5 rounded-lg border border-gray-200/70 dark:border-gray-800/70 hover:bg-gray-100/70 dark:hover:bg-white/5 disabled:opacity-50"
+              >Back</button>
+              {explainSlide < 4 ? (
+                <div className="flex-1 flex justify-end">
+                  <button
+                    onClick={() => setExplainSlide((s) => Math.min(4, s+1))}
+                    className="text-[13px] px-3 py-1.5 rounded-lg border border-transparent bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow hover:opacity-[0.98]"
+                  >Next</button>
+                </div>
+              ) : (
+                <div className="flex-1 flex justify-end">
+                  <button
+                    onClick={async () => {
+                      setShowShadowExplain(false);
+                      try {
+                        await fetch('/api/preferences', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                        });
+                      } catch {}
+                      try {
+                        window.sessionStorage.removeItem('nourish:shadowExplainPending');
+                        window.sessionStorage.removeItem('nourish:onboarding:suspended');
+                        window.sessionStorage.setItem('nourish:onboardingComplete','1');
+                      } catch {}
+                    }}
+                    className="text-[13px] px-3 py-1.5 rounded-lg border border-transparent bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow hover:opacity-[0.98]"
+                  >🚀 Start the Race</button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <h1 className="text-xl font-semibold flex items-center gap-2 mb-4">
         <Swords className="w-5 h-5 text-purple-600" /> Shadow
       </h1>
@@ -782,15 +926,23 @@ export default function ShadowPage() {
               </div>
             );
           })()}
+          {/* Momentum / Consistency */}
+          <div className="rounded-xl p-2 md:p-2.5 bg-surface2">
+            <div className="text-[10px] md:text-[11px] text-muted inline-flex items-center gap-1">
+              <span role="img" aria-label="fire">🔥</span> Momentum
+            </div>
+            <div className="mt-0.5 text-[12px] md:text-[13px] font-medium text-foreground flex items-center gap-2">
               {(() => {
                 const pc = typeof shadowState?.metrics?.pace_consistency === 'number' ? shadowState.metrics.pace_consistency : null;
                 const tasks = (shadowState?.tasks || []) as any[];
                 const anyStarted = tasks.some((t: any) => t.is_user_done || t.is_shadow_done);
-                if (!pc || !anyStarted) return 'Not started yet';
-                if (pc >= 0.8) return <><span className="text-amber-300">🔥</span> Steady pace <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-200 border border-amber-400/20">On a streak</span></>;
+                if (!pc || !anyStarted) return <span className="text-muted">Build momentum by starting tasks</span>;
+                if (pc >= 0.8) return <><span>Steady pace</span><span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-200 border border-amber-400/20">On a streak</span></>;
                 if (pc >= 0.5) return <>Strong start</>;
                 return <>Wobbly pace</>;
               })()}
+            </div>
+          </div>
             
           
 

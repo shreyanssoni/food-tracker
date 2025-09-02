@@ -103,7 +103,7 @@ export async function GET() {
       const nowMin = hh * 60 + mm; // minutes since midnight in user's TZ
       const { data: tasks } = await supabase
         .from('tasks')
-        .select('id, title, time_anchor, order_hint, owner_type, created_at, active')
+        .select('id, title, time_anchor, order_hint, owner_type, created_at, active, ep_value')
         .eq('user_id', user.id)
         .order('created_at', { ascending: true });
 
@@ -129,6 +129,15 @@ export async function GET() {
       }
 
       // defer routineFlow assembly until after metrics so we can include shadow hints once
+
+      // Build EP map per task (default 1 if missing)
+      const epValueMap = new Map<string, number>();
+      for (const t of sorted) {
+        const val = typeof (t as any)?.ep_value === 'number' && !Number.isNaN((t as any).ep_value)
+          ? Number((t as any).ep_value)
+          : 1;
+        epValueMap.set(String(t.id), val);
+      }
 
       // Fetch today's user completions for timestamps (use admin client to bypass RLS edge cases for service ops)
       const admin = createAdminClient();
@@ -246,7 +255,7 @@ export async function GET() {
       let shadow_done_now = 0;
       let shadow_done_in_60 = 0;
       const nowPlus60 = nowMin + 60;
-      for (const [_taskId, schedMin] of schedMinutes.entries()) {
+      for (const [, schedMin] of schedMinutes.entries()) {
         if (schedMin <= nowMin) shadow_done_now += 1;
         if (schedMin <= nowPlus60) shadow_done_in_60 += 1;
       }
@@ -323,13 +332,18 @@ export async function GET() {
       });
 
       // EP-style summary for today:
-      // - User EP equals the number of tasks they completed today
-      // - Shadow EP reflects how many tasks the shadow would have done by now (based on schedule)
-      //   and also expose total planned tasks for the day
+      // - User EP: sum of ep_awarded from completions (fallback 1 if missing)
+      // - Shadow EP: sum of ep_value for tasks expected done by now (based on schedule)
+      // - Shadow total: sum of ep_value for all tasks planned today
+      const shadow_ep_today_sum = Array.from(schedMinutes.entries()).reduce((acc, [taskId, schedMin]) => {
+        if (schedMin <= nowMin) return acc + (epValueMap.get(String(taskId)) ?? 1);
+        return acc;
+      }, 0);
+      const shadow_total_ep = sorted.reduce((acc: number, t: any) => acc + (epValueMap.get(String(t.id)) ?? 1), 0);
       const ep_today = {
         user: user_ep_today_sum, // sum of EP earned today
-        shadow: shadow_done_now, // shadow EP as completed tasks by now
-        shadow_total: sorted.length,
+        shadow: shadow_ep_today_sum, // sum of ep_value for tasks shadow has passed by now
+        shadow_total: shadow_total_ep,
       } as const;
 
       // Log dry-run for visibility

@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Sparkles, Gem, Flame, ShoppingBag, MessageCircleHeart } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 interface PrefsResp {
   profile: {
@@ -161,14 +161,22 @@ const steps: Step[] = [
       </svg>
     ),
   },
+  // Final interactive step is rendered separately below, not in this static array
 ];
 
 export default function Onboarding() {
   const { status } = useSession();
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [idx, setIdx] = useState(0);
+
+  // Create-task dialog state (triggered from final step)
+  const [showTaskDialog, setShowTaskDialog] = useState(false);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskCreating, setTaskCreating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Avoid showing repeatedly if user closes before POST returns
   const [localGuard, setLocalGuard] = useState(false);
@@ -186,6 +194,14 @@ export default function Onboarding() {
         if (window.sessionStorage.getItem("nourish:onboarding:done") === "1") {
           return;
         }
+        // If we're in the middle of the post-task flow, suppress onboarding until shadow explain completes
+        const suspended = window.sessionStorage.getItem("nourish:onboarding:suspended") === "1";
+        const toTasks = window.sessionStorage.getItem("nourish:showShadowIntroAfterTasks") === "1";
+        const explainPending = window.sessionStorage.getItem("nourish:shadowExplainPending") === "1";
+        if (suspended || toTasks || explainPending) {
+          setOpen(false);
+          return;
+        }
         const res = await fetch("/api/preferences", { cache: "no-store" });
         const j: PrefsResp = await res.json().catch(() => ({ profile: null }));
         if (cancelled) return;
@@ -195,6 +211,9 @@ export default function Onboarding() {
         if (!cancelled) setLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [status, pathname]);
 
   const finish = async () => {
@@ -216,6 +235,9 @@ export default function Onboarding() {
 
   if (loading || !open || status !== "authenticated" || pathname?.startsWith("/auth/")) return null;
 
+  // Total steps are static narrative; last action opens create-task dialog
+  const totalSteps = steps.length;
+  const isLast = idx === totalSteps - 1;
   const StepIcon = steps[idx].icon;
 
   return (
@@ -229,18 +251,23 @@ export default function Onboarding() {
           <div className="text-lg font-semibold leading-tight">{steps[idx].title}</div>
         </div>
         <div className="space-y-3 mb-4">
-          <div className="text-gray-700 dark:text-gray-300">{steps[idx].desc}</div>
-          {steps[idx].art && (
-            <div className="overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60">
-              {steps[idx].art}
-            </div>
-          )}
+          <>
+            <div className="text-gray-700 dark:text-gray-300">{steps[idx].desc}</div>
+            {steps[idx].art && (
+              <div className="overflow-hidden rounded-xl border border-gray-200/60 dark:border-gray-800/60">
+                {steps[idx].art}
+              </div>
+            )}
+          </>
         </div>
 
         {/* Progress dots */}
         <div className="flex items-center gap-1.5 mb-4">
-          {steps.map((_, i) => (
-            <span key={i} className={`h-1.5 rounded-full transition-all ${i === idx ? "w-6 bg-blue-600" : "w-2 bg-gray-300 dark:bg-gray-700"}`} />
+          {Array.from({ length: totalSteps }).map((_, i) => (
+            <span
+              key={i}
+              className={`h-1.5 rounded-full transition-all ${i === idx ? "w-6 bg-blue-600" : "w-2 bg-gray-300 dark:bg-gray-700"}`}
+            />
           ))}
         </div>
 
@@ -261,25 +288,80 @@ export default function Onboarding() {
                 Back
               </button>
             )}
-            {idx < steps.length - 1 ? (
+            {!isLast ? (
               <button
-                onClick={() => setIdx((i) => Math.min(steps.length - 1, i + 1))}
+                onClick={() => setIdx((i) => Math.min(totalSteps - 1, i + 1))}
                 className="text-[13px] px-3 py-1.5 rounded-full border border-transparent bg-gradient-to-r from-blue-600 to-emerald-500 text-white"
               >
                 Next
               </button>
             ) : (
               <button
-                onClick={finish}
+                onClick={() => setShowTaskDialog(true)}
                 className="text-[13px] px-3 py-1.5 rounded-full border border-transparent bg-gradient-to-r from-blue-600 to-emerald-500 text-white"
                 disabled={localGuard}
               >
-                Let’s start
+                Create and continue
               </button>
             )}
           </div>
         </div>
       </div>
+    {/* Create Task Dialog */}
+    {showTaskDialog && (
+      <div className="fixed inset-0 z-[110] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/50" onClick={() => setShowTaskDialog(false)} aria-hidden />
+        <div className="relative w-[92%] max-w-md rounded-xl border border-gray-200/70 dark:border-gray-800/70 bg-white dark:bg-gray-900 p-4">
+          <div className="text-base font-semibold mb-2">Create your first task</div>
+          {errorMsg && <div className="text-[12px] text-red-600 dark:text-red-400 mb-2">{errorMsg}</div>}
+          <div className="space-y-2">
+            <label className="block text-[12px] text-gray-600 dark:text-gray-400">Title</label>
+            <input
+              autoFocus
+              type="text"
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., 10-minute walk after lunch"
+              value={taskTitle}
+              onChange={(e) => setTaskTitle(e.target.value)}
+              disabled={taskCreating}
+            />
+          </div>
+          <p className="mt-2 text-[11px] text-gray-500">We’ll set it as a daily task. You can edit schedule later.</p>
+          <div className="mt-3 flex items-center justify-end gap-2">
+            <button onClick={()=>setShowTaskDialog(false)} className="text-[13px] px-3 py-1.5 rounded-lg border border-gray-200/70 dark:border-gray-800/70">Cancel</button>
+            <button
+              disabled={taskCreating || !taskTitle.trim()}
+              onClick={async () => {
+                try {
+                  setErrorMsg(null);
+                  setTaskCreating(true);
+                  const res = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: taskTitle.trim(), ep_value: 10, schedule: { frequency: 'daily' } }),
+                  });
+                  const j = await res.json().catch(() => ({}));
+                  if (!res.ok) throw new Error(j?.error || 'Failed to create');
+                  // Indicate that Tasks page should show Shadow intro next
+                  try {
+                    window.sessionStorage.setItem('nourish:showShadowIntroAfterTasks','1');
+                    window.sessionStorage.setItem('nourish:onboarding:suspended','1');
+                  } catch {}
+                  setShowTaskDialog(false);
+                  setOpen(false);
+                  router.push('/tasks');
+                } catch (e:any) {
+                  setErrorMsg(e?.message || 'Something went wrong');
+                } finally {
+                  setTaskCreating(false);
+                }
+              }}
+              className="text-[13px] px-3 py-1.5 rounded-full border border-transparent bg-blue-600 text-white disabled:opacity-60"
+            >{taskCreating ? 'Creating…' : 'Create task'}</button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }
