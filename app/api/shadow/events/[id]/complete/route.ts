@@ -17,7 +17,12 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
       .maybeSingle();
     if (instErr) throw instErr;
     if (!inst) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    if (inst.shadow_tasks?.shadow_profile?.user_id !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Supabase returns nested relations as arrays; extract first
+    const st = (inst as any)?.shadow_tasks?.[0];
+    const ownerId = st?.shadow_profile?.[0]?.user_id as string | undefined;
+    if (!ownerId || ownerId !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     // Mark completed
     const now = new Date();
@@ -38,7 +43,7 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
     // Log alignment (shadow_only event)
     await supabase.from('alignment_log').insert({
       user_id: user.id,
-      shadow_id: inst.shadow_tasks.shadow_id,
+      shadow_id: st?.shadow_id,
       shadow_instance_id: id,
       alignment_status: alignment,
     });
