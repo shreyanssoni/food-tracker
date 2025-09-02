@@ -63,6 +63,7 @@ export default function ShadowPage() {
     sleep_time?: string;
     focus_areas?: string;
   }>({ difficulty: "medium", wake_time: "", sleep_time: "", focus_areas: "" });
+  const [activating, setActivating] = useState<boolean>(false);
   // Shadow daily challenge UI
   const [todayShadow, setTodayShadow] = useState<{
     id: string;
@@ -1004,25 +1005,45 @@ export default function ShadowPage() {
                     Cancel
                   </button>
                   <button
-                    className="px-3 py-1.5 text-sm rounded-lg bg-purple-600 text-white"
+                    className="px-3 py-1.5 text-sm rounded-lg bg-purple-600 text-white disabled:opacity-50"
+                    disabled={activating}
                     onClick={async () => {
                       try {
+                        setActivating(true);
                         const res = await fetch("/api/shadow/setup", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
+                          cache: "no-store",
+                          credentials: "same-origin",
                           body: JSON.stringify({ preferences: prefs }),
                         });
-                        const j = await res.json();
-                        if (!res.ok)
-                          throw new Error(j.error || "Failed to setup");
+                        const j = await res.json().catch(() => ({}));
+                        if (!res.ok) throw new Error(j?.error || "Failed to setup");
                         setActivated(true);
                         setShowSetupModal(false);
-                      } catch (e) {
+                        // Confirm and refresh hero EPs
+                        try {
+                          const setupRes = await fetch("/api/shadow/setup", { cache: "no-store" });
+                          if (setupRes.ok) {
+                            const setup = await setupRes.json();
+                            setHero({
+                              userEP: setup.user_ep || 0,
+                              shadowEP: setup.shadow_ep || 0,
+                            });
+                          }
+                        } catch {}
+                        setToast({ title: "Shadow activated" });
+                        setTimeout(() => setToast(null), 2000);
+                      } catch (e: any) {
                         console.error(e);
+                        setToast({ title: "Activation failed", body: e?.message || "" });
+                        setTimeout(() => setToast(null), 2500);
+                      } finally {
+                        setActivating(false);
                       }
                     }}
                   >
-                    Save & Activate
+                    {activating ? "Saving…" : "Save & Activate"}
                   </button>
                 </div>
               </div>
