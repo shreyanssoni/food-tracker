@@ -10,6 +10,7 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Brand blues (kept), plus tokenized palette using CSS variables for central control
         brand: {
           50: '#f3f7ff',
           100: '#e6effe',
@@ -22,6 +23,15 @@ export default {
           800: '#1e409b',
           900: '#1d387d',
         },
+        // Theming tokens using rgb(var(--token) / <alpha>) so utilities are solid and support opacity
+        background: 'rgb(var(--color-bg) / <alpha-value>)',
+        surface: 'rgb(var(--color-surface) / <alpha-value>)',
+        surface2: 'rgb(var(--color-surface-2) / <alpha-value>)',
+        border: 'rgb(var(--color-border) / <alpha-value>)',
+        foreground: 'rgb(var(--color-fg) / <alpha-value>)',
+        muted: 'rgb(var(--color-fg-muted) / <alpha-value>)',
+        accent: 'rgb(var(--color-accent) / <alpha-value>)',
+        accentFg: 'rgb(var(--color-accent-fg) / <alpha-value>)',
       },
       boxShadow: {
         soft: '0 10px 25px -10px rgba(0,0,0,0.15)',

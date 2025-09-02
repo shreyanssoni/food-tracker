@@ -79,6 +79,11 @@ export default function DashboardPage() {
     completed_today: number;
     decision_kind: 'boost' | 'slowdown' | 'nudge' | 'noop';
   }>(null);
+  // Shadow Messages Inbox (latest non-expired)
+  const [shadowMessage, setShadowMessage] = useState<
+    | null
+    | { id: string; type: 'taunt' | 'encouragement' | 'neutral'; text: string }
+  >(null);
 
 
   useEffect(() => {
@@ -229,6 +234,36 @@ export default function DashboardPage() {
   }, [clockTick]);
 
   // ---------- existing effects below ----------
+
+  // Load latest non-expired shadow message for the inbox
+  useEffect(() => {
+    (async () => {
+      try {
+        const uid = session?.user?.id;
+        if (!uid) return;
+        const nowIso = new Date().toISOString();
+        const { data, error } = await supabase
+          .from('shadow_messages')
+          .select('id,type,text,expiry')
+          .eq('user_id', uid)
+          .gt('expiry', nowIso)
+          .order('expiry', { ascending: true })
+          .limit(1);
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const m: any = data[0];
+          const t =
+            m?.type === 'taunt' || m?.type === 'encouragement' || m?.type === 'neutral'
+              ? (m.type as 'taunt' | 'encouragement' | 'neutral')
+              : 'neutral';
+          setShadowMessage({ id: String(m.id), type: t, text: String(m.text || '') });
+        } else {
+          setShadowMessage(null);
+        }
+      } catch {
+        setShadowMessage(null);
+      }
+    })();
+  }, [session?.user?.id, clockTick, supabase]);
 
   useEffect(() => {
     const load = async () => {
@@ -657,20 +692,66 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-7">
+      {/* Shadow Messages Inbox */}
+      {shadowMessage && (
+        <section className="rounded-2xl bg-surface p-4 sm:p-5">
+          <div className="flex items-start gap-3">
+            <div className="shrink-0">
+              {/* Simple ghost avatar */}
+              <svg
+                viewBox="0 0 48 48"
+                className="h-10 w-10 text-foreground"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle cx="24" cy="24" r="23" className="fill-surface2" stroke="currentColor" strokeWidth="1" />
+                <path
+                  d="M16 28c0-6.627 4.03-12 9-12s9 5.373 9 12v6l-3-2-3 2-3-2-3 2-3-2-3 2v-6z"
+                  className="fill-foreground/10"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinejoin="round"
+                />
+                <circle cx="22" cy="24" r="1.6" className="fill-current" />
+                <circle cx="30" cy="24" r="1.6" className="fill-current" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span
+                  className={(() => {
+                    const base = 'text-[11px] font-semibold';
+                    if (shadowMessage.type === 'taunt') return `${base} text-rose-300`;
+                    if (shadowMessage.type === 'encouragement') return `${base} text-emerald-300`;
+                    return `${base} text-muted`;
+                  })()}
+                >
+                  {shadowMessage.type === 'taunt' && 'Taunt'}
+                  {shadowMessage.type === 'encouragement' && 'Encouragement'}
+                  {shadowMessage.type === 'neutral' && 'Update'}
+                </span>
+              </div>
+              <div className="mt-0.5 text-[13px] sm:text-sm text-foreground">
+                {shadowMessage.text}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
       {/* Avatar + EP Panel */}
-      <section className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white/70 dark:bg-slate-950/60 p-4 sm:p-5">
+      <section className="rounded-2xl bg-surface p-4 sm:p-5">
         <AvatarPanel progress={progress} lifeStreak={lifeStreak} />
       </section>
       {/* Player Card + Quick Actions */}
-      <section className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gradient-to-br from-sky-600/15 via-indigo-600/10 to-emerald-500/10 dark:from-sky-900/25 dark:via-indigo-900/20 dark:to-emerald-900/20 p-5 sm:p-6">
+      <section className="rounded-2xl bg-gradient-to-br from-sky-600/15 via-indigo-600/10 to-emerald-500/10 dark:from-sky-900/25 dark:via-indigo-900/20 dark:to-emerald-900/20 p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>
-            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">
               Quick Actions
             </h1>
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px]">
               {/* Level */}
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5">
+              <span className="inline-flex items-center gap-1 rounded-full bg-surface px-1.5 py-0.5">
                 <svg
                   viewBox="0 0 24 24"
                   className="h-3 w-3 text-indigo-600"
@@ -729,16 +810,16 @@ export default function DashboardPage() {
 
       {/* Next Up banner (mobile-first) */}
       {nextUp && (
-        <div className="inline-flex w-[240px] sm:w-[260px] items-center justify-between rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-950/60 px-6 py-4 shadow-sm">
+        <div className="inline-flex w-[240px] sm:w-[260px] items-center justify-between rounded-2xl bg-surface px-6 py-4 shadow-sm">
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] uppercase tracking-wide text-slate-500">
+            <div className="text-[10px] uppercase tracking-wide text-muted">
               Next up
             </div>
-            <div className="text-[13px] sm:text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
+            <div className="text-[13px] sm:text-sm font-semibold text-foreground truncate">
               {nextUp.task.title}
             </div>
             {nextUp.when && (
-              <div className="hidden sm:block text-[11px] text-slate-600 dark:text-slate-400">
+              <div className="hidden sm:block text-[11px] text-muted">
                 {nextUp.when.toLocaleTimeString([], {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -747,12 +828,12 @@ export default function DashboardPage() {
             )}
 
       {/* Shadow Pace (Phase 10) */}
-      <section className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white/70 dark:bg-slate-950/60 p-4 sm:p-5">
+      <section className="rounded-2xl bg-surface p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-md font-semibold text-slate-900 dark:text-slate-100">Shadow Pace</h2>
+            <h2 className="text-md font-semibold text-foreground">Shadow Pace</h2>
             {shadowCommit ? (
-              <div className="mt-1 text-[12px] sm:text-[13px] text-slate-700 dark:text-slate-300">
+              <div className="mt-1 text-[12px] sm:text-[13px] text-muted">
                 <span className="font-semibold">Delta:</span> {shadowCommit.delta >= 0 ? '+' : ''}{shadowCommit.delta}
                 <span className="mx-2 opacity-60">•</span>
                 <span className="font-semibold">Target:</span> {shadowCommit.target_today}
@@ -760,14 +841,13 @@ export default function DashboardPage() {
                 <span className="font-semibold">Done:</span> {shadowCommit.completed_today}
               </div>
             ) : (
-              <div className="mt-1 text-[12px] text-slate-500">No pace decision yet today.</div>
+              <div className="mt-1 text-[12px] text-muted">No pace decision yet today.</div>
             )}
           </div>
           {shadowCommit && (
-            <span className="self-start inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+            <span className="self-start inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
               style={{
-                borderColor: 'var(--tw-prose-borders, rgba(148,163,184,0.25))',
-                background: 'rgba(99,102,241,0.08)'
+                background: 'rgb(var(--color-accent) / 0.10)'
               }}
             >
               {shadowCommit.decision_kind === 'boost' && '🚀 Boost'}
@@ -780,7 +860,7 @@ export default function DashboardPage() {
       </section>
           </div>
           <button
-            className="px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-medium bg-blue-600 text-white"
+            className="px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-medium bg-accent text-accent-foreground"
             onClick={() => {
               try {
                 track("next_up_click", { taskId: nextUp.task.id });
@@ -832,14 +912,14 @@ export default function DashboardPage() {
 
             if (dueNow.length + later.length === 0) {
               return (
-                <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-950/60 backdrop-blur-sm p-5 text-center">
-                  <div className="text-sm text-slate-600 dark:text-slate-400">
+                <div className="rounded-2xl bg-surface p-5 text-center">
+                  <div className="text-sm text-muted">
                     No tasks due today. Enjoy a rest or log a quick win.
                   </div>
                   <div className="mt-3">
                     <Link
                       href="/tasks"
-                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-600 text-white"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-accent text-accent-foreground bg-blue-600"
                       onClick={() => {
                         try {
                           track("quick_action_use", {

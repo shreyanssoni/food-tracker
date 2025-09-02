@@ -394,7 +394,7 @@ export default function Navbar() {
   const DropdownLink = ({ path, label }: DropdownItem) => (
     <Link
       href={path as unknown as Route}
-      className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+      className="block px-4 py-2 text-sm text-foreground hover:bg-surface2"
       role="menuitem"
     >
       {label}
@@ -405,7 +405,7 @@ export default function Navbar() {
   const AuthLink = ({ path, label, className }: AuthItem) => (
     <Link
       href={path as unknown as Route}
-      className={`inline-flex items-center px-4 py-2 border text-sm font-medium rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${className}`}
+      className={`inline-flex items-center px-4 py-2 border text-sm font-medium rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent ${className}`}
     >
       {label}
     </Link>
@@ -715,7 +715,7 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="sticky top-0 z-40 bg-white/70 dark:bg-gray-950/60 backdrop-blur supports-[backdrop-filter]:bg-white/50 dark:supports-[backdrop-filter]:bg-gray-950/50 border-b border-gray-200/70 dark:border-gray-800/60 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+    <nav className="sticky top-0 z-40 bg-surface shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Left: Brand */}
@@ -741,7 +741,7 @@ export default function Navbar() {
                     className={`inline-flex items-center px-3 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
                       moreOpen
                         ? "bg-gradient-to-tr from-blue-600 to-emerald-500 text-white shadow-sm"
-                        : "text-gray-700/90 dark:text-gray-200/90 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/70 dark:hover:bg-white/5"
+                        : "text-foreground hover:bg-surface2"
                     }`}
                     aria-expanded={moreOpen}
                     aria-haspopup="true"
@@ -749,7 +749,7 @@ export default function Navbar() {
                     More
                   </button>
                   {moreOpen && (
-                    <div className="absolute left-0 mt-2 w-56 rounded-xl shadow-xl bg-white/90 dark:bg-gray-900/90 backdrop-blur border border-gray-200/70 dark:border-gray-800/70 z-20">
+                    <div className="absolute left-0 mt-2 w-56 rounded-xl shadow-xl bg-surface z-20">
                       <div className="py-1">
                         {moreNav.map((item) => (
                           <DropdownLink key={item.path} {...(item as any)} />
@@ -765,11 +765,11 @@ export default function Navbar() {
           {/* Right side */}
           <div className="hidden sm:flex items-center gap-3">
             {status === "authenticated" && (
-              <div className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-full border border-gray-200/80 dark:border-gray-800/80 bg-white/70 dark:bg-gray-900/70">
+              <div className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-surface">
                 <div className="h-6 w-6 rounded-lg bg-gradient-to-br from-blue-600 to-emerald-500 text-white flex items-center justify-center">
                   <Sparkles className="h-4 w-4" />
                 </div>
-                <div className="text-xs font-semibold text-gray-800 dark:text-gray-100">
+                <div className="text-xs font-semibold text-foreground">
                   Lv {progress?.level ?? "--"}
                 </div>
                 {topBadge && (
@@ -795,21 +795,21 @@ export default function Navbar() {
                       className="h-5 w-5 rounded-sm"
                     />
                     <span
-                      className="text-[11px] text-gray-600 dark:text-gray-300 truncate max-w-[100px]"
+                      className="text-[11px] text-muted truncate max-w-[100px]"
                       title={topBadge.name}
                     >
                       {topBadge.name}
                     </span>
                   </div>
                 )}
-                <div className="ml-1 inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full border bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30">
+                <div className="ml-1 inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300">
                   <Gem className="h-3.5 w-3.5" />
                   <span className="tabular-nums">
                     {progress?.diamonds ?? 0}
                   </span>
                 </div>
                 {typeof lifeStreak?.current === "number" && (
-                  <div className="ml-1 inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full border bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/30">
+                  <div className="ml-1 inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-700 dark:text-orange-300">
                     <span aria-hidden>🔥</span>
                     <span className="tabular-nums">{lifeStreak.current}</span>
                   </div>
@@ -820,7 +820,7 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={sendTest}
-                className="px-3 py-1.5 text-sm rounded-full border border-gray-200/80 dark:border-gray-800/80 hover:bg-gray-100/80 dark:hover:bg-white/5"
+                className="px-3 py-1.5 text-sm rounded-full hover:bg-surface2"
               >
                 Send test
               </button>
@@ -828,7 +828,7 @@ export default function Navbar() {
             {status === "authenticated" && isAdmin && (
               <Link
                 href={"/admin" as unknown as Route}
-                className="px-3 py-1.5 text-sm rounded-full border border-gray-200/80 dark:border-gray-800/80 hover:bg-gray-100/80 dark:hover:bg-white/5"
+                className="px-3 py-1.5 text-sm rounded-full hover:bg-surface2"
                 title="Admin"
               >
                 Admin
@@ -838,7 +838,7 @@ export default function Navbar() {
               <div className="relative" ref={dropdownRef}>
                 <button
                   type="button"
-                  className="relative bg-white/70 dark:bg-gray-900/70 rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 border border-gray-200/70 dark:border-gray-800/70"
+                  className="relative bg-surface rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
                   aria-haspopup="true"
                   aria-expanded={dropdownOpen}
                   onClick={() => setDropdownOpen((v) => !v)}
@@ -851,32 +851,32 @@ export default function Navbar() {
                   />
                   {status === "authenticated" && unreadCount > 0 && (
                     <span
-                      className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 ring-2 ring-white dark:ring-gray-900"
+                      className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 ring-2 ring-background"
                       aria-hidden
                     />
                   )}
                 </button>
                 {dropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-80 max-w-[90vw] rounded-xl shadow-xl bg-white/90 dark:bg-gray-900/90 backdrop-blur border border-gray-200/70 dark:border-gray-800/70 focus:outline-none z-20">
+                  <div className="absolute right-0 mt-2 w-80 max-w-[90vw] rounded-xl shadow-xl bg-surface focus:outline-none z-20">
                     <div className="py-1">
                       {/* Focused notifications list */}
-                      <div className="px-3 py-2 border-b border-gray-200/70 dark:border-gray-800/70">
+                      <div className="px-3 py-2">
                         <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
-                          <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                          <div className="text-xs font-semibold text-muted">
                             Notifications
                           </div>
                           <div className="flex items-center gap-2">
                             <button
                               onClick={markAllRead}
                               disabled={loadingMsgs || unreadMsgs.length === 0}
-                              className="text-[11px] px-2.5 py-1.5 rounded-full border border-gray-200/70 dark:border-gray-800/70 hover:bg-gray-100/70 dark:hover:bg-white/5 disabled:opacity-50"
+                              className="text-[11px] px-2.5 py-1.5 rounded-full hover:bg-surface2 disabled:opacity-50"
                             >
                               Mark all read
                             </button>
                             <Link
                               href={"/notifications" as unknown as Route}
                               onClick={() => setDropdownOpen(false)}
-                              className="text-[11px] px-2.5 py-1.5 rounded-full border border-gray-200/70 dark:border-gray-800/70 hover:bg-gray-100/70 dark:hover:bg-white/5"
+                              className="text-[11px] px-2.5 py-1.5 rounded-full hover:bg-surface2"
                             >
                               View all
                             </Link>
@@ -888,60 +888,45 @@ export default function Navbar() {
                             <div className="skeleton h-14 rounded-xl" />
                           </div>
                         ) : unreadMsgs.length === 0 ? (
-                          <div className="text-xs text-gray-600 dark:text-gray-400">
+                          <div className="text-xs text-muted">
                             No new notifications
                           </div>
                         ) : (
-                          <ul className="space-y-2 max-h-64 overflow-auto">
-                            {unreadMsgs.slice(0, 8).map((m) => (
-                              <li key={m.id}>
-                                <div className="rounded-2xl border border-gray-200/70 dark:border-gray-800/70 bg-white/80 dark:bg-gray-900/70 shadow-sm p-3">
-                                  <div className="flex items-start gap-2">
-                                    <div className="mt-0.5 h-6 w-6 min-w-6 rounded-xl bg-gradient-to-br from-blue-600 to-emerald-500 text-white flex items-center justify-center text-[12px]">
-                                      🔔
+                          <div className="max-h-[45vh] overflow-auto">
+                            {unreadMsgs.map((m) => (
+                              <div key={m.id} className="px-3 py-2 hover:bg-surface2">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-6 w-6 rounded-lg bg-gradient-to-br from-blue-600 to-emerald-500 text-white flex items-center justify-center">
+                                    <Sparkles className="h-4 w-4" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-medium text-foreground truncate">
+                                      {m.title}
                                     </div>
-                                    <div className="min-w-0 flex-1">
-                                      <div
-                                        className="text-[13px] font-semibold text-gray-900 dark:text-gray-100 truncate"
-                                        title={m.title}
-                                      >
-                                        {m.title}
-                                      </div>
-                                      <div
-                                        className="text-[12px] text-gray-700 dark:text-gray-300 truncate"
-                                        title={m.body}
-                                      >
-                                        {m.body}
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 ml-2">
-                                      {m.url && (
-                                        <button
-                                          className="text-[12px] px-2 py-1 rounded-full border border-gray-200/70 dark:border-gray-800/70 hover:bg-gray-100/70 dark:hover:bg-white/5 text-blue-600 dark:text-blue-400"
-                                          onClick={async () => {
-                                            await markMsgRead(m.id);
-                                            setDropdownOpen(false);
-                                            router.push(m.url as Route);
-                                          }}
-                                        >
-                                          View
-                                        </button>
-                                      )}
-                                      <button
-                                        className="text-[12px] px-2 py-1 rounded-full border border-gray-200/70 dark:border-gray-800/70 hover:bg-gray-100/70 dark:hover:bg-white/5"
-                                        onClick={() => markMsgRead(m.id)}
-                                      >
-                                        Mark read
-                                      </button>
+                                    <div className="text-xs text-muted truncate">
+                                      {m.body}
                                     </div>
                                   </div>
+                                  {m.url && (
+                                    <Link
+                                      href={m.url as unknown as Route}
+                                      className="text-[11px] px-2 py-1 rounded-full border border-border hover:bg-surface2 shrink-0"
+                                      onClick={() => setDropdownOpen(false)}
+                                    >
+                                      Open
+                                    </Link>
+                                  )}
                                 </div>
-                              </li>
+                                <div className="mt-2 flex items-center gap-2">
+                                  <button className="text-[11px] px-2 py-1 rounded-full border border-border hover:bg-surface2" onClick={() => markMsgRead(m.id)}>
+                                    Mark read
+                                  </button>
+                                </div>
+                              </div>
                             ))}
-                          </ul>
+                          </div>
                         )}
                       </div>
-                      {/* Notifications toggle */}
                       <button
                         className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50/80 dark:hover:bg:white/5"
                         onClick={async () => {

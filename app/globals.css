@@ -6,21 +6,59 @@
 html { color-scheme: light; }
 html.dark { color-scheme: dark; }
 
+/* Theme tokens (centralized) */
+:root {
+  --color-bg: 255 255 255;            /* bg-background */
+  --color-surface: 255 255 255;       /* bg-surface */
+  --color-surface-2: 249 250 251;     /* bg-surface2 */
+  --color-border: 229 231 235;        /* border-border */
+  --color-fg: 17 24 39;               /* text-foreground */
+  --color-fg-muted: 107 114 128;      /* text-muted */
+  --color-accent: 59 130 246;         /* blue-500 (light) */
+  --color-accent-fg: 255 255 255;     /* accent text */
+}
+
+html.dark {
+  --color-bg: 0 0 0;                  /* pure black canvas */
+  --color-surface: 12 12 12;          /* card bg */
+  --color-surface-2: 17 17 17;        /* inputs */
+  --color-border: 31 31 31;           /* subtle borders */
+  --color-fg: 229 229 229;            /* foreground */
+  --color-fg-muted: 163 163 163;      /* muted */
+  --color-accent: 124 58 237;         /* violet-600 (dark) */
+  --color-accent-fg: 255 255 255;
+}
+
+/* Base layer applies token utilities globally */
+@layer base {
+  html, body { @apply h-full; }
+  body { @apply bg-background text-foreground; }
+}
+
 html, body { height: 100%; }
 /* Prevent white flashes/areas in dark mode (SSR/PWA) */
 @media (prefers-color-scheme: dark) {
-  html, body { background-color: #0b1220; }
+  html, body { background-color: rgb(var(--color-bg)); }
 }
 
 /* Calming UI tweaks */
-.card { @apply bg-white dark:bg-gray-950 shadow-soft rounded-xl p-4; }
-.input { @apply w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 outline-none focus:ring-2 focus:ring-brand-300; }
-.btn { @apply inline-flex items-center justify-center rounded-lg bg-brand-600 text-white px-4 py-2 text-sm font-medium shadow hover:bg-brand-700 active:scale-[.98]; }
-.btn-ghost { @apply text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-gray-800 rounded-lg px-3 py-2; }
+/* Surfaces: use tokens so look is centrally controllable */
+.card { @apply bg-surface shadow-soft rounded-xl p-4; }
+.input { @apply w-full rounded-lg border border-border bg-surface2 text-foreground px-3 py-2 outline-none focus:ring-2 focus:ring-accent; }
+.btn { @apply inline-flex items-center justify-center rounded-lg bg-accent text-accentFg px-4 py-2 text-sm font-medium shadow hover:opacity-95 active:scale-[.98]; }
+.btn-ghost { @apply text-foreground hover:bg-surface2 rounded-lg px-3 py-2; }
 
 /* Focus styles (keyboard only) */
 :focus { outline: none; }
-:focus-visible { outline: 2px solid theme('colors.blue.500'); outline-offset: 2px; }
+:focus-visible { outline: 2px solid theme('colors.violet.500'); outline-offset: 2px; }
+
+/* Links */
+a { @apply underline-offset-2; }
+html.dark a { color: theme('colors.violet.300'); }
+html.dark a:hover { color: theme('colors.violet.200'); }
+
+/* Text selection */
+::selection { background: rgba(139, 92, 246, 0.28); color: #fff; }
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
@@ -32,7 +70,7 @@ html, body { height: 100%; }
 .fade-in-up { animation: fade-in-up 180ms ease-out both; }
 
 /* Skeletons */
-.skeleton { @apply animate-pulse bg-gray-200 dark:bg-gray-800 rounded-md; }
+.skeleton { @apply animate-pulse bg-gray-200 dark:bg-[#1a1a1a] rounded-md; }
 .skeleton-line { @apply skeleton h-3; }
 .skeleton-circle { @apply skeleton rounded-full; }
 .skeleton-card { @apply skeleton; }

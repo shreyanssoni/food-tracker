@@ -526,7 +526,7 @@ export default function ShadowPage() {
       </h1>
 
       {/* Hero */}
-      <section className="rounded-2xl border border-purple-200 dark:border-purple-900/40 bg-gray-900 md:bg-gradient-to-br md:from-gray-900 md:to-gray-950 p-3 pr-16 md:p-4 md:pr-28 mb-4 relative overflow-hidden">
+      <section className="rounded-2xl bg-surface p-3 pr-16 md:p-4 md:pr-28 mb-4 relative overflow-hidden">
         {/* Compact mobile header */}
         <div className="mb-2 md:hidden">
           <div className="flex items-end justify-between text-gray-200">
@@ -543,14 +543,14 @@ export default function ShadowPage() {
         </div>
         {/* Detailed header for md+ */}
         <div className="hidden md:flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2 text-sm text-gray-300">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-600/20 text-blue-300 border border-blue-600/30">
+          <div className="flex items-center gap-2 text-xs md:text-sm text-gray-300">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-surface2 text-blue-300">
               Your EP (today)
             </span>
             <span className="text-blue-300 font-medium">{todayUserEP}</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-300">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-purple-600/20 text-purple-300 border border-purple-600/30">
+          <div className="flex items-center gap-2 text-xs md:text-sm text-gray-300">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-surface2 text-purple-300">
               Shadow EP (today)
             </span>
             <span className="text-purple-300 font-medium">{todayShadowEP}</span>
@@ -563,7 +563,7 @@ export default function ShadowPage() {
             </button> */}
           </div>
         </div>
-        <div className="h-3 w-full bg-gray-800 rounded-full overflow-hidden border border-gray-700 relative">
+        <div className="h-3 w-full bg-surface2 rounded-full overflow-hidden relative">
           <div className="h-full bg-blue-600" style={{ width: `${userPct}%` }} />
           {/* Leader indicator */}
           {todayUserEP !== todayShadowEP && (
@@ -587,7 +587,7 @@ export default function ShadowPage() {
             ghostPop ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
           }`}
         >
-          <div className="inline-flex items-center gap-1 text-purple-300/90 bg-purple-900/30 border border-purple-800/50 rounded-full px-2 py-1 text-xs">
+          <div className="inline-flex items-center gap-1 text-purple-300/90 bg-surface2 rounded-full px-2 py-1 text-xs">
             <ShadowFigure size={14} pose="taunt" />
             <span>boo</span>
           </div>
@@ -680,44 +680,40 @@ export default function ShadowPage() {
               finally { setTimeout(() => setToast(null), 2000); }
             }}
           >9: Fetch history</button>
-        </div>
-      </section>
       )} */}
-
       {/* Race Dashboard (dark panel) */}
-      <section className="rounded-2xl border border-purple-900/30 bg-slate-900 md:bg-gradient-to-br md:from-slate-900 md:to-black p-3 md:p-4 mb-4 shadow-[0_8px_32px_rgba(124,58,237,0.15)]">
+      <section className="rounded-2xl bg-surface p-3 md:p-4 mb-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[12px] md:text-[13px] font-semibold text-gray-200">
+          <div className="flex items-center gap-2 text-[11px] md:text-[12px] font-semibold text-gray-200">
             {(() => {
               const leadVal = typeof shadowState?.lead === 'number' ? shadowState.lead : (todayUserEP - todayShadowEP);
               const ahead = leadVal > 0; const tight = Math.abs(leadVal) < 0.5;
-              const chip = tight ? 'bg-slate-700/60 border-slate-600' : ahead ? 'bg-blue-600/20 border-blue-500/40' : 'bg-purple-600/20 border-purple-500/40';
+              const chip = 'bg-surface2';
               const icon = tight ? 'text-slate-300' : ahead ? 'text-blue-300' : 'text-purple-300';
               return (
-                <span className={`inline-flex items-center justify-center w-4.5 h-4.5 rounded-full border ${chip}`}>
+                <span className={`inline-flex items-center justify-center w-4.5 h-4.5 rounded-full ${chip}`}>
                   <Gauge className={`w-3 h-3 ${icon}`} />
                 </span>
               );
             })()}
             Live Pace
           </div>
-          <div className="text-[10px] md:text-[11px] text-gray-500">
+          <div className="text-[10px] md:text-[11px] text-muted">
             {stateLoading ? "Refreshing…" : "Live"}
           </div>
         </div>
 
         {/* Narrative KPIs */}
-        <div className="mt-2.5 grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-2.5 text-[12px] md:text-[13px]">
+        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-2.5 text-[11px] md:text-[12px]">
           {/* Lead Status */}
           <div className={(() => {
             const leadVal = typeof shadowState?.lead === 'number' ? shadowState.lead : (todayUserEP - todayShadowEP);
             const ahead = leadVal > 0;
             const tight = Math.abs(leadVal) < 0.5;
-            const accent = tight ? 'border-slate-700' : ahead ? 'border-blue-500/30 ring-1 ring-blue-500/10' : 'border-purple-500/30 ring-1 ring-purple-500/10';
-            return `rounded-xl p-2.5 md:p-3 bg-gradient-to-br from-slate-800/60 to-slate-900/60 border ${accent} backdrop-blur-sm transition-colors`;
+            return `rounded-xl p-2 md:p-2.5 bg-surface2 transition-colors`;
           })()}>
             <div className="flex items-center justify-between">
-              <div className="text-[10px] md:text-[11px] text-gray-400 inline-flex items-center gap-1">
+              <div className="text-[10px] md:text-[11px] text-muted inline-flex items-center gap-1">
                 <span>🏁</span> Lead
               </div>
               {(() => {
@@ -725,12 +721,12 @@ export default function ShadowPage() {
                 const tight = Math.abs(leadVal) < 0.5;
                 const ahead = leadVal > 0;
                 const label = tight ? 'Tight' : ahead ? 'You' : 'Shadow';
-                const pill = tight ? 'bg-slate-700/60 text-slate-200' : ahead ? 'bg-blue-600/20 text-blue-200 border border-blue-400/30' : 'bg-purple-600/20 text-purple-200 border border-purple-400/30';
-                const pulse = tight ? '' : 'animate-pulse';
-                return <span className={`px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px] ${pill} ${pulse}`}>{label}</span>;
+                const pill = 'bg-surface px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px]';
+                const tone = ahead ? 'text-blue-200' : tight ? 'text-slate-200' : 'text-purple-200';
+                return <span className={`${pill} ${tone}`}>{label}</span>;
               })()}
             </div>
-            <div className="mt-0.5 text-[12px] md:text-[14px] font-medium text-gray-100 leading-snug">
+            <div className="mt-0.5 text-[12px] md:text-[13px] font-medium text-foreground leading-snug">
               {(() => {
                 const leadVal = typeof shadowState?.lead === 'number' ? shadowState.lead : (todayUserEP - todayShadowEP);
                 const tight = Math.abs(leadVal) < 0.5;
@@ -739,18 +735,18 @@ export default function ShadowPage() {
               })()}
             </div>
             {/* Inline mini tug-of-war bar for quick glance */}
-            <div className="mt-1.5 h-1 w-full bg-slate-800/80 rounded-full overflow-hidden">
+            <div className="mt-1.5 h-1 w-full bg-surface rounded-full overflow-hidden">
               <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${userPct}%` }} />
-              <div className="-mt-1 h-1 bg-purple-600/80 transition-all duration-500 float-right" style={{ width: `${shadowPct}%` }} />
+              <div className="-mt-1 h-1 bg-purple-600 transition-all duration-500 float-right" style={{ width: `${shadowPct}%` }} />
             </div>
           </div>
 
           {/* Projection */}
-          <div className="rounded-xl p-2 md:p-2.5 bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-gray-900/50 backdrop-blur-sm">
-            <div className="text-[10px] md:text-[11px] text-gray-400 inline-flex items-center gap-1">
+          <div className="rounded-xl p-2 md:p-2.5 bg-surface2">
+            <div className="text-[10px] md:text-[11px] text-muted inline-flex items-center gap-1">
               <span>📅</span> Today's projection
             </div>
-            <div className="mt-0.5 text-[12px] md:text-[14px] font-medium space-y-0.5 text-gray-100 leading-snug">
+            <div className="mt-0.5 text-[12px] md:text-[13px] font-medium space-y-0.5 text-foreground leading-snug">
               {(() => {
                 const tasks = (shadowState?.tasks || []) as any[];
                 const userDone = tasks.filter((t: any) => t.is_user_done).length;
@@ -764,7 +760,7 @@ export default function ShadowPage() {
                 return (
                   <>
                     <div>At this pace: {projUser} tasks done today</div>
-                    <div className="text-[11px] md:text-[12px] text-gray-400">Shadow predicts: {projShadow} tasks by end of day</div>
+                    <div className="text-[11px] md:text-[12px] text-muted">Shadow predicts: {projShadow} tasks by end of day</div>
                   </>
                 );
               })()}
@@ -776,23 +772,16 @@ export default function ShadowPage() {
             const ts = typeof shadowState?.metrics?.time_saved_minutes === 'number' ? shadowState.metrics.time_saved_minutes : 0;
             if (!ts || ts <= 0) return null;
             return (
-              <div className="rounded-xl p-2 md:p-2.5 bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-emerald-500/30 ring-1 ring-emerald-500/10 backdrop-blur-sm">
-                <div className="text-[10px] md:text-[11px] text-gray-300 inline-flex items-center gap-1">
+              <div className="rounded-xl p-2 md:p-2.5 bg-surface2">
+                <div className="text-[10px] md:text-[11px] text-muted inline-flex items-center gap-1">
                   <span>⏳</span> Time saved
                 </div>
-                <div className="mt-0.5 text-[12px] md:text-[14px] font-medium text-emerald-200">
+                <div className="mt-0.5 text-[12px] md:text-[13px] font-medium text-emerald-200">
                   {`You\'ve saved ${Math.round(ts)}m so far`}
                 </div>
               </div>
             );
           })()}
-
-          {/* Pace Consistency */}
-          <div className="rounded-xl p-2 md:p-2.5 bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-gray-900/50 backdrop-blur-sm">
-            <div className="text-[10px] md:text-[11px] text-gray-400 inline-flex items-center gap-1">
-              <span>📊</span> Consistency
-            </div>
-            <div className="mt-0.5 text-[12px] md:text-[14px] font-medium text-gray-100 flex items-center gap-2">
               {(() => {
                 const pc = typeof shadowState?.metrics?.pace_consistency === 'number' ? shadowState.metrics.pace_consistency : null;
                 const tasks = (shadowState?.tasks || []) as any[];
@@ -802,21 +791,16 @@ export default function ShadowPage() {
                 if (pc >= 0.5) return <>Strong start</>;
                 return <>Wobbly pace</>;
               })()}
-            </div>
-          </div>
+            
+          
 
           {/* Speed comparison */}
           <div className={(() => {
-            const us = typeof shadowState?.metrics?.user_speed_now === 'number' ? shadowState.metrics.user_speed_now : 0;
-            const ss = typeof shadowState?.metrics?.shadow_speed_now === 'number' ? shadowState.metrics.shadow_speed_now : 0;
-            const ratio = ss > 0 ? us / ss : 1;
-            const ahead = (us > ss);
-            const state = (us === 0 && ss === 0) ? 'idle' : (ahead ? 'ahead' : (us === 0 ? 'shadow-moving' : (ss === 0 ? 'you-moving' : 'even')));
-            const accent = state === 'ahead' ? 'border-emerald-500/30 ring-1 ring-emerald-500/10' : state === 'idle' ? 'border-slate-700' : 'border-amber-500/30 ring-1 ring-amber-500/10';
-            return `rounded-xl p-2 md:p-2.5 bg-gradient-to-br from-slate-800/60 to-slate-900/60 border ${accent} backdrop-blur-sm md:col-span-2`;
+            // Solid card with theme tokens
+            return `rounded-xl p-2 md:p-2.5 bg-surface2 md:col-span-2`;
           })()}>
             <div className="flex items-center justify-between">
-              <div className="text-[10px] md:text-[11px] text-gray-400 inline-flex items-center gap-1">
+              <div className="text-[10px] md:text-[11px] text-muted inline-flex items-center gap-1">
                 <span>⚡</span> Pace
               </div>
               {(() => {
@@ -824,14 +808,14 @@ export default function ShadowPage() {
                 const ss = typeof shadowState?.metrics?.shadow_speed_now === 'number' ? shadowState.metrics.shadow_speed_now : 0;
                 const ratio = ss > 0 ? us / ss : 1;
                 let badge = 'Keeping pace';
-                let cls = 'bg-slate-700/60 text-slate-200';
-                if (ratio >= 1.8) { badge = 'Blazing'; cls = 'bg-emerald-600/20 text-emerald-200 border border-emerald-400/30'; }
-                else if (ratio <= 0.55) { badge = 'Falling behind'; cls = 'bg-amber-600/20 text-amber-200 border border-amber-400/30'; }
+                let cls = 'bg-surface text-foreground';
+                if (ratio >= 1.8) { badge = 'Blazing'; cls = 'bg-surface text-emerald-200'; }
+                else if (ratio <= 0.55) { badge = 'Falling behind'; cls = 'bg-surface text-amber-200'; }
                 const pulse = (badge === 'Blazing' || badge === 'Falling behind') ? 'animate-pulse' : '';
                 return <span className={`px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px] ${cls} ${pulse}`}>{badge}</span>;
               })()}
             </div>
-            <div className="mt-0.5 text-[12px] md:text-[14px] font-medium text-gray-100">
+            <div className="mt-0.5 text-[12px] md:text-[14px] font-medium text-foreground">
               {(() => {
                 const us = typeof shadowState?.metrics?.user_speed_now === 'number' ? shadowState.metrics.user_speed_now : 0;
                 const ss = typeof shadowState?.metrics?.shadow_speed_now === 'number' ? shadowState.metrics.shadow_speed_now : 0;
@@ -849,12 +833,12 @@ export default function ShadowPage() {
               const ss = typeof shadowState?.metrics?.shadow_speed_now === 'number' ? shadowState.metrics.shadow_speed_now : 0;
               const ratio = ss > 0 ? us / ss : 1;
               if (ratio <= 0.55 || (us === 0 && ss > 0)) {
-                return <div className="mt-1 text-[11px] text-amber-300/90">Tip: try a 5‑min sprint to catch up ⚡</div>;
+                return <div className="mt-1 text-[11px] text-amber-300">Tip: try a 5‑min sprint to catch up ⚡</div>;
               }
               return null;
             })()}
             {/* Tiny avatars for sides */}
-            <div className="mt-1.5 flex items-center gap-3 text-[10px] md:text-[11px] text-gray-400">
+            <div className="mt-1.5 flex items-center gap-3 text-[10px] md:text-[11px] text-muted">
               <div className="inline-flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-blue-500" /> You</div>
               <div className="inline-flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-purple-500" /> Shadow</div>
             </div>
@@ -877,51 +861,51 @@ export default function ShadowPage() {
         </div> */}
       </section>
 
-      {/* Challenges (highlighted) */}
-      <section className="rounded-2xl border border-indigo-200 dark:border-indigo-900/40 bg-indigo-50 dark:bg-indigo-950/30 p-4 mb-4">
+      {/* Challenges */}
+      <section className="rounded-2xl bg-surface p-4 mb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 font-semibold mb-1">
-            <Trophy className="w-4 h-4 text-indigo-600" /> Challenges
+            <Trophy className="w-4 h-4 text-foreground" /> Challenges
           </div>
-          <div className="text-xs text-indigo-700/80 dark:text-indigo-300/80">{active.length || 0} active</div>
+          <div className="text-xs text-muted">{active.length || 0} active</div>
         </div>
         {active.length === 0 ? (
-          <div className="text-sm text-indigo-800/80 dark:text-indigo-200/80">No active challenges. New mini-races will appear here.</div>
+          <div className="text-sm text-muted">No active challenges. New mini-races will appear here.</div>
         ) : (
-          <ul className="mt-2 divide-y divide-indigo-200/50 dark:divide-indigo-900/50">
+          <ul className="mt-2 divide-y divide-surface2">
             {active.slice(0, 3).map((c) => (
               <li key={c.id} className="py-2 flex items-center justify-between text-sm">
                 <div className="min-w-0">
-                  <div className="font-medium truncate">{c.task_template?.title || "Mini-race"}</div>
-                  <div className="text-xs text-indigo-700/80 dark:text-indigo-300/80">Due {c.due_time ? new Date(c.due_time).toLocaleString() : "soon"}</div>
+                  <div className="font-medium truncate text-foreground">{c.task_template?.title || "Mini-race"}</div>
+                  <div className="text-xs text-muted">Due {c.due_time ? new Date(c.due_time).toLocaleString() : "soon"}</div>
                 </div>
-                <span className="text-[11px] uppercase text-indigo-700/80 dark:text-indigo-300/80">{c.state}</span>
+                <span className="text-[11px] uppercase text-muted">{c.state}</span>
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      {/* Task Timeline (lighter panel) */}
-      <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-4 mb-4">
+      {/* Task Timeline */}
+      <section className="rounded-2xl bg-surface p-4 mb-4">
         <div className="flex items-center gap-2 font-semibold mb-2">
           <Timer className="w-4 h-4" /> Today
         </div>
         {!initialLoaded && stateLoading && (
-          <div className="text-sm text-gray-500 flex items-center gap-2">
+          <div className="text-sm text-muted flex items-center gap-2">
             <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…
           </div>
         )}
         {!stateLoading && (!groupedFlow || groupedFlow.length === 0) && (
-          <div className="text-sm text-gray-500">No tasks for today.</div>
+          <div className="text-sm text-muted">No tasks for today.</div>
         )}
         <div className="space-y-3">
           {groupedFlow.map((g: any) => (
             <div key={g.anchor}>
-              <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+              <div className="text-xs uppercase tracking-wide text-muted mb-1">
                 {g.anchor}
               </div>
-              <ul className="divide-y divide-gray-100 dark:divide-gray-900">
+              <ul className="divide-y divide-surface2">
                 {g.items.map((t: any) => (
                   <TaskRow
                     key={t.id}
@@ -938,14 +922,14 @@ export default function ShadowPage() {
 
       {/* Compact History (7 days) */}
       {raceHistory?.daily && Array.isArray(raceHistory.daily) && raceHistory.daily.length > 0 && (
-        <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-4 mb-4">
+        <section className="rounded-2xl bg-surface p-4 mb-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 font-semibold">
               <History className="w-4 h-4" /> History (7d)
             </div>
-            <div className="text-xs text-gray-500">Lead by day</div>
+            <div className="text-xs text-muted">Lead by day</div>
           </div>
-          <ul className="divide-y divide-gray-100 dark:divide-gray-900">
+          <ul className="divide-y divide-surface2">
             {raceHistory.daily.slice(-7).map((d: any) => {
               const lead = Number(d.lead ?? 0);
               const userD = Number(d.user_distance ?? 0);
@@ -956,16 +940,16 @@ export default function ShadowPage() {
               return (
                 <li key={d.date} className="py-2">
                   <div className="flex items-center justify-between text-xs mb-1">
-                    <div className="text-gray-500">{d.date}</div>
-                    <div className={`inline-flex items-center px-2 py-0.5 rounded-md border ${lead >= 0 ? 'bg-blue-500/10 text-blue-600 border-blue-500/30' : 'bg-purple-500/10 text-purple-600 border-purple-500/30'}`}>
+                    <div className="text-muted">{d.date}</div>
+                    <div className={`inline-flex items-center px-2 py-0.5 rounded-md ${lead >= 0 ? 'bg-surface2 text-blue-300' : 'bg-surface2 text-purple-300'}`}>
                       {lead >= 0 ? 'You' : 'Shadow'} {Math.abs(lead)}
                     </div>
                   </div>
-                  <div className="h-2 w-full bg-gray-100 dark:bg-gray-900 rounded-full overflow-hidden relative">
+                  <div className="h-2 w-full bg-surface2 rounded-full overflow-hidden relative">
                     <div className="absolute left-0 top-0 h-full bg-blue-500/80" style={{ width: `${userW}%` }} />
                     <div className="absolute right-0 top-0 h-full bg-purple-500/70" style={{ width: `${shadowW}%` }} />
                   </div>
-                  <div className="mt-1 text-[10px] text-gray-500">You {userD} • Shadow {shadowD}</div>
+                  <div className="mt-1 text-[10px] text-muted">You {userD} • Shadow {shadowD}</div>
                 </li>
               );
             })}
@@ -1120,21 +1104,21 @@ export default function ShadowPage() {
 
       {/* Today's Shadow Challenge */}
       {todayShadow && (
-        <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-4 mb-4">
+        <section className="rounded-2xl bg-surface p-4 mb-4">
           <div className="flex items-center justify-between mb-2">
             <div className="font-semibold">Today's Shadow Challenge</div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-muted">
               Deadline: {new Date(todayShadow.deadline).toLocaleTimeString()}
             </div>
           </div>
           <div className="text-sm mb-2">{todayShadow.challenge_text}</div>
           <div className="flex items-center justify-between text-sm">
             <div>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-surface2 text-amber-200">
                 EP at stake: +{epAtStake}
               </span>
             </div>
-            <div className="font-mono text-gray-700 dark:text-gray-300">
+            <div className="font-mono text-foreground">
               {fmt(timeLeft)}
             </div>
           </div>
@@ -1184,7 +1168,7 @@ export default function ShadowPage() {
       )}
 
       {/* Active Challenges */}
-      <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 mb-4">
+      {/* <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 mb-4">
         <div className="px-4 py-3 flex items-center gap-2 font-semibold">
           <Trophy className="w-4 h-4" /> Active Challenges
         </div>
@@ -1221,17 +1205,17 @@ export default function ShadowPage() {
             )}
           </ul>
         )}
-      </section>
+      </section> */}
 
       {/* History */}
-      <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 mb-4">
+      <section className="rounded-2xl bg-surface mb-4">
         <div className="px-4 py-3 flex items-center gap-2 font-semibold">
           <History className="w-4 h-4" /> History
         </div>
         {loading ? (
-          <div className="px-4 pb-4 text-sm text-gray-500">Loading…</div>
+          <div className="px-4 pb-4 text-sm text-muted">Loading…</div>
         ) : (
-          <ul className="divide-y divide-gray-100 dark:divide-gray-900">
+          <ul className="divide-y divide-surface2">
             {history.map((c) => (
               <li
                 key={c.id}
@@ -1241,21 +1225,21 @@ export default function ShadowPage() {
                   <div className="font-medium">
                     {c.task_template?.title || "Challenge"}
                   </div>
-                  <div className="text-gray-500 dark:text-gray-400">
+                  <div className="text-muted">
                     {c.state}
                   </div>
-                  <div className="text-gray-500 dark:text-gray-400">
+                  <div className="text-muted">
                     Ended:{" "}
                     {c.due_time ? new Date(c.due_time).toLocaleString() : "—"}
                   </div>
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-muted">
                   {new Date(c.created_at).toLocaleString()}
                 </div>
               </li>
             ))}
             {!history.length && (
-              <li className="px-4 py-3 text-sm text-gray-500">
+              <li className="px-4 py-3 text-sm text-muted">
                 No past challenges
               </li>
             )}
@@ -1264,22 +1248,22 @@ export default function ShadowPage() {
       </section>
 
       {/* Transparency (optional) */}
-      <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+      <section className="rounded-2xl bg-surface">
         <div className="px-4 py-3 flex items-center gap-2 font-semibold">
           <Eye className="w-4 h-4" /> Transparency
         </div>
-        <div className="px-4 pb-4 text-sm text-gray-500">
+        <div className="px-4 pb-4 text-sm text-muted">
           Shadow-only tasks will be shown here in a future iteration.
         </div>
       </section>
 
-      {err && <div className="mt-4 text-sm text-red-600">{err}</div>}
+      {err && <div className="mt-4 text-sm text-red-500">{err}</div>}
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-4 right-4 z-50 px-3 py-2 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 text-sm">
+        <div className="fixed bottom-4 right-4 z-50 px-3 py-2 rounded-lg shadow-lg bg-surface text-sm">
           <div className="font-medium">{toast.title}</div>
           {toast.body && (
-            <div className="text-gray-600 dark:text-gray-400">{toast.body}</div>
+            <div className="text-muted">{toast.body}</div>
           )}
         </div>
       )}

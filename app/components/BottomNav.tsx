@@ -32,7 +32,7 @@ export default function BottomNav() {
     <nav
       role="navigation"
       aria-label="Primary"
-      className="fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200/70 dark:border-gray-800/70 bg-white/80 dark:bg-gray-950/70 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-950/60 shadow-[0_-1px_0_0_rgba(0,0,0,0.04)] md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-30 bg-surface md:hidden"
     >
       <ul
         className={cn(
@@ -65,7 +65,7 @@ export default function BottomNav() {
                     >
                       <Icon aria-hidden className="h-6 w-6" strokeWidth={2.2} />
                     </span>
-                    <span className="mt-1 text-[10px] leading-none font-medium text-gray-700 dark:text-gray-200">{label}</span>
+                    <span className="mt-1 text-[10px] leading-none font-medium text-foreground">{label}</span>
                   </Link>
                 </div>
               ) : (
@@ -73,7 +73,7 @@ export default function BottomNav() {
                   href={{ pathname: href }}
                   className={cn(
                     "flex-1 mx-1 my-1 flex flex-col items-center justify-center text-[10px] gap-1 rounded-2xl transition-colors",
-                    "hover:bg-gray-100/70 dark:hover:bg-white/5"
+                    "hover:bg-surface2"
                   )}
                   aria-current={active ? "page" : undefined}
                 >
@@ -82,14 +82,14 @@ export default function BottomNav() {
                     className={cn(
                       "h-[21px] w-[21px]",
                       active
-                        ? "text-blue-600 dark:text-emerald-400"
-                        : "text-gray-600 dark:text-gray-300"
+                        ? "text-accent"
+                        : "text-muted"
                     )}
                     strokeWidth={2.2}
                   />
                   <span className={cn(
                     "leading-none font-medium",
-                    "text-gray-700 dark:text-gray-200"
+                    "text-foreground"
                   )}>{label}</span>
                 </Link>
               )}

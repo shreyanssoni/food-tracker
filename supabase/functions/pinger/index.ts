@@ -51,7 +51,7 @@ export const handler = async (req: Request): Promise<Response> => {
   };
 
   // Allow running a single target via query param
-  // ?only=push|eod|pre|shadow-generate|shadow-close|shadow-notify|shadow-run-today|shadow-weekly|shadow-nightly|shadow-taunt
+  // ?only=push|eod|pre|shadow-generate|shadow-close|shadow-notify|shadow-run-today|shadow-audit-fix-all|shadow-generate-events-today-all|shadow-weekly|shadow-nightly|shadow-taunt
   const urlObj = new URL(req.url);
   const only = urlObj.searchParams.get('only');
   const allTargets: Record<string, Target> = {
@@ -65,6 +65,18 @@ export const handler = async (req: Request): Promise<Response> => {
     // New orchestrator cron route uses POST + x-cron-secret header
     'shadow-run-today': {
       url: `${base}/api/cron/shadow/run-today-all`,
+      method: 'POST',
+      headers: { 'x-cron-secret': secret },
+    },
+    // Mirror seeding for all users (idempotent)
+    'shadow-audit-fix-all': {
+      url: `${base}/api/cron/shadow/audit-fix-all`,
+      method: 'POST',
+      headers: { 'x-cron-secret': secret },
+    },
+    // Persist today's shadow_task_instances for all users
+    'shadow-generate-events-today-all': {
+      url: `${base}/api/cron/shadow/generate-events-today-all`,
       method: 'POST',
       headers: { 'x-cron-secret': secret },
     },
@@ -115,6 +127,12 @@ export const handler = async (req: Request): Promise<Response> => {
     case 'shadow-run-today':
       targets = [allTargets['shadow-run-today']];
       break;
+    case 'shadow-audit-fix-all':
+      targets = [allTargets['shadow-audit-fix-all']];
+      break;
+    case 'shadow-generate-events-today-all':
+      targets = [allTargets['shadow-generate-events-today-all']];
+      break;
     case 'shadow-weekly':
       targets = [allTargets['shadow-weekly']];
       break;
@@ -133,6 +151,8 @@ export const handler = async (req: Request): Promise<Response> => {
         allTargets['shadow-close'],
         allTargets['shadow-notify'],
         allTargets['shadow-run-today'],
+        allTargets['shadow-audit-fix-all'],
+        allTargets['shadow-generate-events-today-all'],
         allTargets['shadow-taunt'],
       ];
   }

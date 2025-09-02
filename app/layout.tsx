@@ -34,10 +34,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const session = await auth();
 
   return (
-    <html lang="en" className="h-full bg-gray-50 dark:bg-gray-900" suppressHydrationWarning>
+    <html lang="en" className="h-full" suppressHydrationWarning>
       <head>
         <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
-        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1220" />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -54,9 +54,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           }}
         />
       </head>
-      <body className={`${inter.className} min-h-full flex flex-col text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900`}>
+      <body className={`${inter.className} min-h-full flex flex-col bg-background text-foreground`}>
         {/* Fixed background layer to avoid any white areas behind content (SSR/PWA) */}
-        <div className="fixed inset-0 -z-10 bg-gray-50 dark:bg-gray-900" aria-hidden />
+        <div className="fixed inset-0 -z-10 bg-background" aria-hidden />
         <Providers session={session}>
           <Navbar />
           <main className="flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
@@ -79,12 +79,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <AutoEnableNotifications />
           {/* Global toaster */}
           <Toaster richColors position="top-center" theme="system" />
-          <footer className="hidden md:block bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 mt-8">
+          <footer className="hidden md:block bg-surface border-t border-border mt-8">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-              <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-center text-sm text-muted">
                 &copy; {new Date().getFullYear()} Nourish. All rights reserved.
               </p>
-              <p className="mt-2 text-center text-xs text-gray-400 dark:text-gray-500">
+              <p className="mt-2 text-center text-xs text-muted">
                 Made with ❤️ — by Shreyans. Be Kind to Yourself.
               </p>
             </div>
