@@ -666,7 +666,7 @@ export default function DashboardPage() {
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>
             <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-              Today
+              Quick Actions
             </h1>
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px]">
               {/* Level */}
