@@ -1,0 +1,38 @@
+{
+  "project_info": {
+    "project_number": "318658794111",
+    "project_id": "food-tracker-70b02",
+    "storage_bucket": "food-tracker-70b02.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:318658794111:android:4bb3f531341db60a49e54a",
+        "android_client_info": {
+          "package_name": "com.nourishme.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "318658794111-7821sg1ae9o785fcu2ofjv2ie3dhcueb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nourishme.app",
+            "certificate_hash": "744bae5142095319990cc39ca7906680c16efae2"
+          }
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBWvhu616snq17w50L8f08swlKbQxeb_-c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

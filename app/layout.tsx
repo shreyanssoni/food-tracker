@@ -12,6 +12,10 @@ import Onboarding from './components/Onboarding';
 import TimezoneSetup from './components/TimezoneSetup';
 import TimezoneMismatchPrompt from './components/TimezoneMismatchPrompt';
 import AutoEnableNotifications from './components/AutoEnableNotifications';
+import CapacitorDeepLinkHandler from './components/CapacitorDeepLinkHandler';
+import OfflineBanner from './components/OfflineBanner';
+import PushInit from './components/PushInit';
+import StatusBarInit from './components/StatusBarInit';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -54,14 +58,19 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           }}
         />
       </head>
-      <body className={`${inter.className} min-h-full flex flex-col bg-background text-foreground`}>
+      <body className={`${inter.className} min-h-full flex flex-col bg-background text-foreground pt-[env(safe-area-inset-top)]`}>
         {/* Fixed background layer to avoid any white areas behind content (SSR/PWA) */}
         <div className="fixed inset-0 -z-10 bg-background" aria-hidden />
         <Providers session={session}>
+          <StatusBarInit />
           <Navbar />
+          <OfflineBanner />
+          <PushInit />
           <main className="flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-              {children}
+              <CapacitorDeepLinkHandler>
+                {children}
+              </CapacitorDeepLinkHandler>
             </div>
           </main>
           <BottomNav />

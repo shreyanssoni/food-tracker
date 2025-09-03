@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "export": "next export",
+    "build:export": "next build && next export",
+    "android:sync": "npx cap sync android",
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
@@ -14,6 +17,12 @@
   },
   "dependencies": {
     "@auth/supabase-adapter": "^1.10.0",
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/app": "^7.0.2",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor/preferences": "^7.0.2",
+    "@capacitor/push-notifications": "^7.0.2",
+    "@capacitor/status-bar": "^7.0.2",
     "@ducanh2912/next-pwa": "^10.2.9",
     "@google/generative-ai": "^0.5.0",
     "@radix-ui/react-dialog": "^1.0.5",
@@ -45,6 +54,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.4.3",
     "@tailwindcss/forms": "^0.5.7",
     "@types/node": "^20.16.10",
     "@types/react": "^18.3.5",

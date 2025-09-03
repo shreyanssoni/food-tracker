@@ -32,10 +32,15 @@ const config: NextAuthConfig = {
         try {
           const idToken = (credentials as any)?.id_token as string;
           if (!idToken) return null;
-          const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-          if (!clientId) return null;
-          const client = new OAuth2Client(clientId);
-          const ticket = await client.verifyIdToken({ idToken, audience: clientId });
+          // Accept ID tokens from both Web and Android OAuth clients
+          const allowedAudiences = [
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+            process.env.ANDROID_GOOGLE_CLIENT_ID,
+          ].filter(Boolean) as string[];
+          if (!allowedAudiences.length) return null;
+          const client = new OAuth2Client();
+          const ticket = await client.verifyIdToken({ idToken, audience: allowedAudiences });
           const payload = ticket.getPayload();
           if (!payload || !payload.email) return null;
           return {

@@ -5,6 +5,7 @@ import { createClient as createBrowserClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
 import { CheckCircle2, Plus, Pencil, Trash2, Clock, CalendarDays, Search, ChevronDown, ChevronRight, Sun, Zap, Gem, Flame, MoreHorizontal } from 'lucide-react';
 import TimezoneMismatchPrompt from '@/app/components/TimezoneMismatchPrompt';
+import { writeTodayTasksForWidget } from '@/utils/widget';
 
 interface Task {
   id: string;
@@ -450,6 +451,14 @@ export default function TasksPage() {
     const activeList = filtered.filter((t) => t.active && !todayTaskIds.has(t.id) && !isOverdue(t));
     return { todayList, completedTodayList, activeList, inactiveList };
   }, [filtered, schedules, clockTick, todayTaskIds]);
+
+  // Sync today's tasks to Android widget via Capacitor Preferences (Android only)
+  useEffect(() => {
+    try {
+      const payload = grouped.todayList.map((t) => ({ id: t.id, title: t.title, done: !!t.completedToday }));
+      writeTodayTasksForWidget(payload);
+    } catch {}
+  }, [grouped.todayList]);
 
   // Challenge helpers
   const isChallenge = (t: Task) => t.category === 'challenge' || !!t.challenge_id;

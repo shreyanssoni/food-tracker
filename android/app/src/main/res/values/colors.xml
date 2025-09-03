@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launcher adaptive icon background color -->
+    <color name="ic_launcher_background">#FFFFFF</color>
+
+    <!-- Splash background color (can set to your brand color) -->
+    <color name="splash_background">#FFFFFF</color>
+</resources>

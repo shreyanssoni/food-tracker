@@ -46,6 +46,47 @@ const withPWA = withPWAInit({
   // Enable PWA in dev only if explicitly set
   disable: process.env.NEXT_PUBLIC_ENABLE_PWA_DEV === '1' ? false : process.env.NODE_ENV === 'development',
   customWorkerDir: 'worker',
+  runtimeCaching: [
+    // Cache Next.js static assets (JS/CSS/_next/static)
+    {
+      urlPattern: /(_next\/static|_next\/image|static)\//,
+      handler: 'StaleWhileRevalidate',
+      options: {
+        cacheName: 'static-assets',
+        expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 7 }, // 7 days
+      },
+    },
+    // Cache images
+    {
+      urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|avif)$/,
+      handler: 'StaleWhileRevalidate',
+      options: {
+        cacheName: 'image-cache',
+        expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 7 },
+      },
+    },
+    // App shell/pages (navigations) - network first with fallback to cache
+    {
+      urlPattern: ({ request }) => request.mode === 'navigate',
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'pages-cache',
+        networkTimeoutSeconds: 3,
+        expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 3 }, // 3 days
+      },
+    },
+    // API responses we want available offline (stale data ok)
+    {
+      urlPattern: /\/api\/(tasks(\/today)?|shadow\/(challenges\/today|messages\/latest|state\/today|summary))/,
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'api-cache',
+        networkTimeoutSeconds: 3,
+        expiration: { maxEntries: 50, maxAgeSeconds: 60 * 30 }, // 30 minutes
+        cacheableResponse: { statuses: [0, 200] },
+      },
+    },
+  ],
 });
 
 export default withPWA(nextConfig);

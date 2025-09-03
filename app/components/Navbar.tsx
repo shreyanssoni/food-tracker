@@ -721,7 +721,7 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="sticky top-0 z-40 bg-surface shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+    <nav className="sticky top-0 z-40 bg-surface shadow-[0_1px_0_0_rgba(0,0,0,0.04)] pt-[env(safe-area-inset-top)]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Left: Brand */}
