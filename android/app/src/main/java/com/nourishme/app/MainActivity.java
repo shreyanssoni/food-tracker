@@ -80,10 +80,15 @@ public class MainActivity extends BridgeActivity {
         final String finalTarget = targetPath;
         try {
             if (getBridge() != null && getBridge().getWebView() != null) {
-                // Build absolute URL using current server URL (dev) or base path (prod)
+                // Build absolute URL using current server URL (dev) or local bundled URL (prod)
                 String base = getBridge().getServerUrl();
                 if (base == null || base.isEmpty()) {
-                    base = "http://localhost"; // Capacitor serves internally; relative should still work
+                    try {
+                        // Capacitor provides a local URL for bundled apps, e.g. capacitor://localhost
+                        base = getBridge().getLocalUrl();
+                    } catch (Throwable t) {
+                        base = ""; // Fallback to relative navigation
+                    }
                 }
                 final String url = base + finalTarget;
                 getBridge().getWebView().post(() -> {

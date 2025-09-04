@@ -45,14 +45,16 @@ class TaskWidgetProvider : AppWidgetProvider() {
                 data = Uri.parse(this.toUri(Intent.URI_INTENT_SCHEME))
             }
             views.setRemoteAdapter(R.id.list_view, svcIntent)
+            // Provide an empty view to avoid launcher 'Couldn't load widget' when dataset is empty
+            views.setEmptyView(R.id.list_view, R.id.empty_view)
 
-            // Row clicks should open the tasks screen
-            val openTasksIntent = Intent(Intent.ACTION_VIEW, Uri.parse("nourishme://app/tasks"))
-            val openTasksPending = PendingIntent.getActivity(
-                context, 0, openTasksIntent,
+            // PendingIntent template for list rows: broadcast back to provider to toggle task
+            val toggleBroadcast = Intent(context, TaskWidgetProvider::class.java).apply { action = ACTION_TOGGLE }
+            val togglePending = PendingIntent.getBroadcast(
+                context, 0, toggleBroadcast,
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
-            views.setPendingIntentTemplate(R.id.list_view, openTasksPending)
+            views.setPendingIntentTemplate(R.id.list_view, togglePending)
 
             // Open tasks screen
             val addIntent = Intent(Intent.ACTION_VIEW, Uri.parse("nourishme://app/tasks"))
@@ -76,7 +78,7 @@ class TaskWidgetProvider : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.btn_refresh, refreshPending)
 
             // Compact: tapping top task also opens tasks screen
-            views.setOnClickPendingIntent(R.id.top_task, openTasksPending)
+            views.setOnClickPendingIntent(R.id.top_task, addPending)
 
             // Adjust compact vs list visibility based on size
             applySizeMode(context, appWidgetManager, widgetId, views)
