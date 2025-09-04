@@ -155,6 +155,22 @@ class TaskWidgetProvider : AppWidgetProvider() {
         return Pair(top, remaining.coerceAtLeast(0))
     }
 
+    // Returns the id of the first incomplete task to support compact toggle on tapping the top task
+    private fun readTopId(context: Context): String? {
+        val prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+        val json = prefs.getString("widget:tasks:today", "[]") ?: "[]"
+        val arr = JSONArray(json)
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            val done = o.optBoolean("done", false)
+            if (!done) {
+                val id = o.optString("id", "")
+                if (id.isNotEmpty()) return id
+            }
+        }
+        return null
+    }
+
     private fun schedulePeriodicRefresh(context: Context) {
         val work = PeriodicWorkRequestBuilder<WidgetRefreshWorker>(30, TimeUnit.MINUTES)
             .addTag(WidgetRefreshWorker.UNIQUE_TAG)
