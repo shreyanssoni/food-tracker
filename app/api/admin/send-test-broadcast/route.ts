@@ -38,16 +38,33 @@ export async function POST(req: NextRequest) {
   const dryRun = Boolean(body.dryRun);
 
   const supabase = createAdminClient();
-  const { data: rows, error } = await supabase
+  // Fetch current user's tokens first
+  const meRes = await supabase
     .from('fcm_tokens')
     .select('token')
+    .eq('user_id', uid)
     .limit(limit);
-  if (error) {
-    console.error('[send-test-broadcast] select error', error);
+  if (meRes.error) {
+    console.error('[send-test-broadcast] select(me) error', meRes.error);
     return NextResponse.json({ error: 'DB error' }, { status: 500 });
   }
+  const meTokens = Array.from(new Set((meRes.data || []).map((r: any) => r.token).filter(Boolean)));
 
-  const tokens = Array.from(new Set((rows || []).map((r: any) => r.token).filter(Boolean)));
+  let tokens: string[] = [...meTokens];
+  const remaining = Math.max(0, limit - tokens.length);
+  if (remaining > 0) {
+    const othersRes = await supabase
+      .from('fcm_tokens')
+      .select('token')
+      .not('token', 'in', `(${tokens.map(t => `'${t.replace(/'/g, "''")}'`).join(',') || "''"})`)
+      .limit(remaining);
+    if (othersRes.error) {
+      console.error('[send-test-broadcast] select(others) error', othersRes.error);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
+    const otherTokens = Array.from(new Set((othersRes.data || []).map((r: any) => r.token).filter(Boolean)));
+    tokens = Array.from(new Set([...tokens, ...otherTokens]));
+  }
   if (!tokens.length) {
     return badRequest('No FCM tokens found');
   }

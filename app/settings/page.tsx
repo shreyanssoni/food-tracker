@@ -13,20 +13,29 @@ export default function SettingsPage() {
 
   const [units, setUnits] = useState<Units>('metric');
   const [theme, setTheme] = useState<Theme>('system');
-  const [dietary, setDietary] = useState('');
   // server-backed timezone preference
   const [timezone, setTimezone] = useState<string>('');
   const [tzLoading, setTzLoading] = useState<boolean>(true);
   const [tzSaving, setTzSaving] = useState<boolean>(false);
-  const { enabled: notifications, status: notifStatus, pending, toggle, enable, disable } = useNotifications();
+  const { enabled: notifications, status: notifStatus, pending, enable, disable } = useNotifications();
   const [isNativeCapacitor, setIsNativeCapacitor] = useState(false);
+  const [devicePending, setDevicePending] = useState(false);
+  const [deviceEnabled, setDeviceEnabled] = useState<boolean>(false);
   const [broadcastPending, setBroadcastPending] = useState(false);
   const [broadcastResult, setBroadcastResult] = useState<string | null>(null);
   useEffect(() => {
     (async () => {
       try {
         const { Capacitor } = await import('@capacitor/core');
-        setIsNativeCapacitor(!!Capacitor?.isNativePlatform?.());
+        const native = !!Capacitor?.isNativePlatform?.();
+        setIsNativeCapacitor(native);
+        if (native) {
+          try {
+            const { PushNotifications } = await import('@capacitor/push-notifications');
+            const perm = await PushNotifications.checkPermissions();
+            setDeviceEnabled(perm.receive === 'granted');
+          } catch {}
+        }
       } catch {}
     })();
   }, []);
@@ -36,11 +45,8 @@ export default function SettingsPage() {
     try {
       const lu = (localStorage.getItem('pref_units') as Units) || 'metric';
       const lt = (localStorage.getItem('pref_theme') as Theme) || 'system';
-      const ld = localStorage.getItem('pref_dietary') || '';
-      const ln = localStorage.getItem('pref_notifications') === '1';
       setUnits(lu);
       setTheme(lt);
-      setDietary(ld);
       // notifications state comes from hook; keep localStorage for backward compat
       applyTheme(lt);
     } catch {}
@@ -109,10 +115,7 @@ export default function SettingsPage() {
     applyTheme(t);
   };
 
-  const onChangeDietary = (v: string) => {
-    setDietary(v);
-    localStorage.setItem('pref_dietary', v);
-  };
+  // dietary preferences are currently disabled in UI
 
   useEffect(() => {
     try {
@@ -121,8 +124,79 @@ export default function SettingsPage() {
     } catch {}
   }, [notifications]);
 
+  // Native (device) push helpers
+  const ensureAndroidChannel = async () => {
+    try {
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      await (PushNotifications as any).createChannel?.({
+        id: 'default',
+        name: 'Default',
+        description: 'General notifications',
+        importance: 4,
+        visibility: 1,
+        lights: true,
+        vibration: true,
+      });
+    } catch {}
+  };
+
+  const enableDevicePush = async () => {
+    setDevicePending(true);
+    try {
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      const perm = await PushNotifications.checkPermissions();
+      let granted = perm.receive === 'granted';
+      if (!granted) {
+        const req = await PushNotifications.requestPermissions();
+        granted = req.receive === 'granted';
+      }
+      if (!granted) {
+        setDeviceEnabled(false);
+        return;
+      }
+      await ensureAndroidChannel();
+      // One-time listener to store token after register
+      const once = (handler: any) => {
+        const wrapped = (t: any) => { try { handler(t); } finally { PushNotifications.removeAllListeners?.(); } };
+        return wrapped;
+      };
+      await PushNotifications.addListener('registration', once(async (token: any) => {
+        try {
+          await fetch('/api/store-fcm-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token.value, platform: 'android' }),
+          });
+          setDeviceEnabled(true);
+        } catch {}
+      }));
+      await PushNotifications.register();
+    } catch {
+      // keep disabled on error
+      setDeviceEnabled(false);
+    } finally {
+      setDevicePending(false);
+    }
+  };
+
+  const disableDevicePush = async () => {
+    setDevicePending(true);
+    try {
+      // Remove from our server so broadcasts won't target this device
+      await fetch('/api/delete-fcm-token', { method: 'POST' });
+      setDeviceEnabled(false);
+    } catch {
+    } finally {
+      setDevicePending(false);
+    }
+  };
+
   const onToggleNotifications = async (v: boolean) => {
-    if (v) await enable(); else await disable();
+    if (isNativeCapacitor) {
+      if (v) await enableDevicePush(); else await disableDevicePush();
+    } else {
+      if (v) await enable(); else await disable();
+    }
   };
 
   const saveTimezone = async () => {
@@ -240,19 +314,23 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <button
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${notifications ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`}
-                      onClick={() => toggle()}
-                      disabled={pending}
-                      aria-busy={pending}
-                      aria-pressed={!!notifications}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        (isNativeCapacitor ? deviceEnabled : !!notifications) ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'
+                      }`}
+                      onClick={() => onToggleNotifications(!(isNativeCapacitor ? deviceEnabled : !!notifications))}
+                      disabled={isNativeCapacitor ? devicePending : pending}
+                      aria-busy={isNativeCapacitor ? devicePending : pending}
+                      aria-pressed={isNativeCapacitor ? deviceEnabled : !!notifications}
                     >
-                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${notifications ? 'translate-x-5' : 'translate-x-1'}`} />
+                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${
+                        (isNativeCapacitor ? deviceEnabled : !!notifications) ? 'translate-x-5' : 'translate-x-1'
+                      }`} />
                     </button>
                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {pending
+                      {(isNativeCapacitor ? devicePending : pending)
                         ? 'Working…'
                         : isNativeCapacitor
-                        ? (notifications ? 'Enabled (device)' : 'Tap to enable (device)')
+                        ? (deviceEnabled ? 'Enabled (device)' : 'Tap to enable (device)')
                         : notifStatus === 'unsupported'
                         ? 'Not supported'
                         : `Permission: ${notifStatus}`}
