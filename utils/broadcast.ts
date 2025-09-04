@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { geminiText } from '@/utils/ai';
 import { sendWebPush, type WebPushSubscription, type PushPayload } from '@/utils/push';
+import { sendFcmToTokens } from '@/utils/fcm';
 
 const SLOT_VALUES = ['morning','midday','evening','night'] as const;
 export type Slot = typeof SLOT_VALUES[number];
@@ -184,7 +185,7 @@ export async function broadcastToTimezone(slot: Slot, timezone: string) {
   const ids = (users || []).map(u => u.user_id);
   if (!ids.length) return { sent: 0 };
 
-  // Get subscriptions for those users
+  // Get subscriptions for those users (Web Push / PWA)
   const { data: subs, error: sErr } = await supabase
     .from('push_subscriptions')
     .select('user_id, endpoint, p256dh, auth, expiration_time')
@@ -223,6 +224,45 @@ export async function broadcastToTimezone(slot: Slot, timezone: string) {
         url: payload.url || '/',
         success: true,
         status_code: 201,
+      });
+    }
+  }
+
+  // Also send to Android/iOS devices (FCM tokens) for the same users
+  const { data: fcmRows, error: fErr } = await supabase
+    .from('fcm_tokens')
+    .select('user_id, token')
+    .in('user_id', ids);
+  if (fErr) throw fErr;
+
+  for (const row of fcmRows || []) {
+    try {
+      const res = await sendFcmToTokens([row.token], {
+        title: payload.title,
+        body: payload.body,
+        data: { url: payload.url || '/', slot },
+      });
+      // Heuristic success: v1 returns { ok: true, results: [...] }
+      const success = !!(res && (res.ok === true || (Array.isArray(res.results) && res.results.length > 0)));
+      if (success) sent += 1;
+      await supabase.from('push_sends').insert({
+        user_id: row.user_id,
+        slot,
+        title: payload.title,
+        body: payload.body,
+        url: payload.url || '/',
+        success,
+        status_code: success ? 201 : null,
+      });
+    } catch (e) {
+      await supabase.from('push_sends').insert({
+        user_id: row.user_id,
+        slot,
+        title: payload.title,
+        body: payload.body,
+        url: payload.url || '/',
+        success: false,
+        status_code: null,
       });
     }
   }

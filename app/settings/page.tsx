@@ -20,6 +20,8 @@ export default function SettingsPage() {
   const [tzSaving, setTzSaving] = useState<boolean>(false);
   const { enabled: notifications, status: notifStatus, pending, toggle, enable, disable } = useNotifications();
   const [isNativeCapacitor, setIsNativeCapacitor] = useState(false);
+  const [broadcastPending, setBroadcastPending] = useState(false);
+  const [broadcastResult, setBroadcastResult] = useState<string | null>(null);
   useEffect(() => {
     (async () => {
       try {
@@ -261,18 +263,69 @@ export default function SettingsPage() {
 
               {/* Developer: temporary link to Push Debug */}
               <div className="md:col-span-2">
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col">
                     <div className="text-sm font-medium text-gray-700 dark:text-gray-200">Developer</div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">Temporary debug tools.</p>
                   </div>
-                  <a
-                    href="/debug/push"
-                    className="px-3 py-1.5 rounded-full text-xs font-medium bg-purple-600 text-white hover:bg-purple-700"
-                  >
-                    Open Push Debug
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href="/debug/push"
+                      className="px-3 py-1.5 rounded-full text-xs font-medium bg-purple-600 text-white hover:bg-purple-700"
+                    >
+                      Open Push Debug
+                    </a>
+                    <button
+                      className="px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
+                      disabled={broadcastPending}
+                      onClick={async () => {
+                        try {
+                          setBroadcastPending(true);
+                          setBroadcastResult(null);
+                          const res = await fetch('/api/admin/send-test-broadcast', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ limit: 3, dryRun: false }),
+                          });
+                          const json = await res.json();
+                          setBroadcastResult(res.ok ? `Sent to ${json?.tokens ?? '?'} tokens` : json?.error || 'Error');
+                        } catch (e: any) {
+                          setBroadcastResult(e?.message || 'Error');
+                        } finally {
+                          setBroadcastPending(false);
+                        }
+                      }}
+                    >
+                      {broadcastPending ? 'Sending…' : 'Test Broadcast (3)'}
+                    </button>
+                    <button
+                      className="px-3 py-1.5 rounded-full text-xs font-medium bg-gray-800 text-white hover:bg-gray-900 disabled:opacity-60"
+                      disabled={broadcastPending}
+                      onClick={async () => {
+                        try {
+                          setBroadcastPending(true);
+                          setBroadcastResult(null);
+                          const res = await fetch('/api/admin/send-test-broadcast', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ limit: 3, dryRun: true }),
+                          });
+                          const json = await res.json();
+                          setBroadcastResult(res.ok ? `Dry run: would send to ${json?.tokenCount ?? '?'} tokens` : json?.error || 'Error');
+                        } catch (e: any) {
+                          setBroadcastResult(e?.message || 'Error');
+                        } finally {
+                          setBroadcastPending(false);
+                        }
+                      }}
+                    >
+                      {broadcastPending ? 'Testing…' : 'Dry Run (3)'}
+                    </button>
+                  </div>
                 </div>
+                {broadcastResult && (
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{broadcastResult}</p>
+                )}
               </div>
             </div>
           </>
