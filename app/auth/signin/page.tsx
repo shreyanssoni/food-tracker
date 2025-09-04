@@ -1,7 +1,6 @@
 'use client';
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
-import { isAndroidNative, signInWithGoogleNative } from '@/utils/auth/nativeGoogle';
 import { useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
 import { toast } from 'sonner';
@@ -16,35 +15,21 @@ export default function SignIn() {
     try {
       const platform = Capacitor.getPlatform();
       // eslint-disable-next-line no-console
-      console.log('Capacitor platform:', platform, 'isAndroidNative():', isAndroidNative());
+      console.log('Capacitor platform:', platform);
       if (platform === 'android') {
-        try {
-          const res = await signInWithGoogleNative();
-          // eslint-disable-next-line no-console
-          console.log('Native sign-in result', res);
-          if (res?.ok) {
-            toast.success('Signed in');
-            router.replace('/');
-            return;
-          }
-          // If res not ok, fall through to web OAuth
-          toast.warning('Native Google sign-in unavailable. Using web sign-in…');
-        } catch (nativeErr) {
-          // eslint-disable-next-line no-console
-          console.warn('Native sign-in failed, falling back to web OAuth', nativeErr);
-          toast.warning('Native Google sign-in unavailable. Using web sign-in…');
-        }
-        // Fallback: Web OAuth via absolute URL (keeps flow in WebView on deployed site)
+        // Force absolute navigation to the deployed NextAuth sign-in URL in the WebView
         const base = process.env.NEXT_PUBLIC_AUTH_URL;
         if (!base) {
           toast.error('Missing NEXT_PUBLIC_AUTH_URL. Set it to your deployed domain.');
-        } else {
-          const authUrl = `${base}/api/auth/signin/google?callbackUrl=${encodeURIComponent(base + '/')}`;
-          // eslint-disable-next-line no-console
-          console.log('Redirecting to external sign-in URL:', authUrl);
-          window.location.href = authUrl;
+          // Fallback to NextAuth redirect flow
+          await signIn('google', { callbackUrl: '/', redirect: true });
           return;
         }
+        const authUrl = `${base}/api/auth/signin/google?callbackUrl=${encodeURIComponent(base + '/')}`;
+        // eslint-disable-next-line no-console
+        console.log('Navigating to:', authUrl);
+        window.location.assign(authUrl);
+        return;
       } else {
         const res = await signIn('google', { callbackUrl: '/', redirect: false });
         // eslint-disable-next-line no-console
