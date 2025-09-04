@@ -87,14 +87,14 @@ const config: NextAuthConfig = {
         }
 
         // Verify password
-        const isValid = await verifyPassword(credentials.password, user.password_hash || '');
+        const isValid = await verifyPassword(credentials.password as string, user.password_hash || '');
         if (!isValid) {
           return null;
         }
 
         // Check if email is verified
         if (!user.email_verified) {
-          throw new Error('Email not verified');
+          return null; // Return null instead of throwing error
         }
 
         return {
@@ -109,7 +109,7 @@ const config: NextAuthConfig = {
   // Alternatively, you can set AUTH_TRUST_HOST=true in the environment.
   trustHost: true,
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account }) {
       // Handle email/password sign-in
       if (account?.provider === 'email-password') {
         return true; // Already handled in the authorize callback

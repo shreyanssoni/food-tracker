@@ -38,11 +38,8 @@ export default function SignUp() {
   const isNative = Capacitor.getPlatform() === 'android';
 
   // Get timezone options
-  const tzOptions = (() => {
-    const list = Intl.supportedValuesOf('timeZone')
-      .filter((v, i, a) => !!v && a.indexOf(v) === i);
-    return list;
-  }, []);
+  const tzOptions = Intl.supportedValuesOf('timeZone')
+    .filter((v, i, a) => !!v && a.indexOf(v) === i);
 
   // Get reliable timezone
   const getReliableTimeZone = () => {
@@ -100,9 +97,31 @@ export default function SignUp() {
   const handleNativeSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validation
-    if (!email || !password || !name) {
-      toast.error('Please fill in all required fields');
+    // Enhanced validation with specific error messages
+    if (!name.trim()) {
+      toast.error('Please enter your full name');
+      return;
+    }
+
+    if (!email.trim()) {
+      toast.error('Please enter your email address');
+      return;
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    if (!password) {
+      toast.error('Please enter a password');
+      return;
+    }
+
+    if (!confirmPassword) {
+      toast.error('Please confirm your password');
       return;
     }
 
@@ -111,8 +130,29 @@ export default function SignUp() {
       return;
     }
 
+    // Enhanced password validation
     if (password.length < 8) {
       toast.error('Password must be at least 8 characters long');
+      return;
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      toast.error('Password must contain at least one uppercase letter');
+      return;
+    }
+
+    if (!/[a-z]/.test(password)) {
+      toast.error('Password must contain at least one lowercase letter');
+      return;
+    }
+
+    if (!/[0-9]/.test(password)) {
+      toast.error('Password must contain at least one number');
+      return;
+    }
+
+    if (!timezone) {
+      toast.error('Please select your timezone');
       return;
     }
 
@@ -145,7 +185,15 @@ export default function SignUp() {
         // Redirect to signin page
         router.push('/auth/signin' as any);
       } else {
-        toast.error(data.error || 'Failed to create account');
+        // Handle specific error cases
+        if (response.status === 409) {
+          toast.error('An account with this email already exists. Please sign in instead.');
+        } else if (response.status === 400) {
+          // Show the specific validation error from server
+          toast.error(data.error || 'Please check your information and try again');
+        } else {
+          toast.error(data.error || 'Failed to create account. Please try again.');
+        }
       }
     } catch (error) {
       console.error('Signup error:', error);

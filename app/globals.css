@@ -84,3 +84,40 @@ html.dark a:hover { color: theme('colors.violet.200'); }
 .no-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
 }
+
+/* Sonner toast overrides for better visibility */
+[data-sonner-toaster] {
+  z-index: 99999 !important;
+  position: fixed !important;
+}
+
+[data-sonner-toast] {
+  background: white !important;
+  border: 2px solid #e5e7eb !important;
+  color: #1f2937 !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+  font-weight: 500 !important;
+  min-width: 300px !important;
+}
+
+html.dark [data-sonner-toast] {
+  background: #1f2937 !important;
+  border-color: #374151 !important;
+  color: #f9fafb !important;
+}
+
+[data-sonner-toast][data-type="error"] {
+  background: #ef4444 !important;
+  color: white !important;
+  border-color: #dc2626 !important;
+}
+
+[data-sonner-toast][data-type="success"] {
+  background: #22c55e !important;
+  color: white !important;
+  border-color: #16a34a !important;
+}
+
+.toast-custom {
+  z-index: 99999 !important;
+}

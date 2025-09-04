@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { hashPassword, isValidEmail, validatePassword } from '@/utils/auth/password';
+import { sendVerificationEmail } from '@/utils/email';
 import { v4 as uuidv4 } from 'uuid';
+import { randomBytes } from 'crypto';
 
 export async function POST(req: Request) {
   try {
@@ -61,9 +63,9 @@ export async function POST(req: Request) {
     // Hash password
     const hashedPassword = await hashPassword(password);
     const userId = uuidv4();
-    const verificationToken = require('crypto').randomBytes(32).toString('hex');
+    const verificationToken = randomBytes(32).toString('hex');
 
-    // Create user in database with additional information
+    // Create user in app_users table
     const { error } = await supabase.from('app_users').insert({
       id: userId,
       email: email.toLowerCase(),
@@ -72,14 +74,6 @@ export async function POST(req: Request) {
       auth_provider: 'email',
       email_verified: false,
       verification_token: verificationToken,
-      timezone: timezone || 'UTC',
-      date_of_birth: dateOfBirth || null,
-      gender: gender || null,
-      height: height ? parseInt(height) : null,
-      weight: weight ? parseFloat(weight) : null,
-      activity_level: activityLevel || null,
-      dietary_restrictions: dietaryRestrictions || [],
-      health_goals: healthGoals || [],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -92,21 +86,49 @@ export async function POST(req: Request) {
       );
     }
 
-    // Create user preferences
+    // Create user preferences with profile data
     try {
-      await supabase.from('user_preferences').insert({
+      const prefsData: any = {
         user_id: userId,
         timezone: timezone || 'UTC',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      });
+      };
+
+      // Add optional profile fields if provided
+      if (dateOfBirth) {
+        const birthDate = new Date(dateOfBirth);
+        const today = new Date();
+        const age = today.getFullYear() - birthDate.getFullYear() - 
+          (today.getMonth() < birthDate.getMonth() || 
+           (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate()) ? 1 : 0);
+        prefsData.age = age;
+      }
+      
+      if (gender) prefsData.gender = gender;
+      if (height) prefsData.height_cm = parseFloat(height);
+      if (weight) prefsData.weight_kg = parseFloat(weight);
+      if (activityLevel) prefsData.activity_level = activityLevel;
+      if (dietaryRestrictions && dietaryRestrictions.length > 0) {
+        prefsData.dietary_restrictions = dietaryRestrictions;
+      }
+      
+      // Note: healthGoals is not stored in the current schema but could be added later
+
+      await supabase.from('user_preferences').insert(prefsData);
     } catch (prefError) {
       console.error('Error creating user preferences:', prefError);
       // Don't fail the signup if preferences fail
     }
 
-    // TODO: Send verification email
-    // await sendVerificationEmail(email, verificationToken);
+    // Send verification email
+    try {
+      const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/verify?token=${verificationToken}`;
+      await sendVerificationEmail(email, name, verifyUrl);
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+      // Don't fail signup if email fails
+    }
 
     return NextResponse.json({ 
       success: true,

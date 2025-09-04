@@ -83,7 +83,11 @@ export default function ProfilePrompt() {
           activity_level: form.activity_level,
           goal: form.goal,
           workout_level: form.workout_level,
-          dietary_restrictions: form.dietary_restrictions.split(",").map((x) => x.trim()) ?? null,
+          dietary_restrictions: Array.isArray(form.dietary_restrictions)
+            ? form.dietary_restrictions
+            : form.dietary_restrictions
+              ? form.dietary_restrictions.split(",").map((x) => x.trim())
+              : null,
         }),
       });
       if (res.ok) {

@@ -3,6 +3,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import CircularStat from "@/components/CircularStat";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
 import { toast } from "sonner";

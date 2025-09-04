@@ -1,34 +1,31 @@
 'use client';
-
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { signIn, useSession } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { Loader2, Eye, EyeOff, Mail, Lock, Smartphone } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
+import { signIn } from 'next-auth/react';
 import { signInWithGoogleNative } from '@/utils/auth/nativeGoogle';
 import { registerDevicePushIfPossible } from '@/utils/push/registerDevice';
-import { registerFcmTokenForUser } from '@/utils/fcm/auth';
+import { ResendVerificationModal } from '../../../components/ResendVerificationModal';
 
-type SignInError = 'CredentialsSignin' | 'EmailNotVerified' | string | null;
 
 export default function SignIn() {
-  const { data: session } = useSession();
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const router = useRouter();
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
   const searchParams = useSearchParams();
   const callbackUrl = searchParams?.get('callbackUrl') || '/dashboard';
-  const error = searchParams?.get('error') as SignInError;
+  const error = searchParams?.get('error');
   const isNative = Capacitor.getPlatform() === 'android';
   
   // Show error message if any
@@ -43,7 +40,8 @@ export default function SignIn() {
     if (error === 'CredentialsSignin') {
       toast.error('Invalid email or password');
     } else if (error === 'EmailNotVerified') {
-      toast.error('Please verify your email before signing in');
+      // Show verification modal for email not verified error
+      setShowVerificationModal(true);
     } else if (error) {
       toast.error('An error occurred during sign in');
     }
@@ -51,31 +49,63 @@ export default function SignIn() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) return;
+    e.stopPropagation();
+    
+    // Basic validation for missing data
+    if (!email && !password) {
+      toast.error('Please enter your email and password');
+      return;
+    }
+    if (!email) {
+      toast.error('Please enter your email');
+      return;
+    }
+    if (!password) {
+      toast.error('Please enter your password');
+      return;
+    }
     
     setIsLoading(true);
+    
+    // First check credentials and email verification status
     try {
-      const result = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
-        callbackUrl,
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
       });
 
-      if (result?.error) {
-        toast.error('Invalid email or password');
-      } else {
-        // Success - register push token if available
-        try {
-          await registerDevicePushIfPossible();
-          // Also register FCM token for native users
-          if (isNative && session?.user?.id) {
-            await registerFcmTokenForUser(session.user.id);
+      const data = await response.json();
+
+      if (response.ok) {
+        // Credentials are valid and email is verified, now sign in with NextAuth
+        const result = await signIn('email-password', {
+          email,
+          password,
+          redirect: false,
+          callbackUrl,
+        });
+        
+        if (result?.ok) {
+          // Register push notifications
+          try {
+            await registerDevicePushIfPossible();
+          } catch (pushError) {
+            console.error('Push registration failed:', pushError);
           }
-        } catch (pushError) {
-          console.error('Push registration failed:', pushError);
+          
+          toast.success('Signed in successfully!');
+          window.location.href = callbackUrl;
+        } else {
+          toast.error('Authentication failed. Please try again.');
         }
-        router.push(callbackUrl);
+      } else if (response.status === 403 && data?.requiresVerification) {
+        // Show verification modal for unverified email
+        setShowVerificationModal(true);
+      } else {
+        toast.error(data.error || 'Invalid email or password');
       }
     } catch (error) {
       console.error('Sign in error:', error);
@@ -86,8 +116,9 @@ export default function SignIn() {
   };
   
   const handleForgotPassword = () => {
-    router.push('/auth/forgot-password' as any);
+    window.location.href = '/auth/forgot-password';
   };
+
   
   const handleGoogle = async () => {
     if (isGoogleLoading) return;
@@ -105,7 +136,7 @@ export default function SignIn() {
               console.error('Push registration failed:', pushError);
             }
             toast.success('Signed in successfully');
-            router.push(callbackUrl as any);
+            window.location.href = callbackUrl;
             return;
           }
         } catch (e: any) {
@@ -212,7 +243,7 @@ export default function SignIn() {
                 </Label>
               </div>
 
-              <div className="text-sm">
+              <div className="text-sm flex gap-2">
                 <button
                   type="button"
                   onClick={handleForgotPassword}
@@ -278,7 +309,7 @@ export default function SignIn() {
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <Link href="/auth/signup" className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
                 Sign up
               </Link>
@@ -286,6 +317,13 @@ export default function SignIn() {
           </div>
         </div>
       </div>
+
+      {/* Resend Verification Modal */}
+      <ResendVerificationModal
+        isOpen={showVerificationModal}
+        onClose={() => setShowVerificationModal(false)}
+        email={email}
+      />
     </div>
   );
 }

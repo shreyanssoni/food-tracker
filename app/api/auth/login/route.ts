@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { verifyPassword } from '@/utils/auth/password';
-import { signIn } from '@/auth';
 
 export async function POST(req: Request) {
   try {
@@ -57,29 +56,15 @@ export async function POST(req: Request) {
       );
     }
 
-    // Sign in with NextAuth
-    try {
-      await signIn('credentials', {
+    // Return success - let the client handle NextAuth sign-in
+    return NextResponse.json({ 
+      success: true,
+      user: {
+        id: user.id,
         email: user.email,
-        password,
-        redirect: false,
-      });
-
-      return NextResponse.json({ 
-        success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name
-        }
-      });
-    } catch (authError) {
-      console.error('Auth sign-in error:', authError);
-      return NextResponse.json(
-        { error: 'Authentication failed' },
-        { status: 500 }
-      );
-    }
+        name: user.name
+      }
+    });
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(

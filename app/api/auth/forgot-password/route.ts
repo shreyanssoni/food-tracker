@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { isValidEmail } from '@/utils/auth/password';
+import { sendPasswordResetEmail } from '@/utils/email';
 import { randomBytes } from 'crypto';
 
 export async function POST(req: Request) {
@@ -62,9 +63,14 @@ export async function POST(req: Request) {
       );
     }
 
-    // TODO: Send reset email
-    // const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/reset-password?token=${resetToken}`;
-    // await sendPasswordResetEmail(user.email, user.name, resetUrl);
+    // Send reset email
+    try {
+      const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/reset-password?token=${resetToken}`;
+      await sendPasswordResetEmail(user.email, user.name, resetUrl);
+    } catch (emailError) {
+      console.error('Failed to send password reset email:', emailError);
+      // Don't fail the request if email fails
+    }
 
     return NextResponse.json({ 
       success: true,
