@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
-    android:padding="12dp"
+    android:padding="14dp"
     android:background="@drawable/widget_bg"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -18,10 +18,14 @@
 
         <TextView
             android:id="@+id/title"
-            android:text="Coach Tasks"
+            android:text="Today's Tasks"
             android:textStyle="bold"
-            android:textSize="16sp"
+            android:textSize="18sp"
             android:textColor="@android:color/white"
+            android:shadowColor="#40000000"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="2"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"/>
@@ -36,7 +40,7 @@
         <TextView
             android:id="@+id/remaining_text"
             android:text="All caught up"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:textColor="@android:color/white"
             android:alpha="0.9"
             android:layout_marginStart="8dp"
@@ -44,13 +48,21 @@
             android:layout_height="wrap_content"/>
     </LinearLayout>
 
+    <!-- Subtle divider under header -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="2dp"
+        android:alpha="0.2"
+        android:background="#FFFFFF"/>
+
     <!-- Compact single-task view (shown in smallest size) -->
     <LinearLayout
         android:id="@+id/compact_container"
         android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="10dp"
+        android:padding="12dp"
         android:background="@drawable/widget_card"
         android:layout_marginTop="8dp">
 
@@ -58,7 +70,7 @@
             android:id="@+id/top_task"
             android:text="No tasks for today"
             android:textSize="15sp"
-            android:textColor="#101828"
+            android:textColor="#111827"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:maxLines="2"
@@ -72,11 +84,13 @@
 
             <Button
                 android:id="@+id/btn_add"
-                android:text="Add"
+                android:text="+ Tasks"
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"
-                android:textSize="12sp"
-                android:background="@drawable/widget_btn_primary"
+                android:textSize="13sp"
+                android:paddingLeft="16dp"
+                android:paddingRight="16dp"
+                android:background="@drawable/btn_grad_indigo_blue"
                 android:textColor="@android:color/white"/>
 
             <Button
@@ -97,7 +111,7 @@
         android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="10dp"
+        android:padding="12dp"
         android:background="@drawable/widget_card"
         android:layout_marginTop="8dp"
         android:visibility="gone">
@@ -106,8 +120,30 @@
             android:id="@+id/list_view"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:dividerHeight="6dp"
-            android:divider="@android:color/transparent"/>
+            android:divider="@drawable/widget_list_divider"
+            android:dividerHeight="1dp"
+            android:scrollbars="vertical"
+            android:fadingEdgeLength="8dp"
+            android:requiresFadingEdge="vertical"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end"
+            android:layout_marginTop="8dp">
+
+            <Button
+                android:id="@+id/btn_add_list"
+                android:text="+ Tasks"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:textSize="13sp"
+                android:paddingLeft="16dp"
+                android:paddingRight="16dp"
+                android:background="@drawable/btn_grad_indigo_blue"
+                android:textColor="@android:color/white"/>
+        </LinearLayout>
     </LinearLayout>
 
 </LinearLayout>

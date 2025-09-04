@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="12dp"
+    android:background="@drawable/glass_bg_light">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:weightSum="2"
+        android:baselineAligned="false">
+
+        <LinearLayout
+            android:id="@+id/btn_task"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:background="@drawable/btn_grad_indigo_blue"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:clipToPadding="true">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:tint="#FFFFFFFF"
+                android:src="@drawable/ic_task"
+                android:contentDescription="Add Task icon" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+ Task"
+                android:textColor="#FFFFFFFF"
+                android:textSize="16sp"
+                android:fontFamily="sans-serif-medium"
+                android:paddingStart="8dp" />
+        </LinearLayout>
+
+        <Space
+            android:layout_width="10dp"
+            android:layout_height="1dp" />
+
+        <LinearLayout
+            android:id="@+id/btn_food"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:background="@drawable/btn_grad_indigo_blue"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:clipToPadding="true">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:tint="#FFFFFFFF"
+                android:src="@drawable/ic_food"
+                android:contentDescription="Add Food icon" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+ Food"
+                android:textColor="#FFFFFFFF"
+                android:textSize="16sp"
+                android:fontFamily="sans-serif-medium"
+                android:paddingStart="8dp" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="12dp"
+    android:background="@drawable/glass_bg_light">
+
+    <LinearLayout
+        android:id="@+id/btn_food_pill"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@drawable/btn_grad_indigo_blue"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:clipToPadding="true">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:tint="#FFFFFFFF"
+            android:src="@drawable/ic_food"
+            android:contentDescription="Add Food icon" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="+ Food"
+            android:textColor="#FFFFFFFF"
+            android:textSize="16sp"
+            android:fontFamily="sans-serif-medium"
+            android:paddingStart="10dp" />
+    </LinearLayout>
+</FrameLayout>

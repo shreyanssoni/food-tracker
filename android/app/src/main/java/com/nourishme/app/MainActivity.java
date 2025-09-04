@@ -38,6 +38,61 @@ public class MainActivity extends BridgeActivity {
         ShadowWorkScheduler.scheduleAll(this);
         // Ensure the app content does not draw under system bars (status/navigation)
         WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
+
+        // Handle deep link if app launched via VIEW intent (cold start)
+        try { handleDeepLinkIntent(getIntent()); } catch (Exception ignored) {}
+    }
+
+    @Override
+    protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        try { handleDeepLinkIntent(intent); } catch (Exception ignored) {}
+    }
+
+    private void handleDeepLinkIntent(android.content.Intent intent) {
+        if (intent == null) return;
+        android.net.Uri data = intent.getData();
+        if (data == null) return;
+        String scheme = data.getScheme();
+        String host = data.getHost();
+        String path = data.getPath();
+        if (scheme == null || host == null || path == null) return;
+
+        // Support both nourishme://app/<path> and https://nourish-me.vercel.app/<path>
+        boolean isAppScheme = scheme.equalsIgnoreCase("nourishme") && host.equalsIgnoreCase("app");
+        boolean isHttpsHost = scheme.equalsIgnoreCase("https") && host.equalsIgnoreCase("nourish-me.vercel.app");
+        if (!(isAppScheme || isHttpsHost)) return;
+
+        String targetPath;
+        if ("/add-task".equalsIgnoreCase(path)) {
+            targetPath = "/add-task";
+        } else if ("/add-food".equalsIgnoreCase(path)) {
+            targetPath = "/add-food";
+        } else if ("/tasks".equalsIgnoreCase(path)) {
+            targetPath = "/tasks";
+        } else if ("/food".equalsIgnoreCase(path)) {
+            targetPath = "/food";
+        } else {
+            return; // Let default handling proceed
+        }
+
+        // Navigate WebView to target route
+        final String finalTarget = targetPath;
+        try {
+            if (getBridge() != null && getBridge().getWebView() != null) {
+                // Build absolute URL using current server URL (dev) or base path (prod)
+                String base = getBridge().getServerUrl();
+                if (base == null || base.isEmpty()) {
+                    base = "http://localhost"; // Capacitor serves internally; relative should still work
+                }
+                final String url = base + finalTarget;
+                getBridge().getWebView().post(() -> {
+                    try {
+                        getBridge().getWebView().loadUrl(url);
+                    } catch (Throwable ignored) {}
+                });
+            }
+        } catch (Throwable ignored) {}
     }
 
     private void createDefaultNotificationChannel() {

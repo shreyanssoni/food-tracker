@@ -46,21 +46,25 @@ class TaskWidgetProvider : AppWidgetProvider() {
             }
             views.setRemoteAdapter(R.id.list_view, svcIntent)
 
-            // Pending intent template for row clicks (toggle)
-            val toggleIntent = Intent(context, TaskWidgetProvider::class.java).apply { action = ACTION_TOGGLE }
-            val togglePending = PendingIntent.getBroadcast(
-                context, 0, toggleIntent,
+            // Row clicks should open the tasks screen
+            val openTasksIntent = Intent(Intent.ACTION_VIEW, Uri.parse("nourishme://app/tasks"))
+            val openTasksPending = PendingIntent.getActivity(
+                context, 0, openTasksIntent,
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
-            views.setPendingIntentTemplate(R.id.list_view, togglePending)
+            views.setPendingIntentTemplate(R.id.list_view, openTasksPending)
 
-            // Add Task deep link
-            val addIntent = Intent(Intent.ACTION_VIEW, Uri.parse("nourishme://app/tasks?action=new"))
+            // Open tasks screen
+            val addIntent = Intent(Intent.ACTION_VIEW, Uri.parse("nourishme://app/tasks"))
             val addPending = PendingIntent.getActivity(
                 context, 0, addIntent,
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
             views.setOnClickPendingIntent(R.id.btn_add, addPending)
+            // New "+ Tasks" button inside the list container
+            views.setOnClickPendingIntent(R.id.btn_add_list, addPending)
+            // Also allow tapping header to open tasks
+            views.setOnClickPendingIntent(R.id.header, addPending)
 
             // Refresh action
             val refreshIntent = Intent(context, TaskWidgetProvider::class.java).apply { action = ACTION_REFRESH }
@@ -71,18 +75,8 @@ class TaskWidgetProvider : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.title, refreshPending)
             views.setOnClickPendingIntent(R.id.btn_refresh, refreshPending)
 
-            // Compact toggle (tap top task toggles the first item)
-            readTopId(context)?.let { topId ->
-                val compactToggleIntent = Intent(context, TaskWidgetProvider::class.java).apply {
-                    action = ACTION_TOGGLE
-                    putExtra("task_id", topId)
-                }
-                val compactTogglePending = PendingIntent.getBroadcast(
-                    context, 1, compactToggleIntent,
-                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-                )
-                views.setOnClickPendingIntent(R.id.top_task, compactTogglePending)
-            }
+            // Compact: tapping top task also opens tasks screen
+            views.setOnClickPendingIntent(R.id.top_task, openTasksPending)
 
             // Adjust compact vs list visibility based on size
             applySizeMode(context, appWidgetManager, widgetId, views)

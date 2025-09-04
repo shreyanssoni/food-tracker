@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_glass_light">#E6FFFFFF</color>
+    <color name="widget_glass_dark">#D91E293B</color>
+    <color name="widget_text_light">#111827</color>
+    <color name="widget_text_dark">#F9FAFB</color>
+    <color name="widget_indigo">#6366F1</color>
+    <color name="widget_blue">#3B82F6</color>
+    <color name="widget_emerald">#10B981</color>
+    <color name="widget_teal">#14B8A6</color>
+    <color name="widget_ripple_light">#1A000000</color>
+    <color name="widget_ripple_dark">#33FFFFFF</color>
+</resources>

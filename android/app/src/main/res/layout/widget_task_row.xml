@@ -3,9 +3,20 @@
     android:id="@+id/row_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:minHeight="40dp"
     android:orientation="horizontal"
-    android:padding="8dp"
-    android:background="@drawable/widget_bg">
+    android:padding="10dp"
+    android:gravity="center_vertical"
+    android:background="@drawable/widget_row_pill">
+
+    <View
+        android:id="@+id/status_dot"
+        android:layout_width="8dp"
+        android:layout_height="8dp"
+        android:layout_marginEnd="8dp"
+        android:background="@drawable/widget_status_dot"
+        android:rotationX="6"
+        android:rotationY="-64" />
 
     <TextView
         android:id="@+id/task_title"
@@ -13,7 +24,10 @@
         android:layout_weight="1"
         android:layout_height="wrap_content"
         android:textSize="14sp"
-        android:textColor="#0B1220"/>
+        android:textColor="#111827"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:lineSpacingExtra="2dp"/>
 
     <TextView
         android:id="@+id/task_done"

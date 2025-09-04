@@ -35,6 +35,10 @@ class TaskViewsFactory(private val context: Context) : RemoteViewsService.Remote
         rv.setTextViewText(R.id.task_title, item.title)
         rv.setViewVisibility(R.id.task_done, if (item.done) android.view.View.VISIBLE else android.view.View.GONE)
 
+        // Status dot: green for active, gray for done
+        val dotRes = if (item.done) R.drawable.widget_status_dot_gray else R.drawable.widget_status_dot_green
+        rv.setInt(R.id.status_dot, "setBackgroundResource", dotRes)
+
         // Fill-in intent for toggle action
         val fillIn = Intent().apply {
             action = TaskWidgetProvider.ACTION_TOGGLE

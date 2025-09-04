@@ -5,4 +5,16 @@
 
     <!-- Splash background color (can set to your brand color) -->
     <color name="splash_background">#FFFFFF</color>
+
+    <!-- Widget palette (Light) -->
+    <color name="widget_glass_light">#E6FFFFFF</color> <!-- 90% white -->
+    <color name="widget_glass_dark">#D91E293B</color>  <!-- 85% slate for dark (fallback if night values missing) -->
+    <color name="widget_text_light">#111827</color>    <!-- Charcoal -->
+    <color name="widget_text_dark">#F9FAFB</color>     <!-- Off-white -->
+    <color name="widget_indigo">#6366F1</color>
+    <color name="widget_blue">#3B82F6</color>
+    <color name="widget_emerald">#10B981</color>
+    <color name="widget_teal">#14B8A6</color>
+    <color name="widget_ripple_light">#1A000000</color> <!-- 10% black -->
+    <color name="widget_ripple_dark">#33FFFFFF</color>  <!-- 20% white -->
 </resources>
