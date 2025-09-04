@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { PushNotifications } from "@capacitor/push-notifications";
 
 async function ensureAndroidChannel() {
@@ -47,6 +48,7 @@ async function registerForPush() {
 }
 
 export default function PushInit() {
+  const { status } = useSession();
   useEffect(() => {
     // Skip on web browsers that are not running inside Capacitor
     const isCapacitor = !!(window as any).Capacitor?.isNativePlatform?.();
@@ -89,6 +91,18 @@ export default function PushInit() {
       // No global remove API; listeners auto-clean on reload
     };
   }, []);
+
+  // Re-register and re-post token after login (fixes 401 before auth)
+  useEffect(() => {
+    const isCapacitor = !!(window as any).Capacitor?.isNativePlatform?.();
+    if (!isCapacitor) return;
+    if (status !== "authenticated") return;
+    (async () => {
+      try {
+        await registerForPush();
+      } catch {}
+    })();
+  }, [status]);
 
   return null;
 }
