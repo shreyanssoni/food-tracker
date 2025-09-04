@@ -3,15 +3,43 @@
 import { useEffect } from "react";
 import { PushNotifications } from "@capacitor/push-notifications";
 
+async function ensureAndroidChannel() {
+  try {
+    // Create a default channel on Android (no-op on iOS/web)
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error - createChannel is available on Android platform
+    await (PushNotifications as any).createChannel?.({
+      id: "default",
+      name: "Default",
+      description: "General notifications",
+      importance: 4, // IMPORTANCE_HIGH
+      visibility: 1,
+      lights: true,
+      vibration: true,
+    });
+    // eslint-disable-next-line no-console
+    console.log("[PushInit] Default notification channel ensured");
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn("[PushInit] Failed to ensure channel (ok on non-Android)", e);
+  }
+}
+
 async function registerForPush() {
   try {
     const permStatus = await PushNotifications.checkPermissions();
+    // eslint-disable-next-line no-console
+    console.log("[PushInit] Permission status:", permStatus);
 
     if (permStatus.receive === "granted") {
+      await ensureAndroidChannel();
       await PushNotifications.register();
     } else {
       const req = await PushNotifications.requestPermissions();
+      // eslint-disable-next-line no-console
+      console.log("[PushInit] Permission request result:", req);
       if (req.receive === "granted") {
+        await ensureAndroidChannel();
         await PushNotifications.register();
       }
     }
