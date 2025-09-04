@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { isAndroidNative, signInWithGoogleNative } from '@/utils/auth/nativeGoogle';
 import { useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
+import { toast } from 'sonner';
 
 export default function SignIn() {
   const [loading, setLoading] = useState(false);
@@ -20,16 +21,28 @@ export default function SignIn() {
         const res = await signInWithGoogleNative();
         // eslint-disable-next-line no-console
         console.log('Native sign-in result', res);
-        if (res?.ok) router.replace('/');
+        if (res?.ok) {
+          toast.success('Signed in');
+          router.replace('/');
+        } else {
+          toast.error('Native Google sign-in did not complete. Please try again.');
+        }
       } else {
         const res = await signIn('google', { callbackUrl: '/', redirect: false });
         // eslint-disable-next-line no-console
         console.log('Web sign-in result', res);
-        if (!res?.error) router.replace('/');
+        if (!res?.error) {
+          toast.success('Signed in');
+          router.replace('/');
+        } else {
+          toast.error(res.error || 'Google sign-in failed.');
+        }
       }
-    } catch (e) {
+    } catch (e: any) {
       // eslint-disable-next-line no-console
       console.error('Google sign-in failed', e);
+      const msg = e?.message || 'Google sign-in failed. Please try again.';
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

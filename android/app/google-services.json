@@ -20,6 +20,10 @@
             "package_name": "com.nourishme.app",
             "certificate_hash": "744bae5142095319990cc39ca7906680c16efae2"
           }
+        },
+        {
+          "client_id": "318658794111-cv4dmqt8apft2vgp3r5duaoic7jnp4o6.apps.googleusercontent.com",
+          "client_type": 3
         }
       ],
       "api_key": [
@@ -29,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "318658794111-cv4dmqt8apft2vgp3r5duaoic7jnp4o6.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

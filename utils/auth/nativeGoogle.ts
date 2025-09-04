@@ -13,9 +13,8 @@ export async function signInWithGoogleNative() {
   // Trigger native Google sign-in via Firebase Authentication
   const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
   const { user, credential } = await FirebaseAuthentication.signInWithGoogle({
-    // idToken & accessToken are returned in credential
-    // You can also request extra scopes if you need them:
-    // scopes: ['email', 'profile', 'openid']
+    // Ensure ID token is requested
+    scopes: ['openid', 'email', 'profile'],
   });
 
   const idToken = credential?.idToken || null;
