@@ -34,15 +34,16 @@ export default function SignIn() {
           console.warn('Native sign-in failed, falling back to web OAuth', nativeErr);
           toast.warning('Native Google sign-in unavailable. Using web sign-in…');
         }
-        // Fallback: Web OAuth via NextAuth
-        const webRes = await signIn('google', { callbackUrl: '/', redirect: false });
-        // eslint-disable-next-line no-console
-        console.log('Android fallback web sign-in result', webRes);
-        if (!webRes?.error) {
-          toast.success('Signed in');
-          router.replace('/');
+        // Fallback: Web OAuth via absolute URL (keeps flow in WebView on deployed site)
+        const base = process.env.NEXT_PUBLIC_AUTH_URL;
+        if (!base) {
+          toast.error('Missing NEXT_PUBLIC_AUTH_URL. Set it to your deployed domain.');
         } else {
-          toast.error(webRes.error || 'Google sign-in failed.');
+          const authUrl = `${base}/api/auth/signin/google?callbackUrl=${encodeURIComponent(base + '/')}`;
+          // eslint-disable-next-line no-console
+          console.log('Redirecting to external sign-in URL:', authUrl);
+          window.location.href = authUrl;
+          return;
         }
       } else {
         const res = await signIn('google', { callbackUrl: '/', redirect: false });

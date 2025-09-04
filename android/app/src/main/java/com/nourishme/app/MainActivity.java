@@ -4,6 +4,7 @@ import com.getcapacitor.BridgeActivity;
 import android.os.Bundle;
 import com.capacitorjs.plugins.pushnotifications.PushNotificationsPlugin;
 import androidx.core.view.WindowCompat;
+import io.capawesome.capacitorjs.plugins.firebase.authentication.FirebaseAuthenticationPlugin;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -11,6 +12,8 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         // Register Capacitor Push Notifications plugin
         registerPlugin(PushNotificationsPlugin.class);
+        // Register Firebase Authentication plugin explicitly
+        registerPlugin(FirebaseAuthenticationPlugin.class);
         registerPlugin(WidgetRefresherPlugin.class);
         // Schedule Shadow background jobs
         ShadowWorkScheduler.scheduleAll(this);
