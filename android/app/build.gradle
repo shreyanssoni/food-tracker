@@ -54,6 +54,8 @@ dependencies {
     // Firebase Cloud Messaging via BoM
     implementation platform('com.google.firebase:firebase-bom:33.5.1')
     implementation 'com.google.firebase:firebase-messaging'
+    // Firebase Authentication (required for @capacitor-firebase/authentication Google provider)
+    implementation 'com.google.firebase:firebase-auth'
     // Ensure Google Sign-In APIs are available for Firebase Authentication plugin
     implementation 'com.google.android.gms:play-services-auth:21.2.0'
     testImplementation "junit:junit:$junitVersion"
