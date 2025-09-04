@@ -19,7 +19,23 @@ function base64url(input: Buffer | string) {
 
 async function getAccessTokenFromServiceAccount() {
   const clientEmail = process.env.FIREBASE_V1_CLIENT_EMAIL;
-  const privateKey = (process.env.FIREBASE_V1_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+  // Normalize the private key from env: handle escaped newlines, quotes, and base64-only payloads
+  let rawKey = (process.env.FIREBASE_V1_PRIVATE_KEY || '').trim();
+  // Strip wrapping quotes if present (some hosts include surrounding quotes)
+  if ((rawKey.startsWith('"') && rawKey.endsWith('"')) || (rawKey.startsWith("'") && rawKey.endsWith("'"))) {
+    rawKey = rawKey.slice(1, -1);
+  }
+  // Replace literal \n with real newlines
+  rawKey = rawKey.replace(/\\n/g, '\n');
+
+  // If key is a single line without PEM markers, try to treat it as base64 and wrap into PKCS8 PEM
+  const hasPemMarkers = rawKey.includes('BEGIN PRIVATE KEY') || rawKey.includes('BEGIN RSA PRIVATE KEY');
+  if (!hasPemMarkers) {
+    const b64 = rawKey.replace(/\s+/g, '');
+    const chunked = b64.match(/.{1,64}/g)?.join('\n') || b64;
+    rawKey = `-----BEGIN PRIVATE KEY-----\n${chunked}\n-----END PRIVATE KEY-----\n`;
+  }
+  const privateKey = rawKey;
   if (!clientEmail || !privateKey) return null;
 
   const now = Math.floor(Date.now() / 1000);
@@ -39,7 +55,14 @@ async function getAccessTokenFromServiceAccount() {
   const crypto = await import('node:crypto');
   const signer = crypto.createSign('RSA-SHA256');
   signer.update(toSign);
-  const signature = signer.sign(privateKey);
+  // Parse key via createPrivateKey to avoid OpenSSL unsupported errors due to formatting
+  let keyObject: any;
+  try {
+    keyObject = crypto.createPrivateKey({ key: privateKey, format: 'pem' as any });
+  } catch (e) {
+    throw new Error(`Invalid FIREBASE_V1_PRIVATE_KEY: ${(e as Error).message}`);
+  }
+  const signature = signer.sign(keyObject);
   const jwt = `${toSign}.${base64url(signature)}`;
 
   const res = await fetch(OAUTH_TOKEN_URL, {
