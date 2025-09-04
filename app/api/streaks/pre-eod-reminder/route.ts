@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { sendWebPush, type WebPushSubscription } from '@/utils/push';
+import { sendFcmToTokens } from '@/utils/fcm';
 
 function todayInTimezone(tz: string): string {
   try {
@@ -149,14 +150,24 @@ export async function GET(req: NextRequest) {
           .in('user_id', toNotify);
         if (subErr) throw subErr;
 
+        // FCM tokens for those users
+        const { data: fcmTokens, error: fcmErr } = await supabase
+          .from('fcm_tokens')
+          .select('user_id, token')
+          .in('user_id', toNotify);
+        if (fcmErr) throw fcmErr;
+
         // Send push + create focused message
         for (const uid of toNotify) {
           const userSubs = (subs || []).filter(s => s.user_id === uid);
+          const userFcmTokens = (fcmTokens || []).filter(t => t.user_id === uid).map(t => t.token);
           const payload = {
             title: "You're about to miss your streak",
-            body: 'Finish today’s tasks to keep it alive! Tap to log now.',
+            body: 'Finish today\'s tasks to keep it alive! Tap to log now.',
             url: '/suggestions',
           };
+
+          // Send web push notifications
           for (const s of userSubs) {
             const subscription: WebPushSubscription = {
               endpoint: s.endpoint,
@@ -178,7 +189,48 @@ export async function GET(req: NextRequest) {
               await supabase.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint);
             }
           }
-          if (userSubs.length) notified += 1;
+
+          // Send FCM notifications
+          if (userFcmTokens.length > 0) {
+            try {
+              const fcmRes = await sendFcmToTokens(userFcmTokens, {
+                title: payload.title,
+                body: payload.body,
+                data: { url: payload.url },
+              });
+              // Heuristic success: v1 returns { ok: true, results: [...] }
+              const fcmSuccess = !!(fcmRes && (fcmRes.ok === true || (Array.isArray(fcmRes.results) && fcmRes.results.length > 0)));
+              
+              // Log FCM sends
+              for (const token of userFcmTokens) {
+                await supabase.from('push_sends').insert({
+                  user_id: uid,
+                  slot: 'night',
+                  title: payload.title,
+                  body: payload.body,
+                  url: payload.url,
+                  success: fcmSuccess,
+                  status_code: fcmSuccess ? 201 : null,
+                });
+              }
+            } catch (e) {
+              console.error('FCM send error', e);
+              // Log failed FCM sends
+              for (const token of userFcmTokens) {
+                await supabase.from('push_sends').insert({
+                  user_id: uid,
+                  slot: 'night',
+                  title: payload.title,
+                  body: payload.body,
+                  url: payload.url,
+                  success: false,
+                  status_code: null,
+                });
+              }
+            }
+          }
+
+          if (userSubs.length || userFcmTokens.length) notified += 1;
           await supabase.from('user_messages').insert({ user_id: uid, title: payload.title, body: payload.body, url: payload.url });
         }
       }

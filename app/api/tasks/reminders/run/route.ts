@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { sendWebPush, type WebPushSubscription } from "@/utils/push";
+import { sendFcmToTokens } from '@/utils/fcm';
 
 // ---- Time helpers (timezone-aware, mirrored from other routes) ----
 function todayInTimezone(tz: string): string {
@@ -272,10 +273,18 @@ export async function GET(req: NextRequest) {
           .in("user_id", userIdsToSend);
         if (subErr) throw subErr;
 
+        // Fetch FCM tokens for recipients
+        const { data: fcmTokens, error: fcmErr } = await supabase
+          .from("fcm_tokens")
+          .select("user_id, token")
+          .in("user_id", userIdsToSend);
+        if (fcmErr) throw fcmErr;
+
         for (const entry of toSend) {
           const userSubs = (subs || []).filter(
             (s) => s.user_id === entry.user_id
           );
+          const userFcmTokens = (fcmTokens || []).filter(t => t.user_id === entry.user_id).map(t => t.token);
           const topTask = entry.tasks[0];
           const more = entry.tasks.length - 1;
           const title =
@@ -319,7 +328,50 @@ export async function GET(req: NextRequest) {
                   .eq("endpoint", subscription.endpoint);
               }
             }
-            // Count a notification when at least one push was attempted
+          }
+
+          // Send FCM notifications to mobile devices
+          if (userFcmTokens.length > 0) {
+            try {
+              const fcmRes = await sendFcmToTokens(userFcmTokens, {
+                title,
+                body,
+                data: { url },
+              });
+              // Heuristic success: v1 returns { ok: true, results: [...] }
+              const fcmSuccess = !!(fcmRes && (fcmRes.ok === true || (Array.isArray(fcmRes.results) && fcmRes.results.length > 0)));
+              
+                        // Log FCM sends
+          for (let i = 0; i < userFcmTokens.length; i++) {
+            await supabase.from("push_sends").insert({
+              user_id: entry.user_id,
+              slot: "task_pre",
+              title,
+              body,
+              url,
+              success: fcmSuccess,
+              status_code: fcmSuccess ? 201 : null,
+            });
+          }
+            } catch (e) {
+              console.error('FCM send error', e);
+              // Log failed FCM sends
+              for (let i = 0; i < userFcmTokens.length; i++) {
+                await supabase.from("push_sends").insert({
+                  user_id: entry.user_id,
+                  slot: "task_pre",
+                  title,
+                  body,
+                  url,
+                  success: false,
+                  status_code: null,
+                });
+              }
+            }
+          }
+
+          // Count a notification when at least one push was attempted
+          if (userSubs.length || userFcmTokens.length) {
             countNotified += 1;
           }
 
