@@ -32,9 +32,13 @@ export default function SignIn() {
             router.replace('/');
             return;
           }
-        } catch (nativeErr) {
+        } catch (nativeErr: any) {
           // eslint-disable-next-line no-console
           console.warn('Native sign-in failed, falling back to Browser OAuth', nativeErr);
+          try {
+            const msg = (nativeErr?.message || String(nativeErr)).slice(0, 300);
+            toast.error(`Native sign-in failed: ${msg}`);
+          } catch {}
         }
 
         // 2) Fallback: open NextAuth sign-in in a Custom Tab (allowed by Google OAuth policy)

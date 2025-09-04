@@ -16,9 +16,18 @@ export async function signInWithGoogleNative() {
   try {
     await FirebaseAuthentication.signOut();
   } catch {}
-  const { user, credential } = await FirebaseAuthentication.signInWithGoogle({
-    scopes: ['openid', 'email', 'profile'],
-  });
+  let user: any, credential: any;
+  try {
+    const res = await FirebaseAuthentication.signInWithGoogle({
+      scopes: ['openid', 'email', 'profile'],
+    });
+    user = res.user;
+    credential = res.credential;
+  } catch (e: any) {
+    const code = e?.code || e?.error || 'unknown_error';
+    const msg = e?.message || String(e);
+    throw new Error(`Native Google sign-in failed [${code}]: ${msg}`);
+  }
 
   const idToken = credential?.idToken || null;
   if (!idToken) {
