@@ -138,6 +138,26 @@ export default function SignIn() {
               type="button"
               onClick={async () => {
                 try {
+                  const res = await signInWithGoogleNative();
+                  if (res?.ok) {
+                    toast.success('Signed in (native)');
+                    router.replace('/');
+                  } else {
+                    toast.error('Native sign-in returned no result');
+                  }
+                } catch (e: any) {
+                  const msg = (e?.message || String(e)).slice(0, 300);
+                  toast.error(`Native-only failed: ${msg}`);
+                }
+              }}
+              className="block w-full text-center py-2 px-3 rounded-md border border-gray-200 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900"
+            >
+              Debug: Native Google only (no browser)
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
                   const { Browser } = await import('@capacitor/browser');
                   toast.message('Opening Custom Tab to Google…');
                   await Browser.open({ url: 'https://accounts.google.com', presentationStyle: 'fullscreen' });

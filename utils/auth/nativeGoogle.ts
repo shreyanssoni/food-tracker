@@ -18,9 +18,15 @@ export async function signInWithGoogleNative() {
   } catch {}
   let user: any, credential: any;
   try {
+    const serverClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || undefined;
+    // eslint-disable-next-line no-console
+    console.log('[NativeSignIn] Platform=android, hasServerClientId=', !!serverClientId);
     const res = await FirebaseAuthentication.signInWithGoogle({
       scopes: ['openid', 'email', 'profile'],
-    });
+      // Request an ID token for the Web client so NextAuth audience matches
+      // This is the Web OAuth client ID (NEXT_PUBLIC_GOOGLE_CLIENT_ID)
+      serverClientId,
+    } as any);
     user = res.user;
     credential = res.credential;
   } catch (e: any) {
