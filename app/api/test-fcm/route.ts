@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { sendFcmToTokens } from '@/utils/fcm';
 
-export async function POST() {
+async function handleSendForCurrentUser() {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -38,3 +38,13 @@ export async function POST() {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
+
+export async function POST() {
+  return handleSendForCurrentUser();
+}
+
+export async function GET() {
+  // Allow triggering from a browser URL for authenticated sessions
+  return handleSendForCurrentUser();
+}
+
