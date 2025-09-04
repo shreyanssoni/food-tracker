@@ -13,7 +13,11 @@ export async function triggerNativeGooglePickerOnly() {
   const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
   try { await FirebaseAuthentication.signOut(); } catch {}
   try {
-    const result = await FirebaseAuthentication.signInWithGoogle();
+    const serverClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || undefined;
+    const result = await FirebaseAuthentication.signInWithGoogle({
+      scopes: ['openid', 'email', 'profile'],
+      serverClientId,
+    } as any);
     // eslint-disable-next-line no-console
     console.log('Signed in user:', result.user);
     return result;
