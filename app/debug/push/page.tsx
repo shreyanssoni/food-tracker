@@ -7,6 +7,7 @@ export default function PushDebugPage() {
   const [permission, setPermission] = useState<string>("unknown");
   const [token, setToken] = useState<string>("");
   const [logs, setLogs] = useState<string[]>([]);
+  const [saveStatus, setSaveStatus] = useState<string>("");
 
   const log = (msg: string) => setLogs((prev) => [msg, ...prev].slice(0, 100));
 
@@ -67,6 +68,31 @@ export default function PushDebugPage() {
     );
   };
 
+  const saveTokenToServer = async () => {
+    if (!token) {
+      setSaveStatus("No token yet. Tap Re-register first.");
+      return;
+    }
+    try {
+      setSaveStatus("Saving...");
+      const res = await fetch("/api/store-fcm-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, platform: "android" }),
+      });
+      const text = await res.text();
+      if (res.ok) {
+        setSaveStatus("Saved ✔");
+        log("Token saved to server: " + token);
+      } else {
+        setSaveStatus(`Save failed: ${text}`);
+        log("Save failed: " + text);
+      }
+    } catch (e: any) {
+      setSaveStatus("Save error: " + (e?.message ?? String(e)));
+    }
+  };
+
   useEffect(() => {
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -87,6 +113,15 @@ export default function PushDebugPage() {
         >
           Re-register
         </button>
+        <button
+          onClick={saveTokenToServer}
+          className="ml-2 px-3 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+        >
+          Save token to server
+        </button>
+        {saveStatus && (
+          <div className="text-sm text-gray-700 dark:text-gray-300">{saveStatus}</div>
+        )}
       </div>
 
       <div>
@@ -112,3 +147,4 @@ export default function PushDebugPage() {
     </div>
   );
 }
+
