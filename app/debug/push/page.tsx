@@ -13,7 +13,6 @@ export default function PushDebugPage() {
   const ensureChannel = async () => {
     try {
       // On Android, ensure a default channel exists for heads-up notifications
-      // @ts-expect-error - method available on Android platform
       await (PushNotifications as any).createChannel?.({
         id: "default",
         name: "Default",
