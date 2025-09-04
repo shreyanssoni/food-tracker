@@ -228,6 +228,11 @@ ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY IF NOT EXISTS "Allow select to all on push_subscriptions" ON public.push_subscriptions FOR SELECT USING (true);
 CREATE POLICY IF NOT EXISTS "Allow insert to all on push_subscriptions" ON public.push_subscriptions FOR INSERT WITH CHECK (true);
 CREATE POLICY IF NOT EXISTS "Allow delete to all on push_subscriptions" ON public.push_subscriptions FOR DELETE USING (true);
+-- Needed for UPSERT (onConflict triggers an UPDATE when endpoint exists)
+CREATE POLICY IF NOT EXISTS "Allow update own on push_subscriptions" ON public.push_subscriptions
+  FOR UPDATE
+  USING (user_id = auth.uid()::text)
+  WITH CHECK (user_id = auth.uid()::text);
 
 -- Cache AI-generated push texts to reduce cost (optional)
 CREATE TABLE IF NOT EXISTS public.push_message_cache (

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { getCurrentUser } from '@/utils/auth';
 
 export async function POST(req: Request) {
@@ -18,7 +18,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 });
     }
 
-    const supabase = createClient();
+    // Use admin client because we are using NextAuth (no Supabase auth cookies),
+    // so RLS policies checking auth.uid() would not pass with anon client.
+    const supabase = createAdminClient();
     console.log('[push/subscribe] upsert', { user_id: user.id, endpoint: String(endpoint).slice(0, 32) + '...' });
 
     // Use a single UPSERT to avoid race conditions with unique(endpoint)
