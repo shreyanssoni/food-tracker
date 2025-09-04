@@ -18,6 +18,15 @@ export default function SettingsPage() {
   const [tzLoading, setTzLoading] = useState<boolean>(true);
   const [tzSaving, setTzSaving] = useState<boolean>(false);
   const { enabled: notifications, status: notifStatus, pending, toggle, enable, disable } = useNotifications();
+  const [isNativeCapacitor, setIsNativeCapacitor] = useState(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { Capacitor } = await import('@capacitor/core');
+        setIsNativeCapacitor(!!Capacitor?.isNativePlatform?.());
+      } catch {}
+    })();
+  }, []);
 
   // load from localStorage
   useEffect(() => {
@@ -237,7 +246,13 @@ export default function SettingsPage() {
                       <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${notifications ? 'translate-x-5' : 'translate-x-1'}`} />
                     </button>
                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {pending ? 'Working…' : notifStatus === 'unsupported' ? 'Not supported' : `Permission: ${notifStatus}`}
+                      {pending
+                        ? 'Working…'
+                        : isNativeCapacitor
+                        ? (notifications ? 'Enabled (device)' : 'Tap to enable (device)')
+                        : notifStatus === 'unsupported'
+                        ? 'Not supported'
+                        : `Permission: ${notifStatus}`}
                     </span>
                   </div>
                 </div>
