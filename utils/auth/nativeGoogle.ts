@@ -5,6 +5,25 @@ export function isAndroidNative() {
   return Capacitor.getPlatform() === 'android';
 }
 
+// Minimal helper: trigger native Google account picker only (no NextAuth call)
+export async function triggerNativeGooglePickerOnly() {
+  if (!isAndroidNative()) {
+    throw new Error('Native Google sign-in is only available on Android builds.');
+  }
+  const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+  try { await FirebaseAuthentication.signOut(); } catch {}
+  try {
+    const result = await FirebaseAuthentication.signInWithGoogle();
+    // eslint-disable-next-line no-console
+    console.log('Signed in user:', result.user);
+    return result;
+  } catch (e: any) {
+    const code = e?.code || e?.error || 'unknown_error';
+    const msg = e?.message || String(e);
+    throw new Error(`Native-only Google sign-in failed [${code}]: ${msg}`);
+  }
+}
+
 export async function signInWithGoogleNative() {
   if (!isAndroidNative()) {
     throw new Error('Native Google sign-in is only available on Android builds.');

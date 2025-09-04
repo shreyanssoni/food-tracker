@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
 import { toast } from 'sonner';
-import { signInWithGoogleNative } from '@/utils/auth/nativeGoogle';
+import { signInWithGoogleNative, triggerNativeGooglePickerOnly } from '@/utils/auth/nativeGoogle';
 
 export default function SignIn() {
   const [loading, setLoading] = useState(false);
@@ -138,13 +138,10 @@ export default function SignIn() {
               type="button"
               onClick={async () => {
                 try {
-                  const res = await signInWithGoogleNative();
-                  if (res?.ok) {
-                    toast.success('Signed in (native)');
-                    router.replace('/');
-                  } else {
-                    toast.error('Native sign-in returned no result');
-                  }
+                  const res = await triggerNativeGooglePickerOnly();
+                  // This path strictly tests native plugin; no server calls here.
+                  if (res?.user) toast.success('Native picker returned a user');
+                  else toast.message('Native picker closed or no user');
                 } catch (e: any) {
                   const msg = (e?.message || String(e)).slice(0, 300);
                   toast.error(`Native-only failed: ${msg}`);

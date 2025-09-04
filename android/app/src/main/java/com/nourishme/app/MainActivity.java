@@ -6,6 +6,7 @@ import com.capacitorjs.plugins.pushnotifications.PushNotificationsPlugin;
 import androidx.core.view.WindowCompat;
 import io.capawesome.capacitorjs.plugins.firebase.authentication.FirebaseAuthenticationPlugin;
 import com.google.firebase.FirebaseApp;
+import android.util.Log;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -13,6 +14,12 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         // Ensure Firebase is initialized for Authentication
         try { FirebaseApp.initializeApp(this); } catch (Exception ignored) {}
+        try {
+            String webClientId = getString(R.string.default_web_client_id);
+            Log.d("MainActivity", "default_web_client_id=" + webClientId);
+        } catch (Exception e) {
+            Log.e("MainActivity", "default_web_client_id missing or unreadable", e);
+        }
         // Register Capacitor Push Notifications plugin
         registerPlugin(PushNotificationsPlugin.class);
         // Register Firebase Authentication plugin explicitly

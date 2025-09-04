@@ -4,6 +4,6 @@
     <string name="title_activity_main">Nourish</string>
     <string name="package_name">com.nourishme.app</string>
     <string name="custom_url_scheme">com.nourishme.app</string>
-    <!-- Web OAuth client ID used by Google Sign-In on Android. Replace with your actual Web client ID. -->
-    <string name="default_web_client_id">CHANGE_ME_WEB_CLIENT_ID.apps.googleusercontent.com</string>
+    <!-- Web OAuth client ID used by Google Sign-In on Android. -->
+    <string name="default_web_client_id">318658794111-cv4dmqt8apft2vgp3r5duaoic7jnp4o6.apps.googleusercontent.com</string>
 </resources>
