@@ -255,29 +255,36 @@ export default function SignUp() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col justify-center bg-gradient-to-br from-green-50 to-blue-100 dark:from-gray-900 dark:to-gray-800 px-4 py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex flex-col justify-center bg-gradient-to-br from-green-50 to-blue-100 dark:from-gray-900 dark:to-gray-800 px-4 py-6 sm:py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+        <div className="text-center mb-8">
+          <div className="mb-6">
+            <div className="mx-auto h-16 w-16 bg-gradient-to-tr from-green-600 to-blue-600 rounded-2xl flex items-center justify-center mb-4">
+              <svg className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+              </svg>
+            </div>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3">
             Join Nourish
           </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
             Create your account and start your wellness journey
           </p>
         </div>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white dark:bg-gray-800 py-8 px-4 shadow-xl rounded-xl sm:px-10 border border-gray-200 dark:border-gray-700">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white dark:bg-gray-800 py-6 sm:py-8 px-4 sm:px-10 shadow-xl rounded-2xl border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
           {!session ? (
-            <div className="space-y-6">
+            <div className="space-y-5">
               {/* Google Sign-in Option */}
               <div>
                 <Button
                   type="button"
                   onClick={handleGoogle}
                   disabled={loading}
-                  className="group relative w-full flex justify-center py-3 px-4 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="group relative w-full flex justify-center py-4 px-4 border border-gray-300 dark:border-gray-600 text-base font-semibold rounded-xl text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
                 >
                   {loading ? (
                     <>
@@ -322,7 +329,7 @@ export default function SignUp() {
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="pl-10 block w-full appearance-none rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-3 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="pl-10 block w-full appearance-none rounded-xl border border-gray-300 dark:border-gray-600 px-3 py-4 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:text-sm text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
                       placeholder="Enter your full name"
                     />
                   </div>
@@ -342,7 +349,7 @@ export default function SignUp() {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10 block w-full appearance-none rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-3 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="pl-10 block w-full appearance-none rounded-xl border border-gray-300 dark:border-gray-600 px-3 py-4 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:text-sm text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
                       placeholder="Enter your email"
                     />
                   </div>
@@ -362,13 +369,13 @@ export default function SignUp() {
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 pr-10 block w-full appearance-none rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-3 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="pl-10 pr-10 block w-full appearance-none rounded-xl border border-gray-300 dark:border-gray-600 px-3 py-4 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:text-sm text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
                       placeholder="Create a password"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -389,13 +396,13 @@ export default function SignUp() {
                       required
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="pl-10 pr-10 block w-full appearance-none rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-3 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="pl-10 pr-10 block w-full appearance-none rounded-xl border border-gray-300 dark:border-gray-600 px-3 py-4 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:text-sm text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
                       placeholder="Confirm your password"
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                     >
                       {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -413,7 +420,7 @@ export default function SignUp() {
                       name="timezone"
                       value={timezone}
                       onChange={(e) => setTimezone(e.target.value)}
-                      className="pl-10 block w-full appearance-none rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-3 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="pl-10 block w-full appearance-none rounded-xl border border-gray-300 dark:border-gray-600 px-3 py-4 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:text-sm text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
                     >
                       {tzOptions.map((tz) => (
                         <option key={tz} value={tz}>
@@ -439,7 +446,7 @@ export default function SignUp() {
                       type="date"
                       value={dateOfBirth}
                       onChange={(e) => setDateOfBirth(e.target.value)}
-                      className="pl-10 block w-full appearance-none rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-3 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="pl-10 block w-full appearance-none rounded-xl border border-gray-300 dark:border-gray-600 px-3 py-4 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:text-sm text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
                     />
                   </div>
                 </div>
@@ -453,7 +460,7 @@ export default function SignUp() {
                     name="gender"
                     value={gender}
                     onChange={(e) => setGender(e.target.value)}
-                    className="block w-full appearance-none rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-3 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="block w-full appearance-none rounded-xl border border-gray-300 dark:border-gray-600 px-3 py-4 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:text-sm text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
                   >
                     <option value="">Select gender</option>
                     <option value="male">Male</option>
@@ -474,7 +481,7 @@ export default function SignUp() {
                       type="number"
                       value={height}
                       onChange={(e) => setHeight(e.target.value)}
-                      className="block w-full appearance-none rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-3 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="block w-full appearance-none rounded-xl border border-gray-300 dark:border-gray-600 px-3 py-4 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:text-sm text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
                       placeholder="170"
                     />
                   </div>
@@ -488,7 +495,7 @@ export default function SignUp() {
                       type="number"
                       value={weight}
                       onChange={(e) => setWeight(e.target.value)}
-                      className="block w-full appearance-none rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-3 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="block w-full appearance-none rounded-xl border border-gray-300 dark:border-gray-600 px-3 py-4 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:text-sm text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
                       placeholder="70"
                     />
                   </div>
@@ -503,7 +510,7 @@ export default function SignUp() {
                     name="activityLevel"
                     value={activityLevel}
                     onChange={(e) => setActivityLevel(e.target.value)}
-                    className="block w-full appearance-none rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-3 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="block w-full appearance-none rounded-xl border border-gray-300 dark:border-gray-600 px-3 py-4 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:text-sm text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
                   >
                     <option value="">Select activity level</option>
                     <option value="sedentary">Sedentary (little or no exercise)</option>
@@ -569,7 +576,7 @@ export default function SignUp() {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-base font-semibold rounded-xl text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
                 >
                   {loading ? (
                     <>
@@ -583,9 +590,9 @@ export default function SignUp() {
               </form>
 
               <div className="text-center">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
                   Already have an account?{' '}
-                  <a href="/auth/signin" className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
+                  <a href="/auth/signin" className="font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 p-1 -m-1 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
                     Sign in
                   </a>
                 </p>

@@ -1,17 +1,14 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import type { Route } from "next";
-import { useEffect, useRef, useState } from "react";
-import {
-  useNotifications,
-  syncSubscriptionWithServer,
-} from "@/utils/notifications";
+import { useNotifications, syncSubscriptionWithServer } from "@/utils/notifications";
+import { Loader2, Sparkles, Gem } from "lucide-react";
+import { AvatarWithFallback } from "../../components/ui/avatar";
 import { sendSessionHeartbeat } from "@/utils/sessions";
 import { initGoogleOneTap } from "@/utils/oneTap";
-import { Loader2, Sparkles, Gem, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Caveat } from "next/font/google";
 
@@ -34,6 +31,7 @@ type NavPath =
   | "/shadow";
 type DropdownPath = "/profile" | "/settings";
 type AuthPath = "/auth/signin";
+type Route = NavPath | DropdownPath | AuthPath;
 
 // Navigation items
 interface NavItem {
@@ -853,10 +851,10 @@ export default function Navbar() {
                   onClick={() => setDropdownOpen((v) => !v)}
                 >
                   <span className="sr-only">Open user menu</span>
-                  <img
-                    className="h-8 w-8 rounded-full"
-                    src={session?.user?.image || "/default-avatar.png"}
-                    alt={session?.user?.name || "User"}
+                  <AvatarWithFallback
+                    src={session?.user?.image}
+                    name={session?.user?.name}
+                    size="sm"
                   />
                   {status === "authenticated" && unreadCount > 0 && (
                     <span

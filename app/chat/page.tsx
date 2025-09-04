@@ -1,6 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
+import { AvatarWithFallback } from "../../components/ui/avatar";
 
 type Message = {
   id?: string;
@@ -10,6 +13,7 @@ type Message = {
 };
 
 export default function ChatPage() {
+  const { data: session } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -153,7 +157,7 @@ export default function ChatPage() {
             </div>
           )}
           {messages.map((m, i) => (
-            <Bubble key={i} role={m.role} timestamp={m.created_at}>
+            <Bubble key={i} role={m.role} timestamp={m.created_at} session={session}>
               {m.content}
             </Bubble>
           ))}
@@ -206,7 +210,7 @@ export default function ChatPage() {
   );
 }
 
-function Bubble({ role, timestamp, children }: { role: "user" | "assistant"; timestamp?: string; children: any }) {
+function Bubble({ role, timestamp, children, session }: { role: "user" | "assistant"; timestamp?: string; children: any; session: any }) {
   const isUser = role === "user";
   const ts = timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined;
   return (
@@ -219,7 +223,11 @@ function Bubble({ role, timestamp, children }: { role: "user" | "assistant"; tim
         {ts && <span className={`mt-1 block text-[10px] opacity-75 ${isUser ? 'text-blue-100' : 'text-gray-400'}`}>{ts}</span>}
       </div>
       {isUser && (
-        <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 grid place-items-center">🧑‍💻</div>
+        <AvatarWithFallback
+          src={session?.user?.image}
+          name={session?.user?.name}
+          size="sm"
+        />
       )}
     </div>
   );

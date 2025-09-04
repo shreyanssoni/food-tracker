@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { toast } from "sonner";
+import { createClient } from "@/utils/supabase/client";
+import { Loader2, Edit3, Save, X } from "lucide-react";
+import { AvatarWithFallback } from "../../components/ui/avatar";
 
 type Activity = "sedentary" | "light" | "moderate" | "very" | "super";
 type Goal = "maintain" | "lose" | "gain";
@@ -171,24 +175,11 @@ export default function ProfilePage() {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           {/* Avatar and user meta */}
-          <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden flex items-center justify-center text-gray-500 shrink-0">
-            {session?.user?.image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={session.user.image}
-                alt="avatar"
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <span className="text-sm font-medium">
-                {(session?.user?.name || session?.user?.email || "U")
-                  .toString()
-                  .trim()
-                  .charAt(0)
-                  .toUpperCase()}
-              </span>
-            )}
-          </div>
+          <AvatarWithFallback
+            src={session?.user?.image}
+            name={session?.user?.name}
+            size="lg"
+          />
           <div className="min-w-0">
             <h1 className="text-lg font-semibold truncate">Your Profile</h1>
             <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
