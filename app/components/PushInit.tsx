@@ -6,8 +6,6 @@ import { PushNotifications } from "@capacitor/push-notifications";
 async function ensureAndroidChannel() {
   try {
     // Create a default channel on Android (no-op on iOS/web)
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error - createChannel is available on Android platform
     await (PushNotifications as any).createChannel?.({
       id: "default",
       name: "Default",
