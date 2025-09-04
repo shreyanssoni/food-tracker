@@ -18,14 +18,31 @@ export default function SignIn() {
       // eslint-disable-next-line no-console
       console.log('Capacitor platform:', platform, 'isAndroidNative():', isAndroidNative());
       if (platform === 'android') {
-        const res = await signInWithGoogleNative();
+        try {
+          const res = await signInWithGoogleNative();
+          // eslint-disable-next-line no-console
+          console.log('Native sign-in result', res);
+          if (res?.ok) {
+            toast.success('Signed in');
+            router.replace('/');
+            return;
+          }
+          // If res not ok, fall through to web OAuth
+          toast.warning('Native Google sign-in unavailable. Using web sign-in…');
+        } catch (nativeErr) {
+          // eslint-disable-next-line no-console
+          console.warn('Native sign-in failed, falling back to web OAuth', nativeErr);
+          toast.warning('Native Google sign-in unavailable. Using web sign-in…');
+        }
+        // Fallback: Web OAuth via NextAuth
+        const webRes = await signIn('google', { callbackUrl: '/', redirect: false });
         // eslint-disable-next-line no-console
-        console.log('Native sign-in result', res);
-        if (res?.ok) {
+        console.log('Android fallback web sign-in result', webRes);
+        if (!webRes?.error) {
           toast.success('Signed in');
           router.replace('/');
         } else {
-          toast.error('Native Google sign-in did not complete. Please try again.');
+          toast.error(webRes.error || 'Google sign-in failed.');
         }
       } else {
         const res = await signIn('google', { callbackUrl: '/', redirect: false });

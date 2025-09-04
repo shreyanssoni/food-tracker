@@ -1,8 +1,8 @@
 import { Capacitor } from '@capacitor/core';
-import { signIn, signOut as nextAuthSignOut } from 'next-auth/react';
+import { signIn } from 'next-auth/react';
 
 export function isAndroidNative() {
-  return Capacitor.isNativePlatform?.() ? Capacitor.getPlatform() === 'android' : Capacitor.getPlatform() === 'android';
+  return Capacitor.getPlatform() === 'android';
 }
 
 export async function signInWithGoogleNative() {
@@ -13,7 +13,6 @@ export async function signInWithGoogleNative() {
   // Trigger native Google sign-in via Firebase Authentication
   const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
   const { user, credential } = await FirebaseAuthentication.signInWithGoogle({
-    // Ensure ID token is requested
     scopes: ['openid', 'email', 'profile'],
   });
 
@@ -32,16 +31,12 @@ export async function signInWithGoogleNative() {
     throw new Error(res.error);
   }
 
-  return { user, ok: res?.ok ?? true };
+  return { ok: true, user } as const;
 }
 
 export async function signOutNative() {
-  if (isAndroidNative()) {
-    try {
-      const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
-      await FirebaseAuthentication.signOut();
-    } catch {}
-  }
-  await nextAuthSignOut({ redirect: false });
+  if (!isAndroidNative()) return;
+  const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+  await FirebaseAuthentication.signOut();
+  await import('next-auth/react').then(({ signOut: nextAuthSignOut }) => nextAuthSignOut({ redirect: false }));
 }
-
