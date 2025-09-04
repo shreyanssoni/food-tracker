@@ -2,18 +2,30 @@
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { isAndroidNative, signInWithGoogleNative } from '@/utils/auth/nativeGoogle';
+import { useRouter } from 'next/navigation';
+import { Capacitor } from '@capacitor/core';
 
 export default function SignIn() {
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const handleGoogle = async () => {
     if (loading) return;
     setLoading(true);
     try {
-      if (isAndroidNative()) {
-        await signInWithGoogleNative();
+      const platform = Capacitor.getPlatform();
+      // eslint-disable-next-line no-console
+      console.log('Capacitor platform:', platform, 'isAndroidNative():', isAndroidNative());
+      if (platform === 'android') {
+        const res = await signInWithGoogleNative();
+        // eslint-disable-next-line no-console
+        console.log('Native sign-in result', res);
+        if (res?.ok) router.replace('/');
       } else {
-        await signIn('google', { callbackUrl: '/' });
+        const res = await signIn('google', { callbackUrl: '/', redirect: false });
+        // eslint-disable-next-line no-console
+        console.log('Web sign-in result', res);
+        if (!res?.error) router.replace('/');
       }
     } catch (e) {
       // eslint-disable-next-line no-console
