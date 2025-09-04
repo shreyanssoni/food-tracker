@@ -5,9 +5,21 @@ import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(req: Request) {
   try {
-    const { email, password, name } = await req.json();
+    const { 
+      email, 
+      password, 
+      name, 
+      timezone,
+      dateOfBirth,
+      gender,
+      height,
+      weight,
+      activityLevel,
+      dietaryRestrictions,
+      healthGoals
+    } = await req.json();
 
-    // Validate input
+    // Validate required input
     if (!email || !password || !name) {
       return NextResponse.json(
         { error: 'Email, password, and name are required' },
@@ -51,7 +63,7 @@ export async function POST(req: Request) {
     const userId = uuidv4();
     const verificationToken = require('crypto').randomBytes(32).toString('hex');
 
-    // Create user in database
+    // Create user in database with additional information
     const { error } = await supabase.from('app_users').insert({
       id: userId,
       email: email.toLowerCase(),
@@ -60,6 +72,14 @@ export async function POST(req: Request) {
       auth_provider: 'email',
       email_verified: false,
       verification_token: verificationToken,
+      timezone: timezone || 'UTC',
+      date_of_birth: dateOfBirth || null,
+      gender: gender || null,
+      height: height ? parseInt(height) : null,
+      weight: weight ? parseFloat(weight) : null,
+      activity_level: activityLevel || null,
+      dietary_restrictions: dietaryRestrictions || [],
+      health_goals: healthGoals || [],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -70,6 +90,19 @@ export async function POST(req: Request) {
         { error: 'Failed to create user' },
         { status: 500 }
       );
+    }
+
+    // Create user preferences
+    try {
+      await supabase.from('user_preferences').insert({
+        user_id: userId,
+        timezone: timezone || 'UTC',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+    } catch (prefError) {
+      console.error('Error creating user preferences:', prefError);
+      // Don't fail the signup if preferences fail
     }
 
     // TODO: Send verification email
