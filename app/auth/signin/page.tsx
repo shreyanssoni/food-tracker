@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
@@ -115,7 +116,7 @@ export default function SignIn() {
             <div className="text-xs text-gray-400">or</div>
             <div className="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
           </div>
-          <div className="space-y-2">
+          {/* <div className="space-y-2">
             {absoluteAuthHref ? (
               <a
                 href={absoluteAuthHref}
@@ -167,7 +168,7 @@ export default function SignIn() {
             >
               Debug: Test Custom Tab (Browser.open)
             </button>
-          </div>
+          </div> */}
           <div className="text-center text-sm text-gray-500 dark:text-gray-400">
             By continuing, you agree to our Terms of Service and Privacy Policy
           </div>

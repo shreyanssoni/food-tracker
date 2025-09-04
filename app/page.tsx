@@ -33,7 +33,7 @@ export default function HomePage() {
           </div>
           <div className="mt-4 flex flex-col sm:flex-row gap-3">
             <button
-              onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+              onClick={() => signIn()}
               className="inline-flex items-center justify-center rounded-full bg-blue-600 px-6 py-3 text-white hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-sm"
             >
               Get Started Free
@@ -184,7 +184,7 @@ export default function HomePage() {
             </p>
           </div>
           <button
-            onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+            onClick={() => signIn()}
             className="inline-flex items-center justify-center rounded-full bg-blue-600 px-5 py-2.5 text-white hover:bg-blue-700"
           >
             Get Started Free
