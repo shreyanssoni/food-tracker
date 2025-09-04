@@ -1,5 +1,4 @@
 import { Capacitor } from '@capacitor/core';
-import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { signIn, signOut as nextAuthSignOut } from 'next-auth/react';
 
 export function isAndroidNative() {
@@ -12,6 +11,7 @@ export async function signInWithGoogleNative() {
   }
 
   // Trigger native Google sign-in via Firebase Authentication
+  const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
   const { user, credential } = await FirebaseAuthentication.signInWithGoogle({
     // idToken & accessToken are returned in credential
     // You can also request extra scopes if you need them:
@@ -39,8 +39,10 @@ export async function signInWithGoogleNative() {
 export async function signOutNative() {
   if (isAndroidNative()) {
     try {
+      const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
       await FirebaseAuthentication.signOut();
     } catch {}
   }
   await nextAuthSignOut({ redirect: false });
 }
+
