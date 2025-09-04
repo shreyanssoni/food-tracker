@@ -130,6 +130,22 @@ export default function SignIn() {
             >
               Debug: Open Google sign-in (relative, no JS)
             </a>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const { Browser } = await import('@capacitor/browser');
+                  toast.message('Opening Custom Tab to Google…');
+                  await Browser.open({ url: 'https://accounts.google.com', presentationStyle: 'fullscreen' });
+                } catch (e) {
+                  console.error('Custom Tab open failed', e);
+                  toast.error('Failed to open Custom Tab via @capacitor/browser');
+                }
+              }}
+              className="block w-full text-center py-2 px-3 rounded-md border border-gray-200 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900"
+            >
+              Debug: Test Custom Tab (Browser.open)
+            </button>
           </div>
           <div className="text-center text-sm text-gray-500 dark:text-gray-400">
             By continuing, you agree to our Terms of Service and Privacy Policy
