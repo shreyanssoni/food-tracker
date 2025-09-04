@@ -123,8 +123,74 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'DB error (fcm tokens)' }, { status: 500 });
       }
 
-      if (!subs || subs.length === 0) results.push = { ok: false, error: 'No subscription' };
-      else {
+      if (!subs || subs.length === 0) {
+        // Check if user has FCM tokens instead
+        if (!fcmTokens || fcmTokens.length === 0) {
+          results.push = { ok: false, error: 'No subscription or FCM tokens' };
+        } else {
+          // User has FCM tokens but no web push subscriptions
+          let payload: PushPayload | null = null;
+          if (titleIn || bodyIn) {
+            payload = { title: titleIn || 'Nourish', body: bodyIn || '', url: urlIn && urlIn.startsWith('/') ? urlIn : '/suggestions' };
+          } else {
+            const slot = body.slot;
+            if (!slot) return NextResponse.json({ error: 'Provide either title/body or a slot' }, { status: 400 });
+            let tz = (body.timezone || '').trim();
+            if (!tz) {
+              const { data: pref, error: pErr } = await supabase.from('user_preferences').select('timezone').eq('user_id', targetUserId).maybeSingle();
+              if (pErr) return NextResponse.json({ error: 'DB error (prefs)' }, { status: 500 });
+              tz = (pref?.timezone as string) || process.env.DEFAULT_TIMEZONE || 'Asia/Kolkata';
+            }
+            payload = await generateMessageFor(slot, tz);
+          }
+
+          // Send FCM notifications only
+          const tokens = fcmTokens.map((t: any) => t.token);
+          let sent = 0;
+          const logs: Array<{ user_id: string; slot: string; title: string; body: string; url: string; success: boolean; status_code: number | null }> = [];
+          
+          try {
+            const fcmRes = await sendFcmToTokens(tokens, {
+              title: payload.title,
+              body: payload.body,
+              data: { url: payload.url || '/', slot: body.slot || 'midday' },
+            });
+            // Heuristic success: v1 returns { ok: true, results: [...] }
+            const fcmSuccess = !!(fcmRes && (fcmRes.ok === true || (Array.isArray(fcmRes.results) && fcmRes.results.length > 0)));
+            if (fcmSuccess) sent += tokens.length;
+            
+            // Log FCM sends
+            for (let i = 0; i < tokens.length; i++) {
+              logs.push({
+                user_id: targetUserId,
+                slot: body.slot || 'midday',
+                title: payload.title,
+                body: payload.body,
+                url: payload.url || '/',
+                success: fcmSuccess,
+                status_code: fcmSuccess ? 201 : null,
+              });
+            }
+          } catch (e) {
+            console.error('FCM send error', e);
+            // Log failed FCM sends
+            for (let i = 0; i < tokens.length; i++) {
+              logs.push({
+                user_id: targetUserId,
+                slot: body.slot || 'midday',
+                title: payload.title,
+                body: payload.body,
+                url: payload.url || '/',
+                success: false,
+                status_code: null,
+              });
+            }
+          }
+
+          if (logs.length) await supabase.from('push_sends').insert(logs);
+          results.push = { ok: true, attempted: tokens.length, sent, fcmOnly: true };
+        }
+      } else {
         // Payload
         let payload: PushPayload | null = null;
         if (titleIn || bodyIn) {
@@ -175,7 +241,7 @@ export async function POST(req: NextRequest) {
             if (fcmSuccess) sent += tokens.length;
             
             // Log FCM sends
-            for (const token of tokens) {
+            for (let i = 0; i < tokens.length; i++) {
               logs.push({
                 user_id: targetUserId,
                 slot: body.slot || 'midday',
@@ -189,7 +255,7 @@ export async function POST(req: NextRequest) {
           } catch (e) {
             console.error('FCM send error', e);
             // Log failed FCM sends
-            for (const token of tokens) {
+            for (let i = 0; i < tokens.length; i++) {
               logs.push({
                 user_id: targetUserId,
                 slot: body.slot || 'midday',

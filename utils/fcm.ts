@@ -118,12 +118,20 @@ async function sendViaLegacy(tokens: string[], msg: FcmMessage) {
 
 async function sendViaV1(tokens: string[], msg: FcmMessage) {
   const projectId = process.env.FIREBASE_PROJECT_ID;
-  if (!projectId) return null;
+  if (!projectId) {
+    console.log('[FCM] No FIREBASE_PROJECT_ID configured');
+    return null;
+  }
   if (!tokens.length) return { success: 0 } as const;
 
+  console.log('[FCM] Getting access token from service account');
   const accessToken = await getAccessTokenFromServiceAccount();
-  if (!accessToken) return null;
+  if (!accessToken) {
+    console.log('[FCM] Failed to get access token');
+    return null;
+  }
 
+  console.log('[FCM] Sending to', tokens.length, 'tokens via HTTP v1');
   // For multiple tokens, send as multicast by batching individual messages
   // HTTP v1 supports send via batch endpoints, but we'll loop for simplicity
   const results: any[] = [];
@@ -154,20 +162,30 @@ async function sendViaV1(tokens: string[], msg: FcmMessage) {
 
     if (!res.ok) {
       const text = await res.text();
+      console.log('[FCM] Failed to send to token:', res.status, text);
       results.push({ ok: false, status: res.status, error: text });
     } else {
-      results.push(await res.json());
+      const result = await res.json();
+      console.log('[FCM] Successfully sent to token:', result);
+      results.push(result);
     }
   }
   return { ok: true, results };
 }
 
 export async function sendFcmToTokens(tokens: string[], msg: FcmMessage) {
+  console.log('[FCM] Attempting to send to', tokens.length, 'tokens');
+  console.log('[FCM] Message:', msg);
+  console.log('[FCM] FCM_SERVER_KEY configured:', !!process.env.FCM_SERVER_KEY);
+  console.log('[FCM] FIREBASE_PROJECT_ID configured:', !!process.env.FIREBASE_PROJECT_ID);
+  
   // Try legacy if configured
   if (process.env.FCM_SERVER_KEY) {
+    console.log('[FCM] Using legacy FCM method');
     return sendViaLegacy(tokens, msg);
   }
   // Else try HTTP v1 via service account
+  console.log('[FCM] Using HTTP v1 FCM method');
   const v1 = await sendViaV1(tokens, msg);
   if (v1) return v1;
 

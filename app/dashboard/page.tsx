@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { useNotifications } from "@/utils/notifications";
 import { track } from "@/utils/analytics";
 import AvatarPanel from "../../components/AvatarPanel";
-import { useSession } from "next-auth/react";
+import { writeTodayTasksForWidget } from '@/utils/widget';
 
 export default function DashboardPage() {
   const supabase = createBrowserClient();
@@ -251,7 +251,18 @@ export default function DashboardPage() {
     })();
   }, [clockTick]);
 
-  // Load today's shadow commit for the small widget
+  // Sync today's tasks to Android widget via Capacitor Preferences (Android only)
+  useEffect(() => {
+    try {
+      const dueToday = tasks.filter((t) => {
+        if (t.owner_type === "shadow") return false; // hide shadow-owned tasks on dashboard
+        if (t.active === false) return false; // only active
+        return todayTaskIds.has(t.id) && !t.completedToday;
+      });
+      const payload = dueToday.map((t) => ({ id: t.id, title: t.title, done: !!t.completedToday }));
+      writeTodayTasksForWidget(payload);
+    } catch {}
+  }, [tasks, todayTaskIds]);
   useEffect(() => {
     (async () => {
       try {

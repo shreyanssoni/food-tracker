@@ -16,14 +16,26 @@ import java.util.concurrent.TimeUnit
 
 class TaskWidgetProvider : AppWidgetProvider() {
 
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        android.util.Log.d("TaskWidget", "Widget enabled")
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        android.util.Log.d("TaskWidget", "Widget disabled")
+    }
+
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         // Ensure periodic refresh is scheduled
         schedulePeriodicRefresh(context)
+        android.util.Log.d("TaskWidget", "onUpdate called with ${appWidgetIds.size} widgets")
         for (widgetId in appWidgetIds) {
             val views = RemoteViews(context.packageName, R.layout.widget_task)
 
             // Read tasks from shared prefs
             val (top, remaining) = readTopAndRemaining(context)
+            android.util.Log.d("TaskWidget", "Read tasks: top='$top', remaining=$remaining")
             views.setTextViewText(R.id.top_task, top ?: "No tasks for today")
             val remainingText = if (remaining > 0) "$remaining remaining" else "All caught up"
             views.setTextViewText(R.id.remaining_text, remainingText)
@@ -46,15 +58,19 @@ class TaskWidgetProvider : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.btn_refresh, refreshPending)
 
             appWidgetManager.updateAppWidget(widgetId, views)
+            android.util.Log.d("TaskWidget", "Widget $widgetId updated")
         }
     }
 
     override fun onReceive(context: Context?, intent: Intent?) {
         super.onReceive(context, intent)
+        android.util.Log.d("TaskWidget", "onReceive: action=${intent?.action}")
         if (context != null && intent?.action == ACTION_REFRESH) {
+            android.util.Log.d("TaskWidget", "Refreshing widgets")
             val mgr = AppWidgetManager.getInstance(context)
             val cn = ComponentName(context, TaskWidgetProvider::class.java)
             val ids = mgr.getAppWidgetIds(cn)
+            android.util.Log.d("TaskWidget", "Found ${ids.size} widget instances")
             onUpdate(context, mgr, ids)
         }
     }
@@ -70,6 +86,7 @@ class TaskWidgetProvider : AppWidgetProvider() {
     private fun readTopAndRemaining(context: Context): Pair<String?, Int> {
         val prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
         val json = prefs.getString("widget:tasks:today", "[]") ?: "[]"
+        android.util.Log.d("TaskWidget", "Read JSON from prefs: $json")
         val arr = JSONArray(json)
         if (arr.length() == 0) return Pair(null, 0)
         var remaining = 0
@@ -78,8 +95,9 @@ class TaskWidgetProvider : AppWidgetProvider() {
             val o = arr.getJSONObject(i)
             val done = o.optBoolean("done", false)
             if (!done) remaining++
-            if (top == null) top = o.optString("title", null)
+            if (top == null) top = o.optString("title", "")
         }
+        android.util.Log.d("TaskWidget", "Parsed: top='$top', remaining=$remaining")
         return Pair(top, remaining.coerceAtLeast(0))
     }
 

@@ -7,6 +7,7 @@ import type { NextAuthConfig } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import { OAuth2Client } from 'google-auth-library';
 import { randomUUID } from 'crypto';
+import { verifyPassword } from '@/utils/auth/password';
 
 const config: NextAuthConfig = {
   providers: [
@@ -15,12 +16,13 @@ const config: NextAuthConfig = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          prompt: 'consent',
+          prompt: 'select_account',
           access_type: 'offline',
           response_type: 'code',
           scope: 'openid email profile',
         },
       },
+      allowDangerousEmailAccountLinking: true,
     }),
     Credentials({
       id: 'google-onetap',
@@ -55,12 +57,63 @@ const config: NextAuthConfig = {
         }
       },
     }),
+    Credentials({
+      id: 'email-password',
+      name: 'Email and Password',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
+      },
+      async authorize(credentials) {
+        const { email, password } = credentials as { email: string; password: string };
+        if (!email || !password) {
+          return null;
+        }
+
+        const supabase = createAdminClient();
+        
+        // Get user by email
+        const { data: user, error } = await supabase
+          .from('app_users')
+          .select('id, email, password_hash, name, email_verified')
+          .eq('email', email.toLowerCase())
+          .eq('auth_provider', 'email')
+          .single();
+
+        if (error || !user) {
+          // Hash a dummy password to prevent timing attacks
+          await verifyPassword('dummy-password', '$2a$12$dummyhashdontuseinproduction');
+          return null;
+        }
+
+        // Verify password
+        const isValid = await verifyPassword(credentials.password, user.password_hash || '');
+        if (!isValid) {
+          return null;
+        }
+
+        // Check if email is verified
+        if (!user.email_verified) {
+          throw new Error('Email not verified');
+        }
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        };
+      },
+    }),
   ],
   // Allow Auth.js to accept the current host in development and when using tunnels.
   // Alternatively, you can set AUTH_TRUST_HOST=true in the environment.
   trustHost: true,
   callbacks: {
-    async signIn({ user }) {
+    async signIn({ user, account, profile }) {
+      // Handle email/password sign-in
+      if (account?.provider === 'email-password') {
+        return true; // Already handled in the authorize callback
+      }
       if (!user?.email) return false;
       try {
         const supabase = createClient();
@@ -167,16 +220,18 @@ const config: NextAuthConfig = {
       return token;
     },
   },
+  pages: {
+    signIn: '/auth/signin',
+    signOut: '/auth/signin',
+    error: '/auth/signin',
+    verifyRequest: '/auth/verify-request',
+  },
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60,
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',
-  pages: {
-    signIn: '/auth/signin',
-    error: '/auth/signin',
-  },
 };
 
 export const { handlers, auth, signIn, signOut } = NextAuth(config);

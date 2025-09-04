@@ -222,12 +222,17 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const notify = async (title: string, body: string, url: string) => {
       if (!origin || !secret) return;
       try {
-        await fetch(`${origin}/api/notify`, {
+        console.log('[TaskComplete] Sending notification:', { title, body, url, userId: user.id });
+        const response = await fetch(`${origin}/api/notify`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-cron-secret': secret },
           body: JSON.stringify({ userId: user.id, focused: true, push: true, title, body, url })
         });
-      } catch {}
+        const result = await response.json();
+        console.log('[TaskComplete] Notification result:', result);
+      } catch (e) {
+        console.error('[TaskComplete] Notification error:', e);
+      }
     };
 
     // Mirror into shadow-side log and daily aggregates
