@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
 import { toast } from 'sonner';
+import { signInWithGoogleNative } from '@/utils/auth/nativeGoogle';
 
 export default function SignIn() {
   const [loading, setLoading] = useState(false);
@@ -21,14 +22,35 @@ export default function SignIn() {
       // eslint-disable-next-line no-console
       console.log('Sign-in clicked. Capacitor platform:', platform);
       if (platform === 'android') {
-        // Deterministic absolute navigation to NextAuth Google sign-in
+        // 1) Try native sign-in via Firebase Authentication (best UX)
+        try {
+          const res = await signInWithGoogleNative();
+          // eslint-disable-next-line no-console
+          console.log('Native Google sign-in result:', res);
+          if (res?.ok) {
+            toast.success('Signed in');
+            router.replace('/');
+            return;
+          }
+        } catch (nativeErr) {
+          // eslint-disable-next-line no-console
+          console.warn('Native sign-in failed, falling back to Browser OAuth', nativeErr);
+        }
+
+        // 2) Fallback: open NextAuth sign-in in a Custom Tab (allowed by Google OAuth policy)
         const origin = typeof window !== 'undefined' ? window.location.origin : '';
         const base = (process.env.NEXT_PUBLIC_AUTH_URL || origin || '').replace(/\/$/, '');
         const authUrl = `${base}/api/auth/signin/google?callbackUrl=${encodeURIComponent(base + '/')}`;
         toast.message('Opening Google sign-in…');
         // eslint-disable-next-line no-console
-        console.log('Android absolute auth navigation to:', authUrl, 'origin:', origin, 'env base:', process.env.NEXT_PUBLIC_AUTH_URL);
-        window.location.assign(authUrl);
+        console.log('Android Browser.open to:', authUrl, 'origin:', origin, 'env base:', process.env.NEXT_PUBLIC_AUTH_URL);
+        try {
+          const { Browser } = await import('@capacitor/browser');
+          await Browser.open({ url: authUrl, presentationStyle: 'fullscreen' });
+        } catch (e) {
+          // Final fallback: try direct navigation in WebView (may be blocked by Google)
+          window.location.assign(authUrl);
+        }
         return;
       } else {
         const res = await signIn('google', { callbackUrl: '/', redirect: false });
