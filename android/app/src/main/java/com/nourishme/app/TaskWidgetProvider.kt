@@ -37,10 +37,24 @@ class TaskWidgetProvider : AppWidgetProvider() {
             val (top, remaining) = readTopAndRemaining(context)
             android.util.Log.d("TaskWidget", "Read tasks: top='$top', remaining=$remaining")
             views.setTextViewText(R.id.top_task, top ?: "No tasks for today")
-            val remainingText = if (remaining > 0) "$remaining remaining" else "All caught up"
+            val remainingText = if (remaining > 0) "$remaining left" else "All caught up"
             views.setTextViewText(R.id.remaining_text, remainingText)
 
-            // Add Task deep link: nourishme://app/tasks?action=new or https fallback
+            // Wire list view with RemoteViewsService
+            val svcIntent = Intent(context, TaskRemoteViewsService::class.java).apply {
+                data = Uri.parse(this.toUri(Intent.URI_INTENT_SCHEME))
+            }
+            views.setRemoteAdapter(R.id.list_view, svcIntent)
+
+            // Pending intent template for row clicks (toggle)
+            val toggleIntent = Intent(context, TaskWidgetProvider::class.java).apply { action = ACTION_TOGGLE }
+            val togglePending = PendingIntent.getBroadcast(
+                context, 0, toggleIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            views.setPendingIntentTemplate(R.id.list_view, togglePending)
+
+            // Add Task deep link
             val addIntent = Intent(Intent.ACTION_VIEW, Uri.parse("nourishme://app/tasks?action=new"))
             val addPending = PendingIntent.getActivity(
                 context, 0, addIntent,
@@ -48,7 +62,7 @@ class TaskWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.btn_add, addPending)
 
-            // Tap title to refresh the widget list immediately
+            // Refresh action
             val refreshIntent = Intent(context, TaskWidgetProvider::class.java).apply { action = ACTION_REFRESH }
             val refreshPending = PendingIntent.getBroadcast(
                 context, 0, refreshIntent,
@@ -57,26 +71,66 @@ class TaskWidgetProvider : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.title, refreshPending)
             views.setOnClickPendingIntent(R.id.btn_refresh, refreshPending)
 
+            // Compact toggle (tap top task toggles the first item)
+            readTopId(context)?.let { topId ->
+                val compactToggleIntent = Intent(context, TaskWidgetProvider::class.java).apply {
+                    action = ACTION_TOGGLE
+                    putExtra("task_id", topId)
+                }
+                val compactTogglePending = PendingIntent.getBroadcast(
+                    context, 1, compactToggleIntent,
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                )
+                views.setOnClickPendingIntent(R.id.top_task, compactTogglePending)
+            }
+
+            // Adjust compact vs list visibility based on size
+            applySizeMode(context, appWidgetManager, widgetId, views)
+
             appWidgetManager.updateAppWidget(widgetId, views)
+            appWidgetManager.notifyAppWidgetViewDataChanged(widgetId, R.id.list_view)
             android.util.Log.d("TaskWidget", "Widget $widgetId updated")
+        }
+    }
+
+    override fun onAppWidgetOptionsChanged(context: Context?, appWidgetManager: AppWidgetManager?, appWidgetId: Int, newOptions: android.os.Bundle?) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        if (context != null && appWidgetManager != null) {
+            val views = RemoteViews(context.packageName, R.layout.widget_task)
+            applySizeMode(context, appWidgetManager, appWidgetId, views)
+            appWidgetManager.updateAppWidget(appWidgetId, views)
         }
     }
 
     override fun onReceive(context: Context?, intent: Intent?) {
         super.onReceive(context, intent)
         android.util.Log.d("TaskWidget", "onReceive: action=${intent?.action}")
-        if (context != null && intent?.action == ACTION_REFRESH) {
-            android.util.Log.d("TaskWidget", "Refreshing widgets")
-            val mgr = AppWidgetManager.getInstance(context)
-            val cn = ComponentName(context, TaskWidgetProvider::class.java)
-            val ids = mgr.getAppWidgetIds(cn)
-            android.util.Log.d("TaskWidget", "Found ${ids.size} widget instances")
-            onUpdate(context, mgr, ids)
+        if (context != null) {
+            when (intent?.action) {
+                ACTION_REFRESH -> {
+                    android.util.Log.d("TaskWidget", "Refreshing widgets")
+                    val mgr = AppWidgetManager.getInstance(context)
+                    val cn = ComponentName(context, TaskWidgetProvider::class.java)
+                    val ids = mgr.getAppWidgetIds(cn)
+                    onUpdate(context, mgr, ids)
+                }
+                ACTION_TOGGLE -> {
+                    val id = intent.getStringExtra("task_id")
+                    if (!id.isNullOrEmpty()) {
+                        toggleTaskDone(context, id)
+                        val mgr = AppWidgetManager.getInstance(context)
+                        val cn = ComponentName(context, TaskWidgetProvider::class.java)
+                        val ids = mgr.getAppWidgetIds(cn)
+                        onUpdate(context, mgr, ids)
+                    }
+                }
+            }
         }
     }
 
     companion object {
         const val ACTION_REFRESH = "com.nourishme.app.REFRESH_WIDGET"
+        const val ACTION_TOGGLE = "com.nourishme.app.TOGGLE_TASK"
         fun requestRefresh(context: Context) {
             val intent = Intent(context, TaskWidgetProvider::class.java).apply { action = ACTION_REFRESH }
             context.sendBroadcast(intent)
@@ -110,5 +164,28 @@ class TaskWidgetProvider : AppWidgetProvider() {
             ExistingPeriodicWorkPolicy.KEEP,
             work
         )
+    }
+
+    private fun toggleTaskDone(context: Context, taskId: String) {
+        val prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
+        val json = prefs.getString("widget:tasks:today", "[]") ?: "[]"
+        val arr = JSONArray(json)
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            if (o.optString("id") == taskId) {
+                o.put("done", !o.optBoolean("done", false))
+                break
+            }
+        }
+        prefs.edit().putString("widget:tasks:today", arr.toString()).apply()
+    }
+
+    private fun applySizeMode(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int, views: RemoteViews) {
+        val opts = appWidgetManager.getAppWidgetOptions(widgetId)
+        val minHeight = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
+        val minWidth = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
+        val useList = minHeight >= 140 || minWidth >= 260
+        views.setViewVisibility(R.id.list_container, if (useList) android.view.View.VISIBLE else android.view.View.GONE)
+        views.setViewVisibility(R.id.compact_container, if (useList) android.view.View.GONE else android.view.View.VISIBLE)
     }
 }

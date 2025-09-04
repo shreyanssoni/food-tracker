@@ -87,23 +87,47 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <TimezoneMismatchPrompt />
           {/* Auto-enable/sync notifications on login */}
           <AutoEnableNotifications />
-          {/* Global toaster */}
-          <Toaster 
-            richColors 
-            position="bottom-right" 
-            theme="system"
-            expand={true}
-            visibleToasts={9}
-            closeButton={true}
-            toastOptions={{
-              duration: 4000,
-              style: {
-                zIndex: 99999,
-                position: 'fixed',
-              },
-              className: 'toast-custom',
-            }}
-          />
+          {/* Global toasters: mobile top-center, desktop bottom-right */}
+          {/* Mobile */}
+          <div className="md:hidden">
+            <Toaster
+              richColors
+              position="top-center"
+              theme="system"
+              expand={true}
+              visibleToasts={6}
+              closeButton={true}
+              toastOptions={{
+                duration: 3500,
+                style: {
+                  zIndex: 99999,
+                  position: 'fixed',
+                  top: 'max(12px, env(safe-area-inset-top))',
+                },
+                className: 'toast-custom',
+              }}
+            />
+          </div>
+          {/* Desktop */}
+          <div className="hidden md:block">
+            <Toaster
+              richColors
+              position="bottom-right"
+              theme="system"
+              expand={true}
+              visibleToasts={9}
+              closeButton={true}
+              toastOptions={{
+                duration: 4000,
+                style: {
+                  zIndex: 99999,
+                  position: 'fixed',
+                  bottom: '16px',
+                },
+                className: 'toast-custom',
+              }}
+            />
+          </div>
           <footer className="hidden md:block bg-surface border-t border-border mt-8">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
               <p className="text-center text-sm text-muted">

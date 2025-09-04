@@ -110,7 +110,12 @@ export default function ChatPage() {
     <div className="mx-auto max-w-3xl px-4 pb-[max(5rem,env(safe-area-inset-bottom))]">
       {/* Toast */}
       {toast && (
-        <div role="status" aria-live="polite" className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm px-4 py-2 rounded-full shadow-lg">
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed z-50 left-1/2 -translate-x-1/2 bg-gray-900/90 text-white text-sm px-4 py-2 rounded-full shadow-lg
+                     top-[max(1rem,env(safe-area-inset-top))] md:top-auto md:bottom-4"
+        >
           {toast}
         </div>
       )}

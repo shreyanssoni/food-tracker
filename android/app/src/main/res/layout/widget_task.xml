@@ -2,63 +2,112 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
     android:padding="12dp"
-    android:background="@android:color/white"
+    android:background="@drawable/widget_bg"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:minHeight="110dp">
+    android:minHeight="120dp">
 
-    <TextView
-        android:id="@+id/title"
-        android:text="Today's Tasks"
-        android:textStyle="bold"
-        android:textSize="16sp"
-        android:textColor="@android:color/black"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
-
-    <TextView
-        android:id="@+id/top_task"
-        android:text="No tasks for today"
-        android:textSize="15sp"
-        android:textColor="@android:color/black"
-        android:layout_marginTop="6dp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:maxLines="2"
-        android:ellipsize="end"/>
-
-    <TextView
-        android:id="@+id/remaining_text"
-        android:text="All caught up"
-        android:textSize="13sp"
-        android:textColor="#666666"
-        android:layout_marginTop="2dp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
-
+    <!-- Header with title, progress, and pet -->
     <LinearLayout
-        android:orientation="horizontal"
+        android:id="@+id/header"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="4dp">
+
+        <TextView
+            android:id="@+id/title"
+            android:text="Coach Tasks"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:textColor="@android:color/white"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"/>
+
+        <TextView
+            android:id="@+id/pet"
+            android:text="🐾"
+            android:textSize="18sp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <TextView
+            android:id="@+id/remaining_text"
+            android:text="All caught up"
+            android:textSize="12sp"
+            android:textColor="@android:color/white"
+            android:alpha="0.9"
+            android:layout_marginStart="8dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+    <!-- Compact single-task view (shown in smallest size) -->
+    <LinearLayout
+        android:id="@+id/compact_container"
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="10dp"
+        android:background="@drawable/widget_card"
         android:layout_marginTop="8dp">
 
-        <Button
-            android:id="@+id/btn_add"
-            android:text="Add Task"
+        <TextView
+            android:id="@+id/top_task"
+            android:text="No tasks for today"
+            android:textSize="15sp"
+            android:textColor="#101828"
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:textSize="12sp"
-            android:background="@android:color/holo_blue_light"
-            android:textColor="@android:color/white"/>
+            android:layout_height="wrap_content"
+            android:maxLines="2"
+            android:ellipsize="end"/>
 
-        <Button
-            android:id="@+id/btn_refresh"
-            android:text="⟳"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:textSize="16sp"
-            android:layout_marginStart="8dp"
-            android:background="@android:color/holo_green_light"
-            android:textColor="@android:color/white"/>
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp">
+
+            <Button
+                android:id="@+id/btn_add"
+                android:text="Add"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:textSize="12sp"
+                android:background="@drawable/widget_btn_primary"
+                android:textColor="@android:color/white"/>
+
+            <Button
+                android:id="@+id/btn_refresh"
+                android:text="⟳"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:textSize="16sp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/widget_btn_secondary"
+                android:textColor="@android:color/white"/>
+        </LinearLayout>
     </LinearLayout>
+
+    <!-- Expanded list view (shown when widget is larger) -->
+    <LinearLayout
+        android:id="@+id/list_container"
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="10dp"
+        android:background="@drawable/widget_card"
+        android:layout_marginTop="8dp"
+        android:visibility="gone">
+
+        <ListView
+            android:id="@+id/list_view"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:dividerHeight="6dp"
+            android:divider="@android:color/transparent"/>
+    </LinearLayout>
+
 </LinearLayout>

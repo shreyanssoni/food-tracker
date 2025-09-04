@@ -6,7 +6,7 @@ import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import org.json.JSONArray
 
-data class TaskItem(val title: String, val done: Boolean)
+data class TaskItem(val id: String, val title: String, val done: Boolean)
 
 class TaskRemoteViewsService : RemoteViewsService() {
     override fun onGetViewFactory(intent: Intent): RemoteViewsFactory = TaskViewsFactory(applicationContext)
@@ -34,6 +34,13 @@ class TaskViewsFactory(private val context: Context) : RemoteViewsService.Remote
         val rv = RemoteViews(context.packageName, R.layout.widget_task_row)
         rv.setTextViewText(R.id.task_title, item.title)
         rv.setViewVisibility(R.id.task_done, if (item.done) android.view.View.VISIBLE else android.view.View.GONE)
+
+        // Fill-in intent for toggle action
+        val fillIn = Intent().apply {
+            action = TaskWidgetProvider.ACTION_TOGGLE
+            putExtra("task_id", item.id)
+        }
+        rv.setOnClickFillInIntent(R.id.row_root, fillIn)
         return rv
     }
 
@@ -49,7 +56,7 @@ class TaskViewsFactory(private val context: Context) : RemoteViewsService.Remote
         val out = ArrayList<TaskItem>(arr.length())
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
-            out.add(TaskItem(o.optString("title"), o.optBoolean("done", false)))
+            out.add(TaskItem(o.optString("id"), o.optString("title"), o.optBoolean("done", false)))
         }
         return out
     }
