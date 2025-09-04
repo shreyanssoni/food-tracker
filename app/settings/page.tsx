@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useState } from 'react';
 import { useNotifications } from '@/utils/notifications';
 import { useSession } from 'next-auth/react';
@@ -255,6 +256,22 @@ export default function SettingsPage() {
                         : `Permission: ${notifStatus}`}
                     </span>
                   </div>
+                </div>
+              </div>
+
+              {/* Developer: temporary link to Push Debug */}
+              <div className="md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-gray-700 dark:text-gray-200">Developer</div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Temporary debug tools.</p>
+                  </div>
+                  <a
+                    href="/debug/push"
+                    className="px-3 py-1.5 rounded-full text-xs font-medium bg-purple-600 text-white hover:bg-purple-700"
+                  >
+                    Open Push Debug
+                  </a>
                 </div>
               </div>
             </div>
