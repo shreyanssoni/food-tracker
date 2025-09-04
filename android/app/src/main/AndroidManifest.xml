@@ -55,7 +55,8 @@
         <!-- App Widget Provider (Tasks list) -->
         <receiver
             android:name=".TaskWidgetProvider"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/widget_task_list_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.nourishme.app.REFRESH_WIDGET" />
@@ -68,7 +69,8 @@
         <!-- App Widget Provider (Food Pill) -->
         <receiver
             android:name=".FoodPillWidgetProvider"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/widget_food_pill_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="android.intent.action.CONFIGURATION_CHANGED" />
@@ -81,7 +83,8 @@
         <!-- App Widget Provider (Quick Actions) -->
         <receiver
             android:name=".QuickActionsWidgetProvider"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/widget_quick_actions_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="android.intent.action.CONFIGURATION_CHANGED" />
