@@ -102,8 +102,11 @@ export async function POST(req: NextRequest) {
         if ((dayCount ?? 0) >= 20) return NextResponse.json({ error: 'Rate limit exceeded (20/day)' }, { status: 429 });
       }
 
+      // Choose read client: admin when using secret or admin targeting another user; else session-scoped
+      const dbRead = (hasSecret || (meId && targetUserId !== meId && isAdmin)) ? createAdminClient() : supabase;
+
       // Subscriptions
-      const { data: subs, error: subErr } = await supabase
+      const { data: subs, error: subErr } = await dbRead
         .from('push_subscriptions')
         .select('endpoint, p256dh, auth, expiration_time')
         .eq('user_id', targetUserId)
@@ -114,7 +117,7 @@ export async function POST(req: NextRequest) {
       }
 
       // FCM tokens
-      const { data: fcmTokens, error: fcmErr } = await supabase
+      const { data: fcmTokens, error: fcmErr } = await dbRead
         .from('fcm_tokens')
         .select('token')
         .eq('user_id', targetUserId);
@@ -137,7 +140,7 @@ export async function POST(req: NextRequest) {
             if (!slot) return NextResponse.json({ error: 'Provide either title/body or a slot' }, { status: 400 });
             let tz = (body.timezone || '').trim();
             if (!tz) {
-              const { data: pref, error: pErr } = await supabase.from('user_preferences').select('timezone').eq('user_id', targetUserId).maybeSingle();
+              const { data: pref, error: pErr } = await dbRead.from('user_preferences').select('timezone').eq('user_id', targetUserId).maybeSingle();
               if (pErr) return NextResponse.json({ error: 'DB error (prefs)' }, { status: 500 });
               tz = (pref?.timezone as string) || process.env.DEFAULT_TIMEZONE || 'Asia/Kolkata';
             }
@@ -200,7 +203,7 @@ export async function POST(req: NextRequest) {
           if (!slot) return NextResponse.json({ error: 'Provide either title/body or a slot' }, { status: 400 });
           let tz = (body.timezone || '').trim();
           if (!tz) {
-            const { data: pref, error: pErr } = await supabase.from('user_preferences').select('timezone').eq('user_id', targetUserId).maybeSingle();
+            const { data: pref, error: pErr } = await dbRead.from('user_preferences').select('timezone').eq('user_id', targetUserId).maybeSingle();
             if (pErr) return NextResponse.json({ error: 'DB error (prefs)' }, { status: 500 });
             tz = (pref?.timezone as string) || process.env.DEFAULT_TIMEZONE || 'Asia/Kolkata';
           }
