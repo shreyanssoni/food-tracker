@@ -1179,10 +1179,11 @@ export default function Navbar() {
                 {status === "authenticated" ? (
                   <>
                     <div className="flex items-center gap-3">
-                      <img
-                        className="h-10 w-10 rounded-full"
-                        src={session?.user?.image || "/default-avatar.png"}
-                        alt={session?.user?.name || "User"}
+                      <AvatarWithFallback
+                        src={session?.user?.image || undefined}
+                        name={session?.user?.name}
+                        size="md"
+                        className="shrink-0"
                       />
                       <div>
                         <div className="text-base font-medium text-gray-800 dark:text-gray-100">
