@@ -31,21 +31,26 @@
             android:layout_height="wrap_content"/>
 
         <TextView
-            android:id="@+id/pet"
-            android:text="🐾"
-            android:textSize="18sp"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"/>
-
-        <TextView
             android:id="@+id/remaining_text"
             android:text="All caught up"
             android:textSize="13sp"
             android:textColor="@android:color/white"
             android:alpha="0.9"
-            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"/>
+
+        <Button
+            android:id="@+id/btn_add_header"
+            android:text="+ Tasks"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:textSize="13sp"
+            android:layout_marginStart="2dp"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:background="@drawable/btn_grad_indigo_blue"
+            android:textColor="@android:color/white"/>
     </LinearLayout>
 
     <!-- Subtle divider under header -->
@@ -75,34 +80,6 @@
             android:layout_height="wrap_content"
             android:maxLines="2"
             android:ellipsize="end"/>
-
-        <LinearLayout
-            android:orientation="horizontal"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp">
-
-            <Button
-                android:id="@+id/btn_add"
-                android:text="+ Tasks"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:textSize="13sp"
-                android:paddingLeft="16dp"
-                android:paddingRight="16dp"
-                android:background="@drawable/btn_grad_indigo_blue"
-                android:textColor="@android:color/white"/>
-
-            <Button
-                android:id="@+id/btn_refresh"
-                android:text="⟳"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:textSize="16sp"
-                android:layout_marginStart="8dp"
-                android:background="@drawable/widget_btn_secondary"
-                android:textColor="@android:color/white"/>
-        </LinearLayout>
     </LinearLayout>
 
     <!-- Expanded list view (shown when widget is larger) -->
@@ -119,7 +96,7 @@
         <ListView
             android:id="@+id/list_view"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="180dp"
             android:divider="@drawable/widget_list_divider"
             android:dividerHeight="1dp"
             android:scrollbars="vertical"
@@ -137,25 +114,6 @@
             android:textColor="#111827"
             android:gravity="center"
             android:visibility="gone"/>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="end"
-            android:layout_marginTop="8dp">
-
-            <Button
-                android:id="@+id/btn_add_list"
-                android:text="+ Tasks"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:textSize="13sp"
-                android:paddingLeft="16dp"
-                android:paddingRight="16dp"
-                android:background="@drawable/btn_grad_indigo_blue"
-                android:textColor="@android:color/white"/>
-        </LinearLayout>
     </LinearLayout>
 
 </LinearLayout>

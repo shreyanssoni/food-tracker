@@ -66,9 +66,8 @@ class TaskWidgetProvider : AppWidgetProvider() {
                     context, 0, addIntent,
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
                 )
-                views.setOnClickPendingIntent(R.id.btn_add, addPending)
-                // New "+ Tasks" button inside the list container
-                views.setOnClickPendingIntent(R.id.btn_add_list, addPending)
+                // Header level "+ Tasks" button
+                views.setOnClickPendingIntent(R.id.btn_add_header, addPending)
                 // Also allow tapping header to open tasks
                 views.setOnClickPendingIntent(R.id.header, addPending)
 
@@ -79,7 +78,6 @@ class TaskWidgetProvider : AppWidgetProvider() {
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
                 )
                 views.setOnClickPendingIntent(R.id.title, refreshPending)
-                views.setOnClickPendingIntent(R.id.btn_refresh, refreshPending)
 
                 // Compact: tapping top task also opens tasks screen
                 views.setOnClickPendingIntent(R.id.top_task, addPending)

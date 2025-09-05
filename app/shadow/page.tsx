@@ -443,7 +443,7 @@ export default function ShadowPage() {
     }
     return (
       <li
-        className={`px-3 py-2 flex items-center justify-between gap-3 rounded-xl border transition-all duration-200 shadow-sm
+        className={`px-3 py-2 flex items-start justify-between gap-3 rounded-xl border transition-all duration-200 shadow-sm
         ${
           t.is_user_done
             ? "bg-surface/70 border-blue-500/15"
@@ -452,7 +452,7 @@ export default function ShadowPage() {
         ${winnerGlow}
         ${shimmer ? " bg-purple-500/10" : ""}`}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-start gap-2 min-w-0 flex-1">
           {t.is_user_done ? (
             <CheckCircle2 className="w-4 h-4 text-blue-600 transition-transform duration-300" />
           ) : t.is_shadow_done ? (
@@ -464,9 +464,9 @@ export default function ShadowPage() {
           ) : (
             <span className="w-4 h-4 inline-block rounded-full border border-gray-300 dark:border-gray-700" />
           )}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div
-              className={`text-sm font-medium truncate ${t.is_user_done ? "text-foreground/80" : ""}`}
+              className={`text-sm font-medium whitespace-normal break-words leading-tight ${t.is_user_done ? "text-foreground/80" : ""}`}
             >
               {t.title || "Task"}
               {t.is_user_done && (
@@ -475,10 +475,17 @@ export default function ShadowPage() {
                 </span>
               )}
             </div>
-            <div className="text-xs text-muted-foreground flex items-center gap-2 min-w-0">
+            <div className="mt-0.5 text-xs text-muted-foreground flex flex-col gap-0.5 min-w-0 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
               {(() => {
-                const userLabel = t.user_time_label as string | undefined;
-                const shadowLabel = t.shadow_time_label as string | undefined;
+                const userLabelRaw = t.user_time_label as string | undefined;
+                const shadowLabelRaw = t.shadow_time_label as string | undefined;
+                // Replace plain space before AM/PM with non-breaking space to avoid orphaned line breaks
+                const nobreak = (s?: string) =>
+                  typeof s === "string"
+                    ? s.replace(/\s(AM|PM)$/i, "\u00A0$1")
+                    : s;
+                const userLabel = nobreak(userLabelRaw);
+                const shadowLabel = nobreak(shadowLabelRaw);
                 const eta =
                   typeof t.shadow_eta_minutes === "number"
                     ? t.shadow_eta_minutes
@@ -493,7 +500,7 @@ export default function ShadowPage() {
                 };
 
                 const You = (
-                  <span className="truncate">
+                  <span className="whitespace-nowrap">
                     <span className="text-foreground/70">You</span>{" "}
                     <span className="tabular-nums">{userLabel || "—"}</span>
                   </span>
@@ -503,21 +510,21 @@ export default function ShadowPage() {
                 if (eta != null && eta >= 0 && !t.is_shadow_done) {
                   // Show ETA countdown if shadow hasn't passed yet
                   Shadow = (
-                    <span className="truncate">
+                    <span className="whitespace-nowrap">
                       <span className="text-foreground/70">Shadow ETA</span>{" "}
                       <span className="tabular-nums">{fmtEta(eta)}</span>
                     </span>
                   );
                 } else if (t.is_shadow_done) {
                   Shadow = (
-                    <span className="truncate">
+                    <span className="whitespace-nowrap">
                       <span className="text-foreground/70">Shadow</span>{" "}
                       <span className="tabular-nums">{shadowLabel || "—"}</span>
                     </span>
                   );
                 } else {
                   Shadow = (
-                    <span className="truncate">
+                    <span className="whitespace-nowrap">
                       <span className="text-foreground/70">Shadow</span>{" "}
                       <span className="tabular-nums">{shadowLabel || "—"}</span>
                     </span>
@@ -526,9 +533,8 @@ export default function ShadowPage() {
 
                 return (
                   <>
-                    {You}
-                    <span className="opacity-50">•</span>
-                    {Shadow}
+                    <div className="min-w-0">{You}</div>
+                    <div className="min-w-0">{Shadow}</div>
                   </>
                 );
               })()}
